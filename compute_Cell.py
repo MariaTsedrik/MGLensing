@@ -164,7 +164,7 @@ def compute_covariance(Cosmo, Baryons, aIA, etaIA, betaIA=0., Flag_Model='HMcode
     return  Cov_theory   
 
 
-def compute_covariance_WL_3x2pt(Cosmo, Baryons, aIA, etaIA, betaIA=0., bias_array=np.ones(nbin), Delta_z=None, Flag_Model=False, Flag_Baryons=False, Flag_Probes='WL'):
+def compute_covariance_WL_3x2pt(Cosmo, Baryons, aIA, etaIA, betaIA=0., bias_array=np.ones(nbin), bias2_array=np.zeros(nbin), Delta_z=None, Flag_Model=False, Flag_Baryons=False, Flag_Probes='WL', Flag_savePk=False, bias_model='interpld'):
     Ez, rz = Ez_rz(Cosmo, zz_integr)
     k =(l_WL[:,None]+0.5)/rz
 
@@ -205,7 +205,7 @@ def compute_covariance_WL_3x2pt(Cosmo, Baryons, aIA, etaIA, betaIA=0., bias_arra
 
     for index_l, index_z in index_pknn:
         pk_m_l[index_l, index_z] = Pk_l_interp(zz_integr[index_z], k[index_l,index_z])
-    Pk = pk_m_l
+    Pk = pk_m_l     
     
     ###Add baryonic feedback 
     if Flag_Baryons == True:
@@ -215,6 +215,13 @@ def compute_covariance_WL_3x2pt(Cosmo, Baryons, aIA, etaIA, betaIA=0., bias_arra
             boost_BCemu[index_l, index_z] = boost_BCemu_interp(min(zz_integr[index_z], 2), k[index_l,index_z])
         Pk *= boost_BCemu
 
+    dic_Pk = {}
+    if Flag_savePk==True:
+        dic_Pk['Pmm']=pk_m_l 
+        dic_Pk['Pmm_baryons']=Pk
+        dic_Pk['ell']=l_WL 
+        dic_Pk['r_com']=rz 
+        dic_Pk['k']=k
 
     noise = {
     'LL': rms_shear**2./n_bar,
@@ -271,17 +278,30 @@ def compute_covariance_WL_3x2pt(Cosmo, Baryons, aIA, etaIA, betaIA=0., bias_arra
         # Compute window function W_G(z) of galaxy clustering for each bin:
         bias = np.zeros((nbin),'float64')
         # - case where there is one constant bias value b_i for each bin i
-        if bias_model == 'binned_constant' :
+        if bias_model == 'binned_constant':
             bias = bias_array
             W_G = np.zeros((zbin_integr, nbin), 'float64')
             W_G = bias[None,:] * Ez[:,None] * H0_h_c * eta_z
+            Cl_GG_int = W_G[None,:,:,None] * W_G[None,: , None, :] * Pk[:,:,None,None] / Ez[None,:,None,None] / rz[None,:,None,None] / rz[None,:,None,None] /H0_h_c
+            Cl_LG_int = W_L[:,:,:,None] * W_G[None,: , None, :] * Pk[:,:,None,None] / Ez[None,:,None,None] / rz[None,:,None,None] / rz[None,:,None,None] /H0_h_c
+        
         # - case where the bias is a single function b(z) for all bins
         elif bias_model == 'interpld':
             W_G = np.zeros((zbin_integr, nbin), 'float64')
             biasfunc = interp1d(z_bin_center, bias_array, bounds_error=False, fill_value="extrapolate")
             W_G =  (Ez * H0_h_c * biasfunc(zz_integr))[:,None] * eta_z    
+            Cl_GG_int = W_G[None,:,:,None] * W_G[None,: , None, :] * Pk[:,:,None,None] / Ez[None,:,None,None] / rz[None,:,None,None] / rz[None,:,None,None] /H0_h_c
+            Cl_LG_int = W_L[:,:,:,None] * W_G[None,: , None, :] * Pk[:,:,None,None] / Ez[None,:,None,None] / rz[None,:,None,None] / rz[None,:,None,None] /H0_h_c
+        
+        elif bias_model == 'binned_quadratic':
+            bias = bias_array
+            bias2 = bias2_array
+            W_G = np.zeros((lbin, zbin_integr, nbin), 'float64')
+            W_G = ( bias[None, None,:] + bias2[None, None, :]*k[:, :, None]**2 ) * Ez[None, :,None] * H0_h_c * eta_z[None, :, :]
+            Cl_GG_int = W_G[:,:,:,None] * W_G[:,: , None, :] * Pk[:,:,None,None] / Ez[None,:,None,None] / rz[None,:,None,None] / rz[None,:,None,None] /H0_h_c
+            Cl_LG_int = W_L[:,:,:,None] * W_G[:,: , None, :] * Pk[:,:,None,None] / Ez[None,:,None,None] / rz[None,:,None,None] / rz[None,:,None,None] /H0_h_c
+        
 
-        Cl_GG_int = W_G[None,:,:,None] * W_G[None,: , None, :] * Pk[:,:,None,None] / Ez[None,:,None,None] / rz[None,:,None,None] / rz[None,:,None,None] /H0_h_c
         Cl_GG     = trapz(Cl_GG_int,zz_integr,axis=1)[:nell_GC,:,:]
         for i in range(nbin):
             Cl_GG[:,i,i] += noise['GG']
@@ -293,7 +313,7 @@ def compute_covariance_WL_3x2pt(Cosmo, Baryons, aIA, etaIA, betaIA=0., bias_arra
                     l_GC[:], Cl_GG[:,Bin1,Bin2]))
 
     if Flag_Probes=='3x2pt':
-        Cl_LG_int = W_L[:,:,:,None] * W_G[None,: , None, :] * Pk[:,:,None,None] / Ez[None,:,None,None] / rz[None,:,None,None] / rz[None,:,None,None] /H0_h_c
+        #Cl_LG_int = W_L[:,:,:,None] * W_G[None,: , None, :] * Pk[:,:,None,None] / Ez[None,:,None,None] / rz[None,:,None,None] / rz[None,:,None,None] /H0_h_c
         Cl_LG     = trapz(Cl_LG_int,zz_integr,axis=1)[:nell_XC,:,:]
         Cl_GL     = np.transpose(Cl_LG,(0,2,1))
 
@@ -322,7 +342,13 @@ def compute_covariance_WL_3x2pt(Cosmo, Baryons, aIA, etaIA, betaIA=0., bias_arra
                     ells_GC[:], spline_GG[Bin1,Bin2])
                 Cov_theory_high[:,Bin1,Bin2] = itp.splev(
                     ells_WL[ell_jump:], spline_LL[Bin1,Bin2])
-        return Cov_theory, Cov_theory_high
+        if Flag_savePk==True:
+            dic_Pk['Cl_LL'] = Cl_LL
+            dic_Pk['Cl_GG'] = Cl_GG
+            dic_Pk['Cl_LG'] = Cl_LG
+            return Cov_theory, Cov_theory_high, dic_Pk
+        else:         
+            return Cov_theory, Cov_theory_high
     
     elif Flag_Probes=='WL':
         Cov_theory = np.zeros((len(ells_WL), nbin, nbin), 'float64')
