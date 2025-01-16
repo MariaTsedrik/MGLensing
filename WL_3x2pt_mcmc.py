@@ -423,8 +423,8 @@ output_header += f'points: ModelParsCosmo, ModelParsIA, (ModelParsBC), (b1...b10
 if Flag_test==False:
     print('prior dimensionality: ', prior.dimensionality())
     start = time.time()
-    sampler = Sampler(prior, loglikelihood_det, filepath='hdf5/'+hdf5_name+'.hdf5', n_live=3000)#, pool=14)
-    sampler.run(verbose=True, discard_exploration=True)#, n_eff=30000)
+    sampler = Sampler(prior, loglikelihood_det, filepath='hdf5/'+hdf5_name+'.hdf5', n_live=3000, pool=14)
+    sampler.run(verbose=True, discard_exploration=True, n_eff=30000)
     log_z = sampler.evidence()
 
 
