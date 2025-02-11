@@ -1,0 +1,93 @@
+observable: '3x2pt'
+#Observables
+#     'WL' -> shear-shear
+#     'GC' -> photo-clustering
+#     '3x2pt' -> 3x2pt
+
+specs:
+  fsky: 0.4 #0.5 LSST
+
+  lmin: 10
+  lbin: 100
+
+
+  lmax_WL: 3000
+  lmax_GC: 1000
+  lmax_XC: 1000
+  #cut_in_k:
+  #  k_max: [1., 1., 1., 1., 1.]
+
+  gal_per_sqarcmn: 30.0 #20.0 LSST
+  rms_shear: 0.30 #0.26 LSST
+  #Redshift info
+  nbin: 5
+  zmin: 0.001
+  zmax: 2.5 #1.5 for bacco
+  zbin_integr: 200
+  n_of_z: 0
+  #Redshift n(z) distribution
+  #     0 -> Euclid
+  #     1 -> LSST
+
+
+
+data:
+  NL_model: 0
+  #Nonlinear power spectrum
+  #     0 -> HMcode
+  #     1 -> bacco
+  #     2 -> nDGP
+  #     3 -> gLEMURS
+  bias_model: 0
+  # Photometric galaxy bias model (redshift dependence)
+  #     0 -> constant linear bias within bins
+  #     1 -> (b1, b2) constant within bins
+  #     2 -> bacco
+  IA_model: 0
+  # Intrinsic alignment model
+  #     0 -> zNLA
+  #     1 -> TATT
+  baryon_model: 0
+  # Baryonic flag
+  #     0 -> no baryons
+  #     1 -> Tagn HMcode
+  #     2 -> bcemu
+  #     3 -> bacco
+  params: ./params_data.yaml
+
+theory:
+  NL_model: 0
+  #Nonlinear power spectrum
+  #     0 -> HMcode
+  #     1 -> bacco
+  #     2 -> nDGP
+  #     3 -> gLEMURS
+  bias_model: 0
+  # Photometric galaxy bias model (redshift dependence)
+  #     0 -> linear interpolation
+  #     1 -> constant within bins
+  #     2 -> bacco
+  IA_model: 0
+  # Intrinsic alignment model
+  #     0 -> zNLA
+  #     1 -> TATT
+  baryon_model: 0
+  # Baryonic flag
+  #     0 -> no baryons
+  #     1 -> Tagn HMcode
+  #     2 -> bcemu
+  #     3 -> bacco
+  params: ./params.yaml
+
+output: 
+  chain_name: my_test
+sampler: 
+  #mcmc:
+  #  verbose: True
+  #  n_eff: 10000
+  #  n_live: 1000
+  #  pool: 14
+  #  resume: False
+  #  hdf5_name: 'test'
+  test:
+    plot: True   
