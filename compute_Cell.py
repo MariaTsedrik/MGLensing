@@ -7,7 +7,7 @@ import MGrowth as mg
 from multiprocessing import Pool
 import os
 import baccoemu as bacco
-import pyhmcode 
+#import pyhmcode 
 import cosmopower as cp
 from cosmopower import cosmopower_NN
 from scipy.stats import norm

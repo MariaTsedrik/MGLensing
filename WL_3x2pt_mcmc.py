@@ -1,25 +1,115 @@
-from scipy.integrate import trapz,simpson, quad
+from scipy.integrate import simpson, quad
 from scipy import interpolate as itp
 from scipy.interpolate import interp1d, RectBivariateSpline, InterpolatedUnivariateSpline
 from scipy.special import erf
 import numpy as np
 import MGrowth as mg
+print('loaded packages')
 from multiprocessing import Pool
 import os
 import baccoemu as bacco
-import pyhmcode 
+print('loaded packages')
+#import pyhmcode 
 import cosmopower as cp
 from cosmopower import cosmopower_NN
 from nautilus import Prior, Sampler
+print('loaded packages')
 from scipy.stats import norm
 import BCemu
+print('loaded packages')
 import math
-from compute_power_spectra import *
-from setup_and_priors import *
-from compute_Cell  import *
-from compute_baryonic_boost  import *
+#from compute_power_spectra import *
+#from setup_and_priors import *
+#from compute_Cell  import *
+#from compute_baryonic_boost  import *
 import time
 import matplotlib.pyplot as plt
+print('loaded packages')
+
+MasterPriors = {
+    'IA':
+    {    
+    'aIA': {'type':'U', 'p0': 1.72, 'p1': 0., 'p2': 12.1},
+    'etaIA': {'type':'U', 'p0': -0.41, 'p1': -7., 'p2': 6.17},
+    'betaIA': {'type':'U', 'p0': 0.0, 'p1': -10., 'p2': 10.}
+    },
+    'HMcode':
+    {
+    'Omega_m':  {'type':'U', 'p0':0.3085640138408304, 'p1': 0.15,     'p2': 0.6},    
+    'Omega_b':  {'type':'U', 'p0':0.04904844290657439, 'p1':0.03,    'p2': 0.07},  
+    'Ombh2': {'type':'G', 'p0': 0.02268, 'p1': 0.02268, 'p2': 0.00038},  
+    'h'      :  {'type':'U', 'p0': 0.68, 'p1': 0.5,     'p2': 0.9},      
+    'log10As' : {'type':'U', 'p0': 3.044, 'p1': 1.7, 'p2': 4.},
+    #'log10As' : {'type':'G', 'p0': 3.044, 'p1': 3.044, 'p2': 0.042}, #3 sigma Planck
+    #'ns': {'type':'U', 'p0': 0.97, 'p1': 0.6,'p2': 1.2},
+    'ns': {'type':'G', 'p0': 0.97, 'p1': 0.97,'p2': 0.004}, #1 sigma Planck
+    'Mnu': {'type':'U', 'p0': 0.06, 'p1': 0.0, 'p2': 0.5},
+    'w0': {'type':'U', 'p0': -1., 'p1': -3., 'p2': -0.3},    
+    'wa': {'type':'U', 'p0': 0., 'p1': -3., 'p2': 3.},  
+    #'w0': {'type':'U', 'p0': -1., 'p1': -1.5, 'p2': -0.3},    
+    #'wa': {'type':'U', 'p0': 0., 'p1': -0.5, 'p2': 0.5},  
+    },
+
+    'MGemus':
+    {
+    'gamma'   : {'type':'U', 'p0': 0.55,  'p1': 0.,     'p2': 1.},
+    'gamma0'   : {'type':'U', 'p0': 0.55,  'p1': 0.,     'p2': 1.},
+    'gamma1'   : {'type':'U', 'p0': 0.,  'p1': -0.7,     'p2': 0.7},
+    'q1'   : {'type':'U', 'p0': 0.,  'p1': -1.,     'p2': 2.},
+    'log10omegarc': {'type':'U', 'p0': np.log10(0.25), 'p1': -3, 'p2': 2.},
+    'Omega_m':  {'type':'U', 'p0':0.3085640138408304, 'p1': 0.2899,     'p2': 0.3392},    
+    'Omega_b':  {'type':'U', 'p0':0.04904844290657439, 'p1':0.04044,    'p2': 0.05686},  
+    'Ombh2': {'type':'G', 'p0': 0.02268, 'p1': 0.02268, 'p2': 0.00038},  #BBN
+    'h'   : {'type':'U', 'p0': 0.68, 'p1': 0.629,     'p2': 0.731},            
+    'log10As' : {'type':'U', 'p0': 3.044, 'p1': 2.7081, 'p2': 3.2958},
+    ##'log10As' : {'type':'G', 'p0': 3.044, 'p1': 3.044, 'p2': 0.042}, #3 sigma Planck
+    ##'ns': {'type':'U', 'p0': 0.97, 'p1': 0.9432,'p2': 0.9862},
+    'ns': {'type':'G', 'p0': 0.97, 'p1': 0.97,'p2': 0.004}, #1 sigma Planck
+    #'Mnu': {'type':'U', 'p0': 0.06, 'p1': 0.0, 'p2': 0.1576},
+    'Mnu': {'type':'U', 'p0': 0.06, 'p1': 0.0, 'p2': 0.5}, #for nDGP_v2
+
+    #'Omega_m':  {'type':'G', 'p0':0.3085640138408304, 'p1': 0.3085640138408304,     'p2': 0.0073}, #1 Planck    
+    #'h'   : {'type':'G', 'p0': 0.68, 'p1': 0.68,     'p2': 0.0054},  #1 Planck                    
+    #'log10As' : {'type':'G', 'p0': 3.044, 'p1': 3.044, 'p2': 0.014}, #1 sigma Planck
+
+
+    'mu1'   : {'type':'U', 'p0': 1.,  'p1': 0.9,     'p2': 2.},
+    'mu2'   : {'type':'U', 'p0': 1.,  'p1': 0.9,     'p2': 1.9},
+    'mu3'   : {'type':'U', 'p0': 1.,  'p1': 0.9,     'p2': 1.8},
+    'mu4'   : {'type':'U', 'p0': 1.,  'p1': 0.9,     'p2': 1.8},
+    'mu5'   : {'type':'U', 'p0': 1.,  'p1': 0.9,     'p2': 1.8},
+    'mu6'   : {'type':'U', 'p0': 1.,  'p1': 0.9,     'p2': 1.8},
+    'mu7'   : {'type':'U', 'p0': 1.,  'p1': 0.9,     'p2': 1.5},
+    'mu8'   : {'type':'U', 'p0': 1.,  'p1': 0.9,     'p2': 1.5},
+    'mu9'   : {'type':'U', 'p0': 1.,  'p1': 0.9,     'p2': 1.5},
+    'mu10'   : {'type':'U', 'p0': 1.,  'p1': 0.9,     'p2': 1.5},
+    'mu11'   : {'type':'U', 'p0': 1.,  'p1': 0.9,     'p2': 1.3},
+    },
+    'BCemu':
+    {
+    'log10Mc': {'type':'U', 'p0': 13.32, 'p1': 11.4, 'p2': 14.6}, #broad
+    #'log10Mc': {'type':'U', 'p0': 13.32, 'p1': 13.12, 'p2': 13.52}, #tight
+    #'log10Mc': {'type':'G', 'p0': 13.32, 'p1': 13.32, 'p2': 0.1},
+    #'log10Mc': {'type':'U', 'p0': 13.32, 'p1': 12.00, 'p2': 12.4}, #tight wrong test
+    'thej': {'type':'U', 'p0': 4.235, 'p1': 2.6, 'p2': 7.4},
+    'mu': {'type':'U', 'p0': 0.93, 'p1': 0.2, 'p2': 1.8},
+    'gamma_bc': {'type':'U', 'p0': 2.25, 'p1': 1.3, 'p2': 3.7},
+    'delta': {'type':'U', 'p0': 6.4, 'p1': 3.8, 'p2': 10.2},
+    'eta': {'type':'U', 'p0': 0.15, 'p1': 0.085, 'p2': 0.365},
+    'deta': {'type':'U', 'p0': 0.14, 'p1': 0.085, 'p2': 0.365}
+    },
+    'b1': {'type':'U', 'p0': 0.68, 'p1': 0., 'p2': 8.},
+    'b2': {'type':'U', 'p0': 0., 'p1': -50., 'p2': 50.},
+    'Delta_z': {'type':'G', 'p0': 0., 'p1': 0., 'p2': 0.001} #0.002*(1+z_i)
+}
+
+gal_per_sqarcmn = 30.0
+nbin = 10
+zmin = 0.001
+zmax  = 2.5 #4
+z_bin_edge = np.array([zmin, 0.418, 0.560, 0.678, 0.789, 0.900, 1.019, 1.155, 1.324, 1.576, 2.5])
+z_bin_center = np.array([(z_bin_edge[i]+z_bin_edge[i+1])/2 for i in range(nbin)])
+
 ################################################
 #               MODEL                         #
 ################################################
@@ -39,7 +129,6 @@ hdf5_name = 'test'
 description = 'LCDM on LCDM + no bar + vary cosmology'
 #chain_name = "GQfid_GQModel_lmax3k1k_PlanckBBN_nautilus3k_3x2ptprobe_broadMc"
 chain_name = "test"
-
 ################################################
 #               MOCK DATA                      #
 ################################################
@@ -86,6 +175,8 @@ bias2_array_fid = bias_array_fid*8.
 print('Probe: ', Flag_Probes)
 print('start computing mock data')
 
+
+"""
 if Flag_Probes=='3x2pt':
     Cov_observ, Cov_observ_high = compute_covariance_WL_3x2pt(Cosmo_fid, Baryons_fid, aIA_fid, etaIA_fid, betaIA=0., bias_array=bias_array_fid, Flag_Model=Model_fid, Flag_Baryons=Flag_Baryons_fid, Flag_Probes=Flag_Probes, bias_model=bias_model_fid)
     d_obs = np.linalg.det(Cov_observ) 
@@ -342,7 +433,7 @@ def loglikelihood_det(param_dict):
     return -0.5*chi2
 
 
-
+"""
 
 ################################################
 #               MCMC (nautilus)                #
@@ -350,6 +441,8 @@ def loglikelihood_det(param_dict):
 os.environ["OMP_NUM_THREADS"] = '1'
 if Model == 'HMcode':
     emu_name = 'HMcode'
+elif Model == 'bacco':
+    emu_name = 'bacco'    
 else:
     emu_name = 'MGemus'    
 prior = Prior()
@@ -379,14 +472,14 @@ if Flag_Baryons_Model == True:
             prior_dic[par_i] = '['+str(MasterPriors['BCemu'][par_i]['p1'])+', '+str(MasterPriors['BCemu'][par_i]['p2'])+']'
 if Flag_Probes != 'WL' and Flag_Fix_Bias==False:
     for i in range(nbin):
-        if MasterPriors['b']['type'] == 'G':
-            prior.add_parameter('b'+str(i+1), dist=norm(loc=MasterPriors['b']['p1'] , scale=MasterPriors['b']['p2']))
-            prior_dic['b'+str(i+1)] = 'N('+str(MasterPriors['b']['p1'])+', '+str(MasterPriors['b']['p2'])+')'
+        if MasterPriors['b1']['type'] == 'G':
+            prior.add_parameter('b1_'+str(i+1), dist=norm(loc=MasterPriors['b1']['p1'] , scale=MasterPriors['b1']['p2']))
+            prior_dic['b1_'+str(i+1)] = 'N('+str(MasterPriors['b1']['p1'])+', '+str(MasterPriors['b1']['p2'])+')'
         else:
-            prior.add_parameter('b'+str(i+1), dist=(MasterPriors['b']['p1'] , MasterPriors['b']['p2']))
-            prior_dic['b'+str(i+1)] = '['+str(MasterPriors['b']['p1'])+', '+str(MasterPriors['b']['p2'])+']'
+            prior.add_parameter('b1_'+str(i+1), dist=(MasterPriors['b1']['p1'] , MasterPriors['b1']['p2']))
+            prior_dic['b1_'+str(i+1)] = '['+str(MasterPriors['b1']['p1'])+', '+str(MasterPriors['b1']['p2'])+']'
         if  bias_model == 'binned_quadratic':
-            if MasterPriors['b']['type'] == 'G':
+            if MasterPriors['b2']['type'] == 'G':
                 prior.add_parameter('b2_'+str(i+1), dist=norm(loc=MasterPriors['b2']['p1'] , scale=MasterPriors['b2']['p2']))
                 prior_dic['b2_'+str(i+1)] = 'N('+str(MasterPriors['b2']['p1'])+', '+str(MasterPriors['b2']['p2'])+')'
             else:
@@ -399,27 +492,56 @@ if Flag_Probes != 'WL' and Flag_Fix_Bias==False:
 #            prior.add_parameter('Delta_z'+str(i+1), dist=norm(loc=MasterPriors['Delta_z']['p1'] , scale=MasterPriors['Delta_z']['p2']))
 #        else:
 #            prior.add_parameter('Delta_z'+str(i+1), dist=(MasterPriors['Delta_z']['p1'] , MasterPriors['Delta_z']['p2']))
+header_sections = [
+    "\n######################################",
+    "#######  Setup Specs ########",
+    "######################################",
+    "\n######################################",
+    "#######  Mock Data ########",
+    "######################################"
+]
 
-output_header = f'Mock data is computed with {Model_fid} for {Cosmo_fid}' 
-if Flag_Probes == '3x2pt' or Flag_Probes == 'GC':
-    output_header += f'\n with bias_model_fid = {bias_model_fid}: bias_array_fid = {bias_array_fid}'
+output_header = "\n".join(header_sections)
+output_header += f'\nMock/synthetic data is computed with {Model_fid} for the following fiducial cosmology:'
+output_header += "\n".join(f' {k} = {v}' for k, v in Cosmo_fid.items())
+
+if Flag_Probes in {'3x2pt', 'GC'}:
+    output_header += f'\nwith bias_model_fid = {bias_model_fid}:'
+    output_header += "\n".join(f' b1_{i} = {bias}' for i, bias in enumerate(bias_array_fid))
+    
     if bias_model_fid == 'binned_quadratic':
-        output_header += f' and bias2_array_fid = {bias2_array_fid}'
-if Flag_Baryons_fid==True:
-    output_header += f'\n and BCemu model with {Baryons_fid}' 
-output_header += f'\n --------- \n'     
-output_header += f'Model = {Model} with Euclid-like {Flag_Probes} probe: \n ModelParsCosmo = {ModelParsCosmo},  ModelParsIA = {ModelParsIA}'
-if Flag_Baryons_Model==True:
-    output_header += f'ModelParsBC = {ModelParsBC}'
-if ('Mnu' in ModelParsCosmo)==False:
-    output_header += f'\n fixed neutrinos with Mnu = {Mnu_model}'
-if Flag_Probes == '3x2pt' or Flag_Probes == 'GC':
-    output_header += f'  with bias_model = {bias_model}'     
-output_header += f'\n --------- \n'  
-output_header += f'Priors: \n {prior_dic}'  
-output_header += f'\n --------- \n'  
-output_header += f'points: ModelParsCosmo, ModelParsIA, (ModelParsBC), (b1...b10, b2_1...b2_10); log_w, log_l'  
+        output_header += "\n".join(f' b2_{i} = {bias2}' for i, bias2 in enumerate(bias2_array_fid))
 
+if Flag_Baryons_fid:
+    output_header += '\n Baryonification BCemu model:'
+    output_header += "\n".join(f' {k} = {v}' for k, v in Baryons_fid.items())
+
+output_header += "\n######################################\n#######  Model ########\n######################################\n"
+output_header += f'Model = {Model} with Euclid-like {Flag_Probes} probe:\n'
+output_header += f'ModelParsCosmo = {ModelParsCosmo},  ModelParsIA = {ModelParsIA}'
+
+if Flag_Baryons_Model:
+    output_header += f', ModelParsBC = {ModelParsBC}'
+
+if 'Mnu' not in ModelParsCosmo:
+    output_header += f'\nfixed neutrinos with Mnu = {Mnu_model}'
+
+if Flag_Probes in {'3x2pt', 'GC'}:
+    output_header += f'  with bias_model = {bias_model}'
+
+output_header += "\n######################################\n#######  Priors  ########\n######################################"
+output_header += "\n".join(f' {k} = {v}' for k, v in prior_dic.items())
+
+output_header += "\n######################################\n#######  Chain Steps  ########\n######################################\n"
+output_header += "   ".join(ModelParsCosmo)
+output_header += "   " + "   ".join(ModelParsIA)
+
+if Flag_Baryons_Model:
+    output_header += "   " + "   ".join(ModelParsBC)
+
+output_header += "   log_w   log_l"
+
+"""
 if Flag_test==False:
     print('prior dimensionality: ', prior.dimensionality())
     start = time.time()
@@ -433,5 +555,5 @@ if Flag_test==False:
     print('time for mcmc')
     print(description, ' : ', finish-start)
     np.savetxt("chains/"+chain_name+".txt", np.c_[points, log_w, log_l], header=output_header)
-
+"""
 np.savetxt("output_test.txt", np.zeros(4), header=output_header)

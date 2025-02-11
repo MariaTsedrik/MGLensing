@@ -4,10 +4,9 @@ Repository containing a likelihood for photometric probes with [emulated nonline
 
 ## To-do list
 Possible improvements:
-* save chains with a header containing the important information (like in cosmosis)
+* add varying parameters not in cosmo_pars (e.g., small omega's)
 * add nonlinear bias
 * add TATT
-* add magnification
 * add a scale-cut option in l_max different for each redshift bin
 * add a scale-cut option in k_max
-* test photo-z uncertainties
+* add photo-z uncertainties

@@ -4,7 +4,7 @@ from scipy.interpolate import interp1d, RectBivariateSpline, InterpolatedUnivari
 from scipy.special import erf
 import numpy as np
 import baccoemu as bacco
-import pyhmcode 
+#import pyhmcode 
 import cosmopower as cp
 from cosmopower import cosmopower_NN
 import math
@@ -37,8 +37,8 @@ x = kL*8.
 W = 3./pow(x, 3)* (np.sin(x) - x*np.cos(x))
 ###############
 
-hmc = pyhmcode.Cosmology()
-hmod = pyhmcode.Halomodel(pyhmcode.HMcode2020, verbose=False)
+#hmc = pyhmcode.Cosmology()
+#hmod = pyhmcode.Halomodel(pyhmcode.HMcode2020, verbose=False)
 emulator = bacco.Matter_powerspectrum()
 print('load emulators...')
 cp_nn_nDGP = cosmopower_NN(restore=True, 
@@ -110,16 +110,16 @@ def call_hmcode_with_boost_nDGP(CosmoDict):
     integrand = W**2*PL[-1]*kL**2/(2.*np.pi**2)
     sigma8 = np.sqrt(simpson(integrand, x=kL))
     # Set HMcode internal cosmological parameters
-    hmc.om_m = Omega_m
-    hmc.om_b = Omega_b
-    hmc.om_v = 1-Omega_m
-    hmc.h = h
-    hmc.ns = ns
-    hmc.sig8 = sigma8
-    hmc.m_nu = 0. #no neutrinos!!!
-    hmc.set_linear_power_spectrum(kL, zz_Pk, np.flip(PL,axis=0))
-    PNL_LCDM = pyhmcode.calculate_nonlinear_power_spectrum(hmc, hmod, verbose=False)
-    PNL = Boost_k*PNL_LCDM
+    #hmc.om_m = Omega_m
+    #hmc.om_b = Omega_b
+    #hmc.om_v = 1-Omega_m
+    #hmc.h = h
+    #hmc.ns = ns
+    #hmc.sig8 = sigma8
+    #hmc.m_nu = 0. #no neutrinos!!!
+    #hmc.set_linear_power_spectrum(kL, zz_Pk, np.flip(PL,axis=0))
+    #PNL_LCDM = pyhmcode.calculate_nonlinear_power_spectrum(hmc, hmod, verbose=False)
+    PNL = Boost_k #*PNL_LCDM
     PNL_interp = RectBivariateSpline(zz_Pk,
                                 kL,
                                 PNL ,
@@ -186,16 +186,16 @@ def call_hmcode_with_boost_gamma(CosmoDict):
     integrand = W**2*PL[-1]*kL**2/(2.*np.pi**2)
     sigma8 = np.sqrt(simpson(integrand, x=kL))
     # Set HMcode internal cosmological parameters
-    hmc.om_m = Omm
-    hmc.om_b = Omb
-    hmc.om_v = 1-Omm
-    hmc.h = h
-    hmc.ns = ns
-    hmc.sig8 = sigma8
-    hmc.m_nu = 0.
-    hmc.set_linear_power_spectrum(kL, zz_Pk, np.flip(PL,axis=0))
-    PNL_LCDM = pyhmcode.calculate_nonlinear_power_spectrum(hmc, hmod, verbose=False)
-    PNL = Boost_k*PNL_LCDM
+    #hmc.om_m = Omm
+    #hmc.om_b = Omb
+    #hmc.om_v = 1-Omm
+    #hmc.h = h
+    #hmc.ns = ns
+    #hmc.sig8 = sigma8
+    #hmc.m_nu = 0.
+    #hmc.set_linear_power_spectrum(kL, zz_Pk, np.flip(PL,axis=0))
+    #PNL_LCDM = pyhmcode.calculate_nonlinear_power_spectrum(hmc, hmod, verbose=False)
+    PNL = Boost_k#*PNL_LCDM
     PNL_interp = RectBivariateSpline(zz_Pk,
                                 kL,
                                 PNL ,
@@ -252,16 +252,16 @@ def call_hmcode_with_boost_gamma_z(CosmoDict):
     integrand = W**2*PL[-1]*kL**2/(2.*np.pi**2)
     sigma8 = np.sqrt(simpson(integrand, x=kL))
     # Set HMcode internal cosmological parameters
-    hmc.om_m = Omm
-    hmc.om_b = Omb
-    hmc.om_v = 1.-Omm
-    hmc.h = h
-    hmc.ns = ns
-    hmc.sig8 = sigma8
-    hmc.m_nu = 0.
-    hmc.set_linear_power_spectrum(kL, zz_Pk, np.flip(PL,axis=0))
-    PNL_LCDM = pyhmcode.calculate_nonlinear_power_spectrum(hmc, hmod, verbose=False)
-    PNL = Boost_k*PNL_LCDM
+    #hmc.om_m = Omm
+    #hmc.om_b = Omb
+    #hmc.om_v = 1.-Omm
+    #hmc.h = h
+    #hmc.sig8 = sigma8
+    #hmc.ns = ns
+    #hmc.m_nu = 0.
+    #hmc.set_linear_power_spectrum(kL, zz_Pk, np.flip(PL,axis=0))
+    #PNL_LCDM = pyhmcode.calculate_nonlinear_power_spectrum(hmc, hmod, verbose=False)
+    PNL = Boost_k #*PNL_LCDM
     PNL_interp = RectBivariateSpline(zz_Pk,
                                 kL,
                                 PNL ,
@@ -333,16 +333,16 @@ def call_hmcode_with_boost_mu_spline(CosmoDict):
     integrand = W**2*PL[-1]*kL**2/(2.*np.pi**2)
     sigma8 = np.sqrt(simpson(integrand, x=kL))
     # Set HMcode internal cosmological parameters
-    hmc.om_m = Omm
-    hmc.om_b = Omb
-    hmc.om_v = 1.-Omm
-    hmc.h = h
-    hmc.ns = ns
-    hmc.sig8 = sigma8
-    hmc.m_nu = 0.
-    hmc.set_linear_power_spectrum(kL, zz_Pk, np.flip(PL,axis=0))
-    PNL_LCDM = pyhmcode.calculate_nonlinear_power_spectrum(hmc, hmod, verbose=False)
-    PNL = Boost_k*PNL_LCDM
+    #hmc.om_m = Omm
+    #hmc.om_b = Omb
+    #hmc.om_v = 1.-Omm
+    #hmc.h = h
+    #hmc.ns = ns
+    #hmc.sig8 = sigma8
+    #hmc.m_nu = 0.
+    #hmc.set_linear_power_spectrum(kL, zz_Pk, np.flip(PL,axis=0))
+    #PNL_LCDM = pyhmcode.calculate_nonlinear_power_spectrum(hmc, hmod, verbose=False)
+    PNL = Boost_k #*PNL_LCDM
     PNL_interp = RectBivariateSpline(zz_Pk,
                                 kL,
                                 PNL ,

@@ -1,4 +1,4 @@
-from scipy.integrate import trapz,simpson, quad
+from scipy.integrate import simpson, quad
 from scipy import interpolate as itp
 from scipy.interpolate import interp1d, RectBivariateSpline, InterpolatedUnivariateSpline
 from scipy.special import erf
