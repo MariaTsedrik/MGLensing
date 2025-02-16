@@ -70,7 +70,7 @@ class Survey:
         zmin = config_dic_specs['zmin']
         zmax  = config_dic_specs['zmax'] 
 
-        self.z_bin_edge = np.array([zmin, 0.418, 0.560, 0.678, 0.789, 0.900, 1.019, 1.155, 1.324, 1.576, 2.5])
+        self.z_bin_edge = np.array(config_dic_specs['z_bin_edge']) #works only for 10 bins
         self.z_bin_center = np.array([(self.z_bin_edge[i]+self.z_bin_edge[i+1])/2 for i in range(self.nbin)])
 
         ###for integration###
@@ -87,3 +87,8 @@ class Survey:
         #self.photoerror_z = np.zeros((zbin_integr, self.nbin), 'float64')
 
         self.eta_z_s, self.eta_z_l = self.load_n_of_z(config_dic_specs['n_of_z'])
+        self.noise = {
+        'LL': self.rms_shear**2./self.n_bar,
+        'LG': 0.,
+        'GL': 0.,
+        'GG': 1./self.n_bar}

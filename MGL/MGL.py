@@ -5,12 +5,12 @@ from MGL.likelihood import *
 from MGL.powerspectra import *
 from MGL.specs import *
 
-class mgl(Survey, Theory, MGLike, Sampler):
+class mgl(Survey, Theory, MGLike, Sampling):
     def load_emulators(self):
         print('loading emulators...')
         self.hmcode_emu = HMcode2020()
         self.bcemu = BCemulator(self.zz_integr[-1])
-        #self.bacco_emu = BaccoEmu()
+        self.bacco_emu = BaccoEmu()
 
     def compute_data(self):
         if self.Probe=='3x2pt':
@@ -41,7 +41,8 @@ class mgl(Survey, Theory, MGLike, Sampler):
         try: self.PATH = self.config_dic['PATH']
         except: self.PATH = "./"
         self.chain_name = self.config_dic['output']['chain_name']
-
+        try: self.hdf5_name = self.config_dic['sampler']['emcee']['hdf5_name']
+        except: self.hdf5_name = "nautilus_test"
    
         self.data_model_dic = self.config_dic['data']
         self.theo_model_dic = self.config_dic['theory']

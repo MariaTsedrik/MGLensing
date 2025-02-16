@@ -28,17 +28,18 @@ specs:
   #Redshift n(z) distribution
   #     0 -> Euclid
   #     1 -> LSST
-
+  z_bin_edge: [0.001, 0.560, 0.789, 1.019, 1.324, 2.5]
+  #[0.001, 0.418, 0.560, 0.678, 0.789, 0.900, 1.019, 1.155, 1.324, 1.576, 2.5]
 
 
 data:
-  NL_model: 0
+  NL_model: 1
   #Nonlinear power spectrum
   #     0 -> HMcode
   #     1 -> bacco
   #     2 -> nDGP
   #     3 -> gLEMURS
-  bias_model: 0
+  bias_model: 2
   # Photometric galaxy bias model (redshift dependence)
   #     0 -> constant linear bias within bins
   #     1 -> (b1, b2) constant within bins
@@ -56,13 +57,13 @@ data:
   params: ./params_data.yaml
 
 theory:
-  NL_model: 0
+  NL_model: 1
   #Nonlinear power spectrum
   #     0 -> HMcode
   #     1 -> bacco
   #     2 -> nDGP
   #     3 -> gLEMURS
-  bias_model: 0
+  bias_model: 2
   # Photometric galaxy bias model (redshift dependence)
   #     0 -> linear interpolation
   #     1 -> constant within bins
@@ -77,17 +78,17 @@ theory:
   #     1 -> Tagn HMcode
   #     2 -> bcemu
   #     3 -> bacco
-  params: ./params.yaml
+  params: ./params_bacco_fix.yaml
 
 output: 
-  chain_name: my_test
+  chain_name: test_bacco_3x2pt_nobar_vary_Omm_and_b1L
 sampler: 
-  #mcmc:
-  #  verbose: True
-  #  n_eff: 10000
-  #  n_live: 1000
-  #  pool: 14
-  #  resume: False
-  #  hdf5_name: 'test'
+  mcmc:
+    verbose: True
+    n_eff: 10000
+    n_live: 1000
+    pool: 10
+    resume: False
+    hdf5_name: 'test_bacco_3x2pt_nobar'
   test:
     plot: True   

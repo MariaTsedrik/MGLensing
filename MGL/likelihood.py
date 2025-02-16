@@ -48,36 +48,68 @@ EmulatorRanges = {
         'thetainn_bc':  {'p1': -2.,          'p2': -0.52},
         'log10Minn_bc': {'p1': 9.,           'p2': 13.5}
         }
+
 }
 
 
 cosmo_pars = ['Omega_m', 'Ombh2', 'h', 'log10As', 'ns', 'w0', 'wa', 'Mnu']
 
 class MGLike:
+    def check_abundance(self, params):
+        conditions = [
+        'Omega_m',
+        ('Omega_c', 'Omch2'),
+        ('Omega_b', 'Ombh2'),
+        ('Omega_nu', 'Mnu', 'Omnuh2')]
+        all_present = all(any(key in params for key in condition) if isinstance(condition, tuple) else condition in params for condition in conditions)
+        if all_present:
+            raise ValueError("Invalid parameter set: too many densities are present in the dictionary.")
+        return "Check passed!"
+    def derived_pars(self, params):
+        #test it properly later, looks fishy
+        h2 = params['h']**2
+        params['Omega_b'] = params.get('Ombh2', params.get('Omega_b', 0) * h2) / h2
+        params['Ombh2'] = params.get('Ombh2', params.get('Omega_b', 0) * h2)
+        params['Omega_nu'] = params.get('Mnu', params.get(params.get('Omega_nu', 0) * 93.14 * h2, params.get('Omnuh2', 0) * 93.14))/(93.14 * h2) 
+        params['Mnu'] = params.get('Mnu', params.get('Omega_nu', 0) * 93.14 * h2)
+        params['Mnu'] = params.get('Mnu', params.get('Omnuh2', 0) * 93.14)
+        params['Omega_c'] = params.get('Omch2', 0) / h2
+        params['Omega_m'] = params.get('Omega_m', sum(params.get(k, 0) for k in ['Omega_c', 'Omega_b', 'Omega_nu']))
+        params['fb'] = params['Omega_b'] / params['Omega_m']
+        return params
+        
+    def check_ranges(self, params, model):
+        status = True
+        if  model['NL_model']==0:
+            params['Omega_c'] = params['Omega_m']-params['Omega_b']-params['Omega_nu']
+            if not all(EmulatorRanges['HMcode'][par_i]['p1'] <= params[par_i] <= EmulatorRanges['HMcode'][par_i]['p2'] for par_i in EmulatorRanges['HMcode']):
+                #raise ValueError("Not all parameters are within HMcode2020Emu ranges!")
+                status = False
+        elif  model['NL_model']==1:       
+            params['Omega_cb'] = params['Omega_m']-params['Omega_nu']
+            if not all(EmulatorRanges['bacco'][par_i]['p1'] <= params[par_i] <= EmulatorRanges['bacco'][par_i]['p2'] for par_i in EmulatorRanges['bacco']):
+                #raise ValueError("Not all parameters are within baccoemu ranges!")
+                status = False
+        if  model['baryon_model']!=0:
+            if any( params[par_i] < EmulatorRanges['baryons'][par_i]['p1'] or 
+                    params[par_i] > EmulatorRanges['baryons'][par_i]['p2']
+                    for par_i in params if par_i in EmulatorRanges['baryons']):
+                #raise ValueError("Not all baryonic parameters are within allowed ranges!")
+                status = False
+        return  status   
+
     def check_pars(self, param_dic, model_dic):
         param_dic_all = {par_i: param_dic[par_i] for par_i in param_dic.keys()}
         param_dic_all.update({par_i: self.ModelParsFix[par_i] for par_i in self.ModelParsFix.keys()})
-        print('param_dic_all: ', set(param_dic_all))
-        print('cosmo_par: ', set(cosmo_pars))
+
+        self.check_abundance(param_dic_all)
+        if 'h' not in param_dic_all.keys():
+            raise KeyError("h not found in dictionary")
+        self.derived_pars(param_dic_all)
         if not set(cosmo_pars).issubset(param_dic_all.keys()):
-            print("Some cosmo parameters are missing!!!")
-        param_dic_all['Omega_b'] = param_dic_all['Ombh2']/param_dic_all['h']**2    
-        param_dic_all['Omega_nu'] = param_dic_all['Mnu']/93.14/param_dic_all['h']**2
-        param_dic_all['fb'] = param_dic_all['Omega_b']/param_dic_all['Omega_m']
-        if  model_dic['NL_model']==0:
-            param_dic_all['Omega_c'] = param_dic_all['Omega_m']-param_dic_all['Omega_b']-param_dic_all['Omega_nu']
-            return param_dic_all, all(EmulatorRanges['HMcode'][par_i]['p1'] <= param_dic_all[par_i] <= EmulatorRanges['HMcode'][par_i]['p2'] for par_i in EmulatorRanges['HMcode'])
-
-        elif  model_dic['NL_model']==1:       
-            param_dic_all['Omega_cb'] = param_dic_all['Omega_m']-param_dic_all['Omega_nu']
-            return param_dic_all, all(EmulatorRanges['bacco'][par_i]['p1'] <= param_dic_all[par_i] <= EmulatorRanges['bacco'][par_i]['p2'] for par_i in EmulatorRanges['bacco'])
-
-        if  model_dic['baryon_model']!=0:
-            if any( param_dic_all[par_i] < EmulatorRanges['baryons'][par_i]['p1'] or 
-                    param_dic_all[par_i] > EmulatorRanges['baryons'][par_i]['p2']
-                    for par_i in param_dic_all if par_i in EmulatorRanges['baryons']):
-                return param_dic_all, False
-        return param_dic_all, True
+            raise KeyError("Some cosmo parameters are missing!!!")
+        status = self.check_ranges(param_dic_all, model_dic)
+        return param_dic_all, status
     
     def loglikelihood_det_3x2pt(self, param_dic):
         param_dic_all, status = self.check_pars(param_dic, self.theo_model_dic)
@@ -126,7 +158,7 @@ class MGLike:
     
 #-------------------------------------------------------------------------------
 
-class Sampler:
+class Sampling:
     def gen_output_header(self, mcmc=False):
         """
         Generates output header
@@ -163,7 +195,7 @@ class Sampler:
         theory_models = config.get("theory", {})
         params_data = self.params_data_dic
         params_priors = self.MasterPriors
-        print('params_priors', params_priors.keys())
+        #print('params_priors', params_priors.keys())
         output_header = f"""
         ##############################################################
         # Cosmology Pipeline Configuration
@@ -209,7 +241,7 @@ class Sampler:
         """
         if mcmc:
             for par_i in self.ModelPars:
-                output_header += "   " + "   ".join(par_i)
+                output_header += f"     {par_i}     "
             output_header += "   log_w   log_l"    
         return output_header
 
@@ -239,7 +271,7 @@ class Sampler:
 
 
 
-    def test(self, plot=False):
+    def test(self):
         dic_test = {par_i: self.MasterPriors[par_i]['p0'] for par_i in self.MasterPriors.keys()}
         dic_test.update({par_i: self.ModelParsFix[par_i] for par_i in self.ModelParsFix.keys()})
         #print(dic_test)
@@ -255,8 +287,7 @@ class Sampler:
             test_time = finish-start
         test_txt = "loglikelihood = "+ str(test_like)+ "  evaluation took  "+ str(test_time) + "  s"
         np.savetxt(self.PATH+"chains/chain_"+self.chain_name+".txt", [], header=self.gen_output_header()+test_txt)
-        if plot:
-            print('ahoi')
+
             
 
 
