@@ -93,7 +93,7 @@ def plot_kernel_of_z(show=True):
     if show:
         plt.show()
     else:
-        plt.savefig('figs/wl_kernels_of_z_'+MGLtest.Survey.survey_name+'.png')    
+        plt.savefig('figs/modelling/wl_kernels_of_z_'+MGLtest.Survey.survey_name+'.png')    
 
 
 

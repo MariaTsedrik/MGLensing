@@ -100,7 +100,7 @@ theory:
   params: ./params_bacco_test.yaml
 
 output: 
-  chain_name: lsst_test_bacco_3x2pt_nobar_heft_fix_cosmo_varyb_and_ia
+  chain_name: lsst_bacco_3x2pt_nobar_heft
 sampler: 
   mcmc:
     verbose: True
@@ -108,7 +108,7 @@ sampler:
     n_live: 1000
     pool: 14
     resume: False
-    hdf5_name: 'test_bacco_3x2pt_nobar_fix_sigma8cold_vary_ia'
+    hdf5_name: 'bacco_3x2pt_nobar'
   #----- not implemented yet:  
   minimiser:
     verbose: True

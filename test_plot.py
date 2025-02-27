@@ -88,7 +88,7 @@ def plot_n_of_z(show=True):
     if show:
         plt.show()
     else:
-        plt.savefig('figs/etas_of_z_'+MGLtest.Survey.survey_name+'.png')    
+        plt.savefig('figs/modelling/etas_of_z_'+MGLtest.Survey.survey_name+'.png')    
 
 def plot_p_k_fields(Pk, bPgg, bPgm, z_int_pick, bini, binj, show=True, name=""):
     def k2ell(x, ind=z_int_pick[0]):
@@ -129,7 +129,7 @@ def plot_p_k_fields(Pk, bPgg, bPgm, z_int_pick, bini, binj, show=True, name=""):
     if show:
         plt.show()
     else:
-        plt.savefig('figs/p_of_k'+name+'.png')  
+        plt.savefig('figs/modelling/p_of_k'+name+'.png')  
 
 def plot_cells(type, Cl_LL_list, Cl_LG_list, Cl_GG_list, show=True, names=""):
     types = ['LL', 'LG', 'GG']
@@ -162,7 +162,7 @@ def plot_cells(type, Cl_LL_list, Cl_LG_list, Cl_GG_list, show=True, names=""):
     if show:
         plt.show()
     else:
-        plt.savefig('figs/cells_'+types[type]+'_'+MGLtest.Survey.survey_name+'_cut_in_kmax.png')  
+        plt.savefig('figs/modelling/cells_'+types[type]+'_'+MGLtest.Survey.survey_name+'_cut_in_kmax.png')  
 
 def plot_pk_bias(z_int_pick, bini, binj, show=True):
     def k2ell(x, ind=z_int_pick[0]):
@@ -201,7 +201,7 @@ def plot_pk_bias(z_int_pick, bini, binj, show=True):
     if show:
         plt.show()
     else:
-        plt.savefig('figs/pgg_of_k.png')  
+        plt.savefig('figs/modelling/pgg_of_k.png')  
 
 def plot_pmm(z_int_pick, show=True):
     def k2ell(x, ind=z_int_pick[0]):
@@ -240,7 +240,7 @@ def plot_pmm(z_int_pick, show=True):
     if show:
         plt.show()
     else:
-        plt.savefig('figs/pmm_of_k.png')  
+        plt.savefig('figs/modelling/pmm_of_k.png')  
 
 _, rcom = MGLtest.get_expansion_and_rcom(params)
 
