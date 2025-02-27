@@ -33,6 +33,11 @@ chain2 = np.genfromtxt(file_path)
 chain2_pars = read_last_header_line(file_path)
 chain2_pars = chain2_pars[:-2]
 
+file_path = 'chains/chain_lsst_test_bacco_3x2pt_nobar_heft_fix_sigma8cold.txt'  
+chain = np.genfromtxt(file_path)
+chain_nuis_pars = read_last_header_line(file_path)
+chain_nuis_pars = chain_nuis_pars[:-2]
+
 colors = ['tab:orange', 'tab:blue', 'tab:green', 'tab:red']
 from matplotlib import rc
 rc('text', usetex=True)
@@ -51,18 +56,24 @@ sample2 = getdist.MCSamples(samples = chain2[:,:len(chain2_pars)],
                                     weights=np.exp(chain2[:, -2]),
                                     labels = [params_dic[p]
                                                 for p in chain2_pars])
+sample = getdist.MCSamples(samples = chain[:,:len(chain_nuis_pars)],
+                                    names = [i for i in chain_nuis_pars],
+                                    weights=np.exp(chain[:, -2]),
+                                    labels = [params_dic[p]
+                                                for p in chain_nuis_pars])
 g.settings.legend_fontsize=36
 g.settings.axes_fontsize=25
 g.settings.axes_labelsize=32
 g.settings.linewidth=3   
 g.settings.figure_legend_frame = False
 
-ModelPars = chain2_pars
-g.triangle_plot([sample2, sample1], 
+ModelPars = chain_nuis_pars
+g.triangle_plot(sample, #[sample2, sample1], 
     ModelPars,
 legend_labels = [
-'3x2pt hmcode b1+b2',
-'3x2pt hmcode b1'
+#'3x2pt hmcode b1+b2',
+#'3x2pt hmcode b1'
+'LSST 3x2pt bacco heft fix cosmo'
 ],
 legend_loc = 'upper right',
 contour_args = [{'filled':True, 'color': colors[0]}, 
@@ -83,5 +94,5 @@ if fiducials != None:
             
 
 #plt.show()
-plt.savefig('figs/test_posterior.png')  
+plt.savefig('figs/lsst_test_posterior_nuisances.png')  
 

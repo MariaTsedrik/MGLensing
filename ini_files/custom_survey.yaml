@@ -1,0 +1,13 @@
+
+fsky: 0.4 #0.5 LSST
+lmin: 10
+lbin: 100
+gal_per_sqarcmn: 30.0 #20.0 LSST
+rms_shear: 0.30 #0.26 LSST
+#Redshift info
+nbin: 5
+zmin: 0.001
+zmax: 2.5 
+zbin_integr: 200
+file_path: 
+z_bin_edge: [0.001, 0.560, 0.789, 1.019, 1.324, 2.5]
