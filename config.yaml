@@ -42,7 +42,7 @@ specs:
 
 
 data:
-  NL_model: 1
+  nl_model: 1
   #Nonlinear power spectrum
   #     0 -> HMcode
   #     1 -> bacco
@@ -51,13 +51,12 @@ data:
   #     3 -> gLEMURS
   #     4 -> μ-Σ 
   #     5 -> Dark Scattering (Interacting Dark Energy)
-  #     6 -> f(R)
   bias_model: 2
   # Photometric galaxy bias model (redshift dependence)
   #     0 -> constant linear bias within bins
   #     1 -> (b1, b2) constant within bins
   #     2 -> heft
-  IA_model: 0
+  ia_model: 0
   # Intrinsic alignment model
   #     0 -> zNLA
   #----- not implemented yet:
@@ -71,7 +70,7 @@ data:
   params: ./params_data.yaml
 
 theory:
-  NL_model: 1
+  nl_model: 1
   #Nonlinear power spectrum
   #     0 -> HMcode
   #     1 -> bacco
@@ -80,13 +79,12 @@ theory:
   #     3 -> gLEMURS
   #     4 -> μ-Σ 
   #     5 -> Dark Scattering (Interacting Dark Energy)
-  #     6 -> f(R)
   bias_model: 2
   # Photometric galaxy bias model (redshift dependence)
   #     0 -> linear interpolation
   #     1 -> constant within bins
   #     2 -> heft
-  IA_model: 0
+  ia_model: 0
   # Intrinsic alignment model
   #     0 -> zNLA
   #----- not implemented yet:
@@ -100,7 +98,7 @@ theory:
   params: ./params_bacco_test.yaml
 
 output: 
-  chain_name: lsst_bacco_3x2pt_nobar_heft
+  chain_name: lsst_bacco_3x2pt_nobar_heft_test
 sampler: 
   mcmc:
     verbose: True

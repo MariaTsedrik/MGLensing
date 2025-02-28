@@ -15,7 +15,7 @@ print(bias1_arr , bias2_arr)
 
 biasL1_arr = bias1_arr-1
 #Lagrangian co-evolution 
-biasL2_arr = 0.5*(0.9*biasL1_arr**2+0.5-8./21*biasL1_arr)#np.zeros(nbin)#
+biasL2_arr = 0.5*(0.9*biasL1_arr**2+0.5-8./21*biasL1_arr)
 #local-in-matter-density (LIMD) Lagrangian bias:
 biasLs2_arr = np.zeros(nbin)
 biasLlapl_arr = np.zeros(nbin) 
@@ -65,9 +65,10 @@ params = {
     'blaplL_5': biasLlapl_arr[4]   
 }     
 
-W_LL = MGLtest.get_wl_kernel(params, NL_model=0, IA_model=100)
+
 W_LL_tot = MGLtest.get_wl_kernel(params, NL_model=0, IA_model=0)
 W_IA = MGLtest.get_ia_kernel(params, NL_model=0, IA_model=0)
+W_LL = W_LL_tot-W_IA
 print(W_LL.shape, W_IA.shape)
 
 

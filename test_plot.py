@@ -25,6 +25,8 @@ print('biasL1_arr, biasL2_arr: ', biasL1_arr, biasL2_arr)
 
 params = {
     'Omega_m' :  0.315,
+    'Omega_c' :  0.315-0.05,
+    'Omega_cb' :  0.315,
     'Omega_nu':  0.,
     'As'      :  np.exp(3.07)*1.e-10,
     'Omega_b' :  0.05,
@@ -157,12 +159,12 @@ def plot_cells(type, Cl_LL_list, Cl_LG_list, Cl_GG_list, show=True, names=""):
     ax[int(nbin/2)][0].set_ylabel('$C^{\\rm '+types[type]+'}_{\ell}$')
 
     #ax[1, 1].annotate('LSST kernels with DES IA parameters: \n $A_{\\rm IA} = $'+str(round(params['aIA'], 2))+', $\eta_{\\rm IA} = $'+str(params['etaIA'])+', $\\beta_{\\rm IA} = $'+str(params['betaIA']), (1.1, 0.05), xycoords='axes fraction', clip_on=False) 
-    ax[1, 1].annotate('WL k_eff: '+str(MGLtest.config_dic['specs']['scale_cuts']['max_WL'])+'\n GC k_eff: '+str(MGLtest.config_dic['specs']['scale_cuts']['max_GC']), (1.1, 0.05), xycoords='axes fraction', clip_on=False) 
+    #ax[1, 1].annotate('WL k_eff: '+str(MGLtest.config_dic['specs']['scale_cuts']['max_WL'])+'\n GC k_eff: '+str(MGLtest.config_dic['specs']['scale_cuts']['max_GC']), (1.1, 0.05), xycoords='axes fraction', clip_on=False) 
     plt.tight_layout()
     if show:
         plt.show()
     else:
-        plt.savefig('figs/modelling/cells_'+types[type]+'_'+MGLtest.Survey.survey_name+'_cut_in_kmax.png')  
+        plt.savefig('figs/modelling/cells_'+types[type]+'_'+MGLtest.Survey.survey_name+'.png')  
 
 def plot_pk_bias(z_int_pick, bini, binj, show=True):
     def k2ell(x, ind=z_int_pick[0]):
@@ -245,12 +247,12 @@ def plot_pmm(z_int_pick, show=True):
 _, rcom = MGLtest.get_expansion_and_rcom(params)
 
 #plot power spectra (with/without baryons, with/without galaxy bias)
-k_ell, Pk =  MGLtest.get_Pmm(params, NL_model=0, baryon_model=0)
-_, bPgg =  MGLtest.get_bPgg(params, NL_model=0, bias_model=0)
-_, bPgm =  MGLtest.get_bPgm(params, NL_model=0, bias_model=0)
+k_ell, Pk =  MGLtest.get_pmm(params, nl_model=0, baryon_model=0)
+_, bPgg =  MGLtest.get_bpgg(params, nl_model=0, bias_model=0)
+_, bPgm =  MGLtest.get_bpgm(params, nl_model=0, bias_model=0)
 
-_, bPgg2 =  MGLtest.get_bPgg(params, NL_model=0, bias_model=1)
-_, bPgm2 =  MGLtest.get_bPgm(params, NL_model=0, bias_model=1)
+_, bPgg2 =  MGLtest.get_bpgg(params, nl_model=0, bias_model=1)
+_, bPgm2 =  MGLtest.get_bpgm(params, nl_model=0, bias_model=1)
 
 
 
@@ -259,30 +261,30 @@ bini=2
 binj=3
 
 
-_, Pk_bacco =  MGLtest.get_Pmm(params, NL_model=1, baryon_model=0)
-_, bPgg_bacco =  MGLtest.get_bPgg(params, NL_model=1, bias_model=2)
-_, bPgm_bacco =  MGLtest.get_bPgm(params, NL_model=1, bias_model=2)
+_, Pk_bacco =  MGLtest.get_pmm(params, nl_model=1, baryon_model=0)
+_, bPgg_bacco =  MGLtest.get_bpgg(params, nl_model=1, bias_model=2)
+_, bPgm_bacco =  MGLtest.get_bpgm(params, nl_model=1, bias_model=2)
 
 
-#plot_n_of_z(False)
-#plot_p_k_fields(Pk_bacco, bPgg_bacco, bPgm_bacco, z_int_pick, bini, binj, False, "_bacco")
-#plot_p_k_fields(Pk, bPgg, bPgm, z_int_pick, bini, binj, False, "_hmcode")
-#plot_pk_bias(z_int_pick, bini, binj, False)
-#plot_pmm(z_int_pick, False)
+plot_n_of_z(False)
+plot_p_k_fields(Pk_bacco, bPgg_bacco, bPgm_bacco, z_int_pick, bini, binj, False, "_bacco")
+plot_p_k_fields(Pk, bPgg, bPgm, z_int_pick, bini, binj, False, "_hmcode")
+plot_pk_bias(z_int_pick, bini, binj, False)
+plot_pmm(z_int_pick, False)
 
 
 
 
 #plot c_ells 
-l_WL, Cl_LL = MGLtest.get_cell_shear(params, NL_model=0, baryon_model=0, IA_model=0)
-l_GC, Cl_GG = MGLtest.get_cell_galclust(params, NL_model=0, bias_model=0, baryon_model=0)   
-l_XC, Cl_LG, Cl_GL = MGLtest.get_cell_galgal(params, NL_model=0, bias_model=0, baryon_model=0, IA_model=0)   
+l_WL, Cl_LL = MGLtest.get_cell_shear(params, nl_model=0, baryon_model=0, ia_model=0)
+l_GC, Cl_GG = MGLtest.get_cell_galclust(params, nl_model=0, bias_model=0, baryon_model=0)   
+l_XC, Cl_LG, Cl_GL = MGLtest.get_cell_galgal(params, nl_model=0, bias_model=0, baryon_model=0, ia_model=0)   
 
-_, Cl_LL_bacco = MGLtest.get_cell_shear(params, NL_model=1, baryon_model=0, IA_model=0)
-_, Cl_GG_bacco = MGLtest.get_cell_galclust(params, NL_model=1, bias_model=2,  baryon_model=0)   
-_, Cl_LG_bacco, Cl_GL_bacco = MGLtest.get_cell_galgal(params, NL_model=1, bias_model=2, baryon_model=0, IA_model=0)   
+_, Cl_LL_bacco = MGLtest.get_cell_shear(params, nl_model=1, baryon_model=0, ia_model=0)
+_, Cl_GG_bacco = MGLtest.get_cell_galclust(params, nl_model=1, bias_model=2,  baryon_model=0)   
+_, Cl_LG_bacco, Cl_GL_bacco = MGLtest.get_cell_galgal(params, nl_model=1, bias_model=2, baryon_model=0, ia_model=0)   
 
-l_WL_max, l_GC_max = MGLtest.Survey.ells_WL_max, MGLtest.Survey.ells_GC_max
+l_WL_max, l_GC_max = MGLtest.Survey.ells_wl_max, MGLtest.Survey.ells_gc_max
 
 for type_i in [0, 1, 2]:
     plot_cells(type_i, [Cl_LL, Cl_LL_bacco], [Cl_LG, Cl_LG_bacco], [Cl_GG, Cl_GG_bacco], False, names=['hmcode', 'bacco'])

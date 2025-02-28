@@ -6,11 +6,9 @@ import numpy as np
 import yaml
 import time
 from .theory import Theory
-from .specs import EuclidSetUp, LSSTSetUp, CustomSetUp
+from .specs import EuclidSetUp, LSSTSetUp
 from .likelihood import MGLike
 from datetime import timedelta
-# set MGlensing as working directory
-#os.chdir(os.path.dirname(os.path.realpath(__file__)))
 
 class MGL():
     def __init__(self, config_file):
@@ -25,8 +23,6 @@ class MGL():
             self.Survey = EuclidSetUp(self.config_dic['specs']['survey_info'], self.config_dic['specs']['scale_cuts'])  
         elif self.config_dic['specs']['survey_info'] == 'LSST_Y1' or self.config_dic['specs']['survey_info'] == 'LSST_Y10':
             self.Survey = LSSTSetUp(self.config_dic['specs']['survey_info'], self.config_dic['specs']['scale_cuts'])  
-        #elif self.config_dic['specs']['survey_info'] == 'Custom':
-        #    self.Survey = CustomSetUp(self.config_dic['specs']['custom_survey_path'], self.config_dic['specs']['scale_cuts'])  
         else:
             raise ValueError('Invalid survey name')   
  
@@ -95,112 +91,112 @@ class MGL():
 
         Sets:
             cov_observ (ndarray): The computed covariance matrix.
-            cov_observ_high (ndarray, optional): The block of the covariance for l>l_jump for shear, as we assume that lmax_GC<lmax_WL.
-            d_obs (float): The determinant of the covariance matrix.
-            d_obs_high (float, optional): The determinant of the high-ell shear covariance matrix for '3x2pt' probe.
+            cov_observ_high (ndarray, optional): The block of the covariance for l>l_jump for shear, as we assume that lmax_gc<lmax_wl.
+            det_obs (float): The determinant of the covariance matrix.
+            det_obs_high (float, optional): The determinant of the high-ell shear covariance matrix for '3x2pt' probe.
             ells_one_probe (ndarray, optional): The ell values for the 'WL' or 'GC' probe.
         """
 
         if self.probe=='3x2pt':
             cov_observ, cov_observ_high = self.Theo.compute_covariance_3x2pt(self.params_data_dic, self.data_model_dic)
-            d_obs = np.linalg.det(cov_observ) 
-            d_obs_high = np.linalg.det(cov_observ_high) 
+            det_obs = np.linalg.det(cov_observ) 
+            det_obs_high = np.linalg.det(cov_observ_high) 
             data_dic = {'cov_observ': cov_observ, 'cov_observ_high': cov_observ_high, 
-                        'd_obs': d_obs, 'd_obs_high': d_obs_high,
-                        'ells': self.Survey.ells_WL}
+                        'det_obs': det_obs, 'det_obs_high': det_obs_high,
+                        'ells': self.Survey.ells_wl}
         elif self.probe=='WL':
-            cov_observ = self.Theo.compute_covariance_WL(self.params_data_dic, self.data_model_dic)
-            d_obs = np.linalg.det(cov_observ) 
-            ells_one_probe = self.Survey.ells_WL
+            cov_observ = self.Theo.compute_covariance_wl(self.params_data_dic, self.data_model_dic)
+            det_obs = np.linalg.det(cov_observ) 
+            ells_one_probe = self.Survey.ells_wl
             data_dic = {'cov_observ': cov_observ, 
-                'd_obs': d_obs,
+                'det_obs': det_obs,
                 'ells': ells_one_probe}
         elif self.probe=='GC':
-            cov_observ = self.Theo.compute_covariance_GC(self.params_data_dic, self.data_model_dic)
-            d_obs = np.linalg.det(cov_observ) 
-            ells_one_probe = self.Survey.ells_GC 
+            cov_observ = self.Theo.compute_covariance_gc(self.params_data_dic, self.data_model_dic)
+            det_obs = np.linalg.det(cov_observ) 
+            ells_one_probe = self.Survey.ells_gc 
             data_dic = {'cov_observ': cov_observ, 
-                        'd_obs': d_obs,
+                        'det_obs': det_obs,
                         'ells': ells_one_probe}
             
         return data_dic  
 
-    def get_Pmm(self, params, NL_model, baryon_model=0):
-        _, _, k = self.Theo.get_Ez_rz_k(params, self.Survey.zz_integr)
-        Pk = self.Theo.get_Pmm(params, k, self.Survey.lbin, self.Survey.zz_integr, NL_model, baryon_model)
-        return   k, Pk  
+    def get_pmm(self, params, nl_model, baryon_model=0):
+        _, _, k = self.Theo.get_ez_rz_k(params, self.Survey.zz_integr)
+        pk = self.Theo.get_pmm(params, k, self.Survey.lbin, self.Survey.zz_integr, nl_model, baryon_model)
+        return k, pk
     
-    def get_bPgm(self, params, NL_model, bias_model, baryon_model=0):
-        _, _, k = self.Theo.get_Ez_rz_k(params, self.Survey.zz_integr)
+    def get_bpgm(self, params, nl_model, bias_model, baryon_model=0):
+        _, _, k = self.Theo.get_ez_rz_k(params, self.Survey.zz_integr)
         if bias_model==2:
-            Pgm, Pgm_extr = self.Theo.baccoemulator.get_heft(params, k, self.Survey.lbin, self.Survey.zz_integr) 
+            pgm, pgm_extr = self.Theo.BaccoEmulator.get_heft(params, k, self.Survey.lbin, self.Survey.zz_integr) 
         else:
-            Pgm = self.Theo.get_Pmm(params, k, self.Survey.lbin, self.Survey.zz_integr, NL_model, baryon_model)  
-            Pgm_extr = None
-        bPgm = self.Theo.get_bPgm(params, k, Pgm, Pgm_extr, self.Survey.nbin, bias_model)
-        return k, bPgm  
+            pgm = self.Theo.get_pmm(params, k, self.Survey.lbin, self.Survey.zz_integr, nl_model, baryon_model)  
+            pgm_extr = None
+        bpgm = self.Theo.get_bpgm(params, k, pgm, pgm_extr, self.Survey.nbin, bias_model)
+        return k, bpgm  
     
-    def get_bPgg(self, params, NL_model, bias_model, baryon_model=0):
-        _, _, k = self.Theo.get_Ez_rz_k(params, self.Survey.zz_integr)
+    def get_bpgg(self, params, nl_model, bias_model, baryon_model=0):
+        _, _, k = self.Theo.get_ez_rz_k(params, self.Survey.zz_integr)
         if bias_model==2:
-            Pgg, Pgg_extr = self.Theo.baccoemulator.get_heft(params, k, self.Survey.lbin, self.Survey.zz_integr) 
+            pgg, pgg_extr = self.Theo.BaccoEmulator.get_heft(params, k, self.Survey.lbin, self.Survey.zz_integr) 
         else:
-            Pgg = self.Theo.get_Pmm(params, k, self.Survey.lbin, self.Survey.zz_integr, NL_model, baryon_model) 
-            Pgg_extr = None
-        bPgg = self.Theo.get_bPgg(params, k, Pgg, Pgg_extr, self.Survey.nbin, bias_model)
-        return k, bPgg
+            pgg = self.Theo.get_pmm(params, k, self.Survey.lbin, self.Survey.zz_integr, nl_model, baryon_model) 
+            pgg_extr = None
+        bpgg = self.Theo.get_bpgg(params, k, pgg, pgg_extr, self.Survey.nbin, bias_model)
+        return k, bpgg
 
-    def get_cell_shear(self, params, NL_model, baryon_model=0, IA_model=0):
-        Ez, rz, k = self.Theo.get_Ez_rz_k(params, self.Survey.zz_integr)
-        Dz = self.Theo.get_growth(params, self.Survey.zz_integr, NL_model)
-        Pk = self.Theo.get_Pmm(params, k, self.Survey.lbin, self.Survey.zz_integr, NL_model, baryon_model)
-        Cl_LL, _ = self.Theo.get_cell_shear(params, Ez, rz, Dz, Pk, IA_model)
-        return  self.Survey.l_WL, Cl_LL
+    def get_cell_shear(self, params, nl_model, baryon_model=0, ia_model=0):
+        ez, rz, k = self.Theo.get_ez_rz_k(params, self.Survey.zz_integr)
+        dz = self.Theo.get_growth(params, self.Survey.zz_integr, nl_model)
+        pk = self.Theo.get_pmm(params, k, self.Survey.lbin, self.Survey.zz_integr, nl_model, baryon_model)
+        cl_ll, _ = self.Theo.get_cell_shear(params, ez, rz, dz, pk, ia_model)
+        return  self.Survey.l_wl, cl_ll
     
-    def get_wl_kernel(self, params, NL_model, IA_model=0):
-        Ez, rz, _ = self.Theo.get_Ez_rz_k(params, self.Survey.zz_integr)
-        Dz = self.Theo.get_growth(params, self.Survey.zz_integr, NL_model)
-        Omega_m = params['Omega_m']
-        W_L = self.Theo.get_wl_kernel(Omega_m, params, Ez, rz, Dz, IA_model)
-        return  W_L
+    def get_wl_kernel(self, params, nl_model, ia_model=0):
+        ez, rz, _ = self.Theo.get_ez_rz_k(params, self.Survey.zz_integr)
+        dz = self.Theo.get_growth(params, self.Survey.zz_integr, nl_model)
+        omega_m = params['Omega_m']
+        w_l = self.Theo.get_wl_kernel(omega_m, params, ez, rz, dz, ia_model)
+        return w_l
     
-    def get_ia_kernel(self, params, NL_model, IA_model=0):
-        Ez, _, _ = self.Theo.get_Ez_rz_k(params, self.Survey.zz_integr)
-        Dz = self.Theo.get_growth(params, self.Survey.zz_integr, NL_model)
-        Omega_m = params['Omega_m']
-        W_IA = self.Theo.get_ia_kernel(Omega_m, params, Ez, Dz, self.Survey.eta_z_s, self.Survey.zz_integr, IA_model)
-        return  W_IA
+    def get_ia_kernel(self, params, nl_model, ia_model=0):
+        ez, _, _ = self.Theo.get_ez_rz_k(params, self.Survey.zz_integr)
+        dz = self.Theo.get_growth(params, self.Survey.zz_integr, nl_model)
+        omega_m = params['Omega_m']
+        w_ia = self.Theo.get_ia_kernel(omega_m, params, ez, dz, self.Survey.eta_z_s, self.Survey.zz_integr, ia_model)
+        return w_ia
 
 
-    def get_cell_galclust(self, params, NL_model, bias_model, baryon_model=0):
-        Ez, rz, k = self.Theo.get_Ez_rz_k(params, self.Survey.zz_integr)
-        if bias_model==2:
-            Pgg, Pgg_extr = self.Theo.baccoemulator.get_heft(params, k, self.Survey.lbin, self.Survey.zz_integr) 
+    def get_cell_galclust(self, params, nl_model, bias_model, baryon_model=0):
+        ez, rz, k = self.Theo.get_ez_rz_k(params, self.Survey.zz_integr)
+        if bias_model == 2:
+            pgg, pgg_extr = self.Theo.BaccoEmulator.get_heft(params, k, self.Survey.lbin, self.Survey.zz_integr)
         else:
-            Pgg = self.Theo.get_Pmm(params, k, self.Survey.lbin, self.Survey.zz_integr, NL_model, baryon_model)
-            Pgg_extr = None
-        Cl_GG, _ = self.Theo.get_cell_galclust(params, Ez, rz, k, Pgg, Pgg_extr, bias_model)    
-        return  self.Survey.l_GC, Cl_GG
+            pgg = self.Theo.get_pmm(params, k, self.Survey.lbin, self.Survey.zz_integr, nl_model, baryon_model)
+            pgg_extr = None
+        cl_gg, _ = self.Theo.get_cell_galclust(params, ez, rz, k, pgg, pgg_extr, bias_model)
+        return self.Survey.l_gc, cl_gg
     
-    def get_cell_galgal(self, params, NL_model, bias_model, baryon_model=0, IA_model=0):
-        Ez, rz, k = self.Theo.get_Ez_rz_k(params, self.Survey.zz_integr)
-        Dz = self.Theo.get_growth(params, self.Survey.zz_integr, NL_model)
-        Pk = self.Theo.get_Pmm(params, k, self.Survey.lbin, self.Survey.zz_integr, NL_model, baryon_model)
-        Pmm = Pk
-        Pgg = Pk
-        Pgm = Pk 
-        Pgm_extr = None
-        Pgg_extr = None
-        if bias_model==2:
-            Pgg, Pgg_extr = Pgm, Pgm_extr = self.Theo.baccoemulator.get_heft(params, k, self.Survey.lbin, self.Survey.zz_integr) 
-        _, W_L = self.Theo.get_cell_shear(params, Ez, rz, Dz, Pmm, IA_model)
-        _, W_G = self.Theo.get_cell_galclust(params, Ez, rz, k, Pgg, Pgg_extr, bias_model)    
-        Cl_LG, Cl_GL = self.Theo.get_cell_galgal(params, Ez, rz, k, Pgm, Pgm_extr, W_L, W_G, bias_model)   
-        return  self.Survey.l_XC, Cl_LG, Cl_GL 
+    def get_cell_galgal(self, params, nl_model, bias_model, baryon_model=0, ia_model=0):
+        ez, rz, k = self.Theo.get_ez_rz_k(params, self.Survey.zz_integr)
+        dz = self.Theo.get_growth(params, self.Survey.zz_integr, nl_model)
+        pk = self.Theo.get_pmm(params, k, self.Survey.lbin, self.Survey.zz_integr, nl_model, baryon_model)
+        pmm = pk
+        pgg = pk
+        pgm = pk 
+        pgm_extr = None
+        pgg_extr = None
+        if bias_model == 2:
+            pgg, pgg_extr = pgm, pgm_extr = self.Theo.BaccoEmulator.get_heft(params, k, self.Survey.lbin, self.Survey.zz_integr) 
+        _, w_l = self.Theo.get_cell_shear(params, ez, rz, dz, pmm, ia_model)
+        _, w_g = self.Theo.get_cell_galclust(params, ez, rz, k, pgg, pgg_extr, bias_model)    
+        cl_lg, cl_gl = self.Theo.get_cell_cross(params, ez, rz, k, pgm, pgm_extr, w_l, w_g, bias_model)   
+        return self.Survey.l_xc, cl_lg, cl_gl 
     
     def get_expansion_and_rcom(self, params):
-        Ez, rz, _ = self.Theo.get_Ez_rz_k(params, self.Survey.zz_integr)
-        return Ez, rz
+        ez, rz, _ = self.Theo.get_ez_rz_k(params, self.Survey.zz_integr)
+        return ez, rz
 
     def gen_output_header(self):
         """
@@ -224,26 +220,21 @@ class MGL():
 
         def get_model_label(value, model_type):
             model_maps = {
-                "NL_model": {0: "HMcode", 1: "bacco", 2: "nDGP", 3: "gLEMURS"},
+                "nl_model": {0: "HMcode", 1: "bacco", 2: "nDGP", 3: "gLEMURS"},
                 "bias_model": {0: "b1 constant within bins", 1: "(b1, b2) constant within bins", 2: "bacco"},
-                "IA_model": {0: "zNLA", 1: "TATT"},
+                "ia_model": {0: "zNLA", 1: "TATT"},
                 "baryon_model": {0: "no baryons", 1: "Tagn HMcode", 2: "bcemu", 3: "bacco"}
             }
             return model_maps.get(model_type, {}).get(value, "Unknown")
 
         config = self.config_dic
         observable = get_observable_label(config.get("observable", -1))
-        specs = config.get("specs", {})
-        data_models = self.data_model_dic
-        theory_models = self.theo_model_dic
-        params_data = self.params_data_dic
-        params_priors = self.params_priors
 
         output_header = f"""
         ##############################################################
         # Cosmology Pipeline Configuration
         #------------------------------------------------------------
-        # Observable: {observable} ({config.get("observable", "N/A")})
+        # Observable: {observable}
         # Sky Fraction (fsky): {self.Survey.fsky}
         # Redshift Binning: {self.Survey.nbin} bins ({self.Survey.zmin} ≤ z ≤ {self.Survey.zmax})
         # for n(z) {self.Survey.survey_name}-like
@@ -253,31 +244,31 @@ class MGL():
         #   - l_max (GC, XC): {self.Survey.lmax_gc_vals}
         #
         # Data Model:
-        #   - Nonlinear Power Spectrum: {get_model_label(data_models.get("NL_model", -1), "NL_model")} ({data_models.get("NL_model", "N/A")})
-        #   - Galaxy Bias Model: {get_model_label(data_models.get("bias_model", -1), "bias_model")} ({data_models.get("bias_model", "N/A")})
-        #   - Intrinsic Alignments: {get_model_label(data_models.get("IA_model", -1), "IA_model")} ({data_models.get("IA_model", "N/A")})
-        #   - Baryon Model: {get_model_label(data_models.get("baryon_model", -1), "baryon_model")} ({data_models.get("baryon_model", "N/A")})
+        #   - Nonlinear Power Spectrum: {get_model_label(self.data_model_dic.get("nl_model", -1), "nl_model")} ({self.data_model_dic.get("nl_model", "N/A")})
+        #   - Galaxy Bias Model: {get_model_label(self.data_model_dic.get("bias_model", -1), "bias_model")} ({self.data_model_dic.get("bias_model", "N/A")})
+        #   - Intrinsic Alignments: {get_model_label(self.data_model_dic.get("ia_model", -1), "ia_model")} ({self.data_model_dic.get("ia_model", "N/A")})
+        #   - Baryon Model: {get_model_label(self.data_model_dic.get("baryon_model", -1), "baryon_model")} ({self.data_model_dic.get("baryon_model", "N/A")})
         #   - Parameters: 
         """
-        for par_i in params_data.keys():
-            output_header += f"\n            #       - {par_i}: {params_data[par_i]}"
-        #output_header += "\n".join(f'#       - {k}: {v}' for k, v in params_data.items())    
+        for par_i in self.params_data_dic.keys():
+            output_header += f"\n            #       - {par_i}: {self.params_data_dic[par_i]}"
+
         output_header += f"""
         #
         # Theory Model:
-        #   - Nonlinear Power Spectrum: {get_model_label(theory_models.get("NL_model", -1), "NL_model")} ({theory_models.get("NL_model", "N/A")})
-        #   - Galaxy Bias Model: {get_model_label(theory_models.get("bias_model", -1), "bias_model")} ({theory_models.get("bias_model", "N/A")})
-        #   - Intrinsic Alignments: {get_model_label(theory_models.get("IA_model", -1), "IA_model")} ({theory_models.get("IA_model", "N/A")})
-        #   - Baryon Model: {get_model_label(theory_models.get("baryon_model", -1), "baryon_model")} ({theory_models.get("baryon_model", "N/A")})
+        #   - Nonlinear Power Spectrum: {get_model_label(self.theo_model_dic.get("nl_model", -1), "nl_model")} ({self.theo_model_dic.get("nl_model", "N/A")})
+        #   - Galaxy Bias Model: {get_model_label(self.theo_model_dic.get("bias_model", -1), "bias_model")} ({self.theo_model_dic.get("bias_model", "N/A")})
+        #   - Intrinsic Alignments: {get_model_label(self.theo_model_dic.get("ia_model", -1), "ia_model")} ({self.theo_model_dic.get("ia_model", "N/A")})
+        #   - Baryon Model: {get_model_label(self.theo_model_dic.get("baryon_model", -1), "baryon_model")} ({self.theo_model_dic.get("baryon_model", "N/A")})
         #   - Parameter priors:
         """
-        for par_i in params_priors.keys():
-            if params_priors[par_i]['type'] == 'G':
-                output_header += f"\n           #       - {par_i}: N({params_priors[par_i]['p1']},{params_priors[par_i]['p2']})"
-            elif params_priors[par_i]['type'] == 'U':
-                output_header += f"\n           #       - {par_i}: [{params_priors[par_i]['p1']},{params_priors[par_i]['p2']}]"   
-            elif params_priors[par_i]['type'] == 'F':
-                output_header += f"\n           #       - {par_i}: {params_priors[par_i]['p0']}"
+        for par_i in self.params_priors.keys():
+            if self.params_priors[par_i]['type'] == 'G':
+                output_header += f"\n           #       - {par_i}: N({self.params_priors[par_i]['p1']},{self.params_priors[par_i]['p2']})"
+            elif self.params_priors[par_i]['type'] == 'U':
+                output_header += f"\n           #       - {par_i}: [{self.params_priors[par_i]['p1']},{self.params_priors[par_i]['p2']}]"   
+            elif self.params_priors[par_i]['type'] == 'F':
+                output_header += f"\n           #       - {par_i}: {self.params_priors[par_i]['p0']}"
         output_header += f"""
         ##############################################################
         """

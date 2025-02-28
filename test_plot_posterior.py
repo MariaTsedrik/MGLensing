@@ -24,15 +24,14 @@ def read_last_header_line(file_path):
         return []
 
 file_paths = [
-    #'chains/chaintest_hmcode_3x2pt_nobar.txt',  
-    #'chains/chaintest_hmcode_3x2pt_b1b2_nobar.txt',  
-    # 'chains/chain_lsst_test_bacco_3x2pt_nobar_heft_fix_cosmo_and_ia_sigma8cold.txt',  
+    'chains/chain_lsst_test_bacco_3x2pt_nobar_heft_w0wa_vary_cosmo_ia_b1L_and_b2L.txt',
     'chains/chain_lsst_test_bacco_3x2pt_nobar_heft_w0wa_vary_cosmo_ia_and_b1L.txt',
     'chains/chain_lsst_test_bacco_3x2pt_nobar_heft_w0wa_vary_cosmo_and_ia.txt', 
     'chains/chain_lsst_test_bacco_3x2pt_nobar_heft_w0wa.txt', ]  
 
 file_name = 'lsst_test_posterior_cosmo_vars'
 legend_labels = [
+'cosmo+ia+b1+b2: 2:07:11',
 'cosmo+ia+b1: 1:38:32',
 'cosmo+ia: 0:50:57',
 'cosmo: 0:35:15']
