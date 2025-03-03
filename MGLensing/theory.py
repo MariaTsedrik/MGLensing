@@ -890,6 +890,28 @@ class Theory:
                 raise ValueError("Invalid baryon_model option.")
             pk *= boost_bar
         return pk
+    
+    def get_pk_nl(self, params_dic, k, lbin, zz_integr, nl_model=0):
+        if nl_model == NL_MODEL_HMCODE:
+            pk = self.HMcode2020Emulator.get_pk(params_dic, k, lbin, zz_integr)
+        elif nl_model == NL_MODEL_BACCO:
+            pk = self.BaccoEmulator.get_pk(params_dic, k, lbin, zz_integr)
+        else:
+            raise ValueError("Invalid nl_model option.")
+        return pk
+
+    def get_bar_boost(self, params_dic, k, lbin, zz_integr, baryon_model=0):
+        if baryon_model == NO_BARYONS:
+            boost_bar = np.ones((lbin, len(zz_integr)), 'float64')
+        elif baryon_model == BARYONS_HMCODE:
+            boost_bar = self.HMcode2020Emulator.get_barboost(params_dic, k, lbin, zz_integr)
+        elif baryon_model == BARYONS_BCEMU:
+            boost_bar = self.BCemulator.get_barboost(params_dic, k, lbin, zz_integr)
+        elif baryon_model == BARYONS_BACCO:
+            boost_bar = self.BaccoEmulator.get_barboost(params_dic, k, lbin, zz_integr)
+        else:
+            raise ValueError("Invalid baryon_model option.")
+        return boost_bar
 
     def compute_covariance_wl(self, params_dic, model_dic):
         """
@@ -916,9 +938,9 @@ class Theory:
         # compute growth factor
         dz, _ = self.get_growth(params_dic, self.Survey.zz_integr, model_dic['nl_model'])
         # compute matter-matter power spectrum
-        pk = self.get_pmm(params_dic, k, self.Survey.lbin, self.Survey.zz_integr, model_dic['nl_model'], model_dic['baryon_model'])
+        pmm = self.get_pmm(params_dic, k, self.Survey.lbin, self.Survey.zz_integr, model_dic['nl_model'], model_dic['baryon_model'])
         # compute weak lensing angular power spectra
-        cl_wl, _ = self.get_cell_shear(params_dic, ez, rz, dz, pk, model_dic['ia_model'])
+        cl_wl, _ = self.get_cell_shear(params_dic, ez, rz, dz, pmm, model_dic['ia_model'])
         # create an interpolator at the binned ells
         spline_ll = np.empty((self.Survey.nbin, self.Survey.nbin), dtype=(list, 3))
         for bin1 in range(self.Survey.nbin):
@@ -977,16 +999,20 @@ class Theory:
         ez, rz, k = self.get_ez_rz_k(params_dic, self.Survey.zz_integr)
         # compute growth factor
         dz, _ = self.get_growth(params_dic, self.Survey.zz_integr, model_dic['nl_model'])
-        # compute matter-matter power spectrum
-        pk = self.get_pmm(params_dic, k, self.Survey.lbin, self.Survey.zz_integr, model_dic['nl_model'], model_dic['baryon_model'])
-        # find matter-galaxy and galaxy-galaxy power spectra
-        pmm = pk
-        pgg = pk
-        pgg_extr = None
-        pgm = pk 
-        pgm_extr = None
         if model_dic['bias_model'] == BIAS_HEFT:
+            # compute matter-matter power spectrum with gravity only
+            pk = self.get_pk_nl(params_dic, k, self.Survey.lbin, self.Survey.zz_integr, model_dic['nl_model'])
+            bar_boost = self.get_bar_boost(params_dic, k, self.Survey.lbin, self.Survey.zz_integr, model_dic['baryon_model'])
+            pmm = pk*bar_boost
+            # find matter-galaxy and galaxy-galaxy power spectra without galaxy-bias
             pgg, pgg_extr = pgm, pgm_extr = self.BaccoEmulator.get_heft(params_dic, k, self.Survey.lbin, self.Survey.zz_integr) 
+            pgm, pgm_extr = pgm*np.sqrt(bar_boost), pgm_extr*np.sqrt(bar_boost) 
+        else: 
+            # compute matter-matter power spectrum with baryonic feedback
+            pmm = self.get_pmm(params_dic, k, self.Survey.lbin, self.Survey.zz_integr, model_dic['nl_model'], model_dic['baryon_model'])
+            # find matter-galaxy and galaxy-galaxy power spectra without galaxy-bias
+            pgg, pgg_extr = pmm, None
+            pgm, pgm_extr = pmm, None    
         # compute weak lensing angular power spectra cl_ll(l, bin_i, bin_j)
         # window function w_l(l,z,bin) in units of h/Mpc
         cl_ll, w_l = self.get_cell_shear(params_dic, ez, rz, dz, pmm, model_dic['ia_model'])
