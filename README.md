@@ -14,7 +14,7 @@ This code is not complete to perform a real data analysis (yet), but is a fairly
 
 ## Available Models
 - BACCO-emulator and HMcode2020-emulator: 
-    - LCDM, $w$ CDM and $w_0w_a$ CDM with neutrinos.
+    - $\Lambda$ CDM, $w$ CDM and $w_0w_a$ CDM with neutrinos.
 - ReACT-based emulators: 
     - normal branch of [DGP gravity](https://arxiv.org/abs/hep-th/0005016) (nDGP); 
     - [Growth index parametrisation](https://arxiv.org/abs/astro-ph/0507263) and [Time-dependent growth index](https://arxiv.org/abs/2304.07281) with Screening;
@@ -35,7 +35,6 @@ This code is not complete to perform a real data analysis (yet), but is a fairly
 
 
 ## To-do list for Maria
-* de-bug check_ranges in Theory
 * new likelihood 
 
 
