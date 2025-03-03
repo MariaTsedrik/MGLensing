@@ -54,7 +54,15 @@ blaplL_5: 0.0
 ################################################
 #               Baryons                        #
 ################################################
-#nu_Mc_bcemu: 0.0
+log10Mc_bc: 13.8
+eta_bc: -0.3
+beta_bc: -0.22 
+log10Mz0_bc: 10.5
+thetaout_bc: 0.25
+thetainn_bc: -0.86
+log10Minn_bc: 12.4
+
+#log10Tagn: 7.8
 #log10Mc_bcemu: 13.32
 #thej_bcemu: 4.235
 #mu_bcemu: 0.93 

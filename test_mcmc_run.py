@@ -12,10 +12,15 @@ os.environ["OMP_NUM_THREADS"] = "1"
 
 MGLtest = MGLensing.MGL("config.yaml")
 
-def log_probability_function(pars):
+def log_probability_function_3x2pt(pars):
     param_dic = pars | MGLtest.params_fixed
     return MGLtest.Like.loglikelihood_det_3x2pt(param_dic, MGLtest.theo_model_dic)
-
+def log_probability_function_wl(pars):
+    param_dic = pars | MGLtest.params_fixed
+    return MGLtest.Like.loglikelihood_det_wl(param_dic, MGLtest.theo_model_dic)
+def log_probability_function_gc(pars):
+    param_dic = pars | MGLtest.params_fixed
+    return MGLtest.Like.loglikelihood_det_gc(param_dic, MGLtest.theo_model_dic)
 
 prior = Prior()
 for par_i in MGLtest.params_model:
@@ -23,6 +28,15 @@ for par_i in MGLtest.params_model:
         prior.add_parameter(par_i, dist=norm(loc=MGLtest.params_priors[par_i]['p1'] , scale=MGLtest.params_priors[par_i]['p2']))
     elif MGLtest.params_priors[par_i]['type'] == 'U':
         prior.add_parameter(par_i, dist=(MGLtest.params_priors[par_i]['p1'] , MGLtest.params_priors[par_i]['p2']))
+
+if MGLtest.probe == 'WL':
+    log_probability_function = log_probability_function_wl
+elif MGLtest.probe == 'GC':
+    log_probability_function = log_probability_function_gc    
+elif MGLtest.probe == '3x2pt':
+    log_probability_function = log_probability_function_3x2pt
+else:
+    raise ValueError('Check the probe name!')      
 
 def main():
     sampler = Sampler(prior, log_probability_function, 

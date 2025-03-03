@@ -261,10 +261,12 @@ class BaccoEmu():
         z_max_l = 3. #add a comment about global z_max
         k_min_nl = 0.01001
         k_max_nl = 4.903235148249275
+        k_max_boost = 4.692772528625323
         z_max_nl = 1.5
         k_min_heft = 0.01001
         k_max_heft = 0.71
         self.kh_nl = np.logspace(log10(k_min_nl), log10(k_max_nl), num=256)
+        self.kh_boost = np.logspace(log10(k_min_nl), log10(k_max_boost), num=256)
         self.kh_heft = np.logspace(log10(k_min_heft), log10(k_max_heft), num=128)
         self.kh_l = np.logspace(log10(k_min_l), log10(k_max_l), num=256)
         self.z_nl_bacco = np.linspace(z_min, z_max_nl, 12)
@@ -272,6 +274,7 @@ class BaccoEmu():
         self.kh_l_left = self.kh_l[self.kh_l<self.kh_nl[0]]
         self.boost_left = np.ones((len(self.z_nl_bacco), len(self.kh_l_left)))
         self.kh = np.concatenate((self.kh_l_left, self.kh_nl))
+        self.kh_boost_tot = np.concatenate((self.kh_l_left, self.kh_boost))
         self.z_l_high = self.z_l_bacco[self.z_l_bacco>self.z_nl_bacco[-1]]
         self.aa_l_high = 1./(1.+self.z_l_high)[::-1]
         self.aa_nl = 1./(1.+self.z_nl_bacco)[::-1]
@@ -362,12 +365,12 @@ class BaccoEmu():
             params_bacco['A_s']   = params_dic['As'] 
         elif 'sigma8' in params_dic:
             params_bacco['sigma8_cold']   = params_dic['sigma8']
-        _, boost = self.baccoemulator.get_baryonic_boost(k=self.kh_nl, cold=False, **params_bacco)
-        # to-do: add power-law extrapolation for 5<k[h/Mpc]<50
+        _, boost = self.baccoemulator.get_baryonic_boost(k=self.kh_boost, cold=False, **params_bacco)
+        # to-do: add power-law extrapolation for 4.7<k[h/Mpc]<50
         boost = boost[::-1, :]
         boost_k  = np.concatenate((self.boost_left, boost),axis=1)
         bfc_interpolator = RectBivariateSpline(self.z_nl_bacco, 
-                                               self.kh,
+                                               self.kh_boost_tot,
                                                boost_k,
                                                kx=1, ky=1)
         return  bfc_interpolator   

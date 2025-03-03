@@ -35,21 +35,21 @@ class MGLike:
         param_dic_all, status = self.Theo.check_pars(param_dic, theo_model_dic)
         if status:   
             chi2 = 0. 
-            cov_theory, cov_theory_high = self.Theo.compute_covariance_3x2pt(param_dic_all, theo_model_dic)
-            det_theo = np.linalg.det(cov_theory)
+            cov_theo, cov_theo_high = self.Theo.compute_covariance_3x2pt(param_dic_all, theo_model_dic)
+            det_theo = np.linalg.det(cov_theo)
             det_mix = np.zeros_like(det_theo)
             det_obs = self.data_dic['det_obs']
             det_obs_high = self.data_dic['det_obs_high'] 
             for i in range(2*self.Theo.Survey.nbin):
-                new_cov = cov_theory.copy()
-                new_cov[:, i] = self.data_dic['cov_observ'][:, :, i]
+                new_cov = cov_theo.copy()
+                new_cov[:, i] = self.data_dic['cov_obs'][:, :, i]
                 det_mix += np.linalg.det(new_cov)
 
-            det_theo_high = np.linalg.det(cov_theory_high)
+            det_theo_high = np.linalg.det(cov_theo_high)
             det_mix_high = np.zeros_like(det_theo_high)
             for i in range(self.Theo.Survey.nbin):
-                new_cov = cov_theory_high.copy()
-                new_cov[:, i] = self.data_dic['cov_observ_high'][:, :, i]
+                new_cov = cov_theo_high.copy()
+                new_cov[:, i] = self.data_dic['cov_obs_high'][:, :, i]
                 det_mix_high += np.linalg.det(new_cov)
             det_theo = np.concatenate([det_theo,det_theo_high])
             det_obs = np.concatenate([det_obs,det_obs_high])
@@ -59,7 +59,7 @@ class MGLike:
         else:
             return -np.inf
         
-    def loglikelihood_det_GC(self, param_dic, theo_model_dic):
+    def loglikelihood_det_gc(self, param_dic, theo_model_dic):
         """
         Compute the log-likelihood for a photometric galaxy clustering (GC) analysis 
         using the determinant method. Applicable only for the same scale-cuts in all redshift bins. 
@@ -79,20 +79,20 @@ class MGLike:
         param_dic_all, status = self.Theo.check_pars(param_dic, theo_model_dic)
         if status:  
             chi2 = 0. 
-            cov_theory = self.Theo.compute_covariance_gc(param_dic_all, theo_model_dic)
-            det_theo = np.linalg.det(cov_theory)
+            cov_theo = self.Theo.compute_covariance_gc(param_dic_all, theo_model_dic)
+            det_theo = np.linalg.det(cov_theo)
             det_mix = np.zeros_like(det_theo)
             for i in range(self.Theo.Survey.nbin):
-                new_cov = np.copy(cov_theory)
+                new_cov = np.copy(cov_theo)
                 det_obs = self.data_dic['det_obs']
-                new_cov[:, i] = self.data_dic['cov_observ'][:, :, i]
+                new_cov[:, i] = self.data_dic['cov_obs'][:, :, i]
                 det_mix += np.linalg.det(new_cov)
             chi2 += np.sum((2*self.data_dic['ells']+1)*self.Theo.Survey.fsky*((det_mix/det_theo)+np.log(det_theo/det_obs)))
             return -0.5*chi2    
         else:
             return -np.inf
         
-    def loglikelihood_det_WL(self, param_dic, theo_model_dic):
+    def loglikelihood_det_wl(self, param_dic, theo_model_dic):
         """
         Compute the log-likelihood for a shear-shear of weak lensing (WL) analysis 
         using the determinant method. Applicable only for the same scale-cuts in all redshift bins. 
@@ -112,13 +112,13 @@ class MGLike:
         param_dic_all, status = self.Theo.check_pars(param_dic, theo_model_dic)
         if status:  
             chi2 = 0. 
-            cov_theory = self.Theo.compute_covariance_wl(param_dic_all, theo_model_dic)
-            det_theo = np.linalg.det(cov_theory)
+            cov_theo = self.Theo.compute_covariance_wl(param_dic_all, theo_model_dic)
+            det_theo = np.linalg.det(cov_theo)
             det_mix = np.zeros_like(det_theo)
             for i in range(self.Theo.Survey.nbin):
-                new_cov = np.copy(cov_theory)
+                new_cov = np.copy(cov_theo)
                 det_obs = self.data_dic['det_obs']
-                new_cov[:, i] = self.data_dic['cov_observ'][:, :, i]
+                new_cov[:, i] = self.data_dic['cov_obs'][:, :, i]
                 det_mix += np.linalg.det(new_cov)
             chi2 += np.sum((2*self.data_dic['ells']+1)*self.Theo.Survey.fsky*((det_mix/det_theo)+np.log(det_theo/det_obs)))
             return -0.5*chi2    

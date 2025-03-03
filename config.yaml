@@ -1,4 +1,4 @@
-observable: '3x2pt'
+observable: 'wl'
 #Observables
 #     'WL' -> shear-shear
 #     'GC' -> photo-clustering
@@ -61,7 +61,7 @@ data:
   #     0 -> zNLA
   #----- not implemented yet:
   #     1 -> TATT
-  baryon_model: 0
+  baryon_model: 3
   # Baryonic flag
   #     0 -> no baryons
   #     1 -> Tagn HMcode
@@ -89,7 +89,7 @@ theory:
   #     0 -> zNLA
   #----- not implemented yet:
   #     1 -> TATT
-  baryon_model: 0
+  baryon_model: 3
   # Baryonic flag
   #     0 -> no baryons
   #     1 -> Tagn HMcode
@@ -98,15 +98,15 @@ theory:
   params: ./params_bacco_test.yaml
 
 output: 
-  chain_name: lsst_bacco_3x2pt_nobar_heft_test
+  chain_name: params_debug
 sampler: 
   mcmc:
     verbose: True
     n_eff: 10000
     n_live: 1000
-    pool: 14
+    pool: 20
     resume: False
-    hdf5_name: 'bacco_3x2pt_nobar'
+    hdf5_name: 'params_debug'
   #----- not implemented yet:  
   minimiser:
     verbose: True

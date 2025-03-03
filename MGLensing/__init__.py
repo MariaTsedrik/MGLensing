@@ -97,32 +97,32 @@ class MGL():
             survey (object): An object containing survey-specific information, including ell values.
 
         Sets:
-            cov_observ (ndarray): The computed covariance matrix.
-            cov_observ_high (ndarray, optional): The block of the covariance for l>l_jump for shear, as we assume that lmax_gc<lmax_wl.
+            cov_obs (ndarray): The computed covariance matrix.
+            cov_obs_high (ndarray, optional): The block of the covariance for l>l_jump for shear, as we assume that lmax_gc<lmax_wl.
             det_obs (float): The determinant of the covariance matrix.
             det_obs_high (float, optional): The determinant of the high-ell shear covariance matrix for '3x2pt' probe.
             ells_one_probe (ndarray, optional): The ell values for the 'WL' or 'GC' probe.
         """
 
         if self.probe=='3x2pt':
-            cov_observ, cov_observ_high = self.Theo.compute_covariance_3x2pt(self.params_data_dic, self.data_model_dic)
-            det_obs = np.linalg.det(cov_observ) 
-            det_obs_high = np.linalg.det(cov_observ_high) 
-            data_dic = {'cov_observ': cov_observ, 'cov_observ_high': cov_observ_high, 
+            cov_obs, cov_obs_high = self.Theo.compute_covariance_3x2pt(self.params_data_dic, self.data_model_dic)
+            det_obs = np.linalg.det(cov_obs) 
+            det_obs_high = np.linalg.det(cov_obs_high) 
+            data_dic = {'cov_obs': cov_obs, 'cov_obs_high': cov_obs_high, 
                         'det_obs': det_obs, 'det_obs_high': det_obs_high,
                         'ells': self.Survey.ells_wl}
         elif self.probe=='WL':
-            cov_observ = self.Theo.compute_covariance_wl(self.params_data_dic, self.data_model_dic)
-            det_obs = np.linalg.det(cov_observ) 
+            cov_obs = self.Theo.compute_covariance_wl(self.params_data_dic, self.data_model_dic)
+            det_obs = np.linalg.det(cov_obs) 
             ells_one_probe = self.Survey.ells_wl
-            data_dic = {'cov_observ': cov_observ, 
+            data_dic = {'cov_obs': cov_obs, 
                 'det_obs': det_obs,
                 'ells': ells_one_probe}
         elif self.probe=='GC':
-            cov_observ = self.Theo.compute_covariance_gc(self.params_data_dic, self.data_model_dic)
-            det_obs = np.linalg.det(cov_observ) 
+            cov_obs = self.Theo.compute_covariance_gc(self.params_data_dic, self.data_model_dic)
+            det_obs = np.linalg.det(cov_obs) 
             ells_one_probe = self.Survey.ells_gc 
-            data_dic = {'cov_observ': cov_observ, 
+            data_dic = {'cov_obs': cov_obs, 
                         'det_obs': det_obs,
                         'ells': ells_one_probe}
             

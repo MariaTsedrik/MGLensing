@@ -22,7 +22,7 @@ def read_last_header_line(file_path):
         return last_header.split() 
     else:
         return []
-
+"""
 file_paths = [    'chains/chain_lsst_test_bacco_3x2pt_nobar_heft_w0wa_vary_cosmo_ia_b1L_b2L_and_bs2L.txt',
     'chains/chain_lsst_test_bacco_3x2pt_nobar_heft_w0wa_vary_cosmo_ia_b1L_and_b2L.txt',
     'chains/chain_lsst_test_bacco_3x2pt_nobar_heft_w0wa_vary_cosmo_ia_and_b1L.txt',
@@ -37,8 +37,17 @@ legend_labels = [
 'cosmo+ia: 0:50:57',
 'cosmo: 0:35:15']
 annotation_text = 'LSST 3x2pt bacco+heft\n Cuillin 14 cores'
+"""
+file_paths = [    'chains/chain_bacco_baryons_wl.txt',  'chains/chain_bacco_baryons_3x2pt.txt',
+ ]  
 
-
+file_name = 'bacco_baryons_fix_cosmo'
+legend_labels = [
+'wl: 0:06:24',
+'xc: 0:31:45']
+annotation_text = 'LSST bacco+heft\n fix cosmo\n laptop 20 pools'
+# annotation square
+num = 2
 
 n_samples = len(file_paths)
 chains_info = {}
@@ -98,8 +107,8 @@ if fiducials != None:
             if ModelPars[j] in fiducials and fiducials[ModelPars[j]] != None:
                 ax.axvline(fiducials[ModelPars[j]],lw=2.,color='tab:gray')
 
-ax = g.subplots[2, 2]
-ax.annotate(annotation_text, (2.5, 0.05), xycoords='axes fraction', clip_on=False, fontsize=30) 
+ax = g.subplots[num, num]
+ax.annotate(annotation_text, (1.5, 0.05), xycoords='axes fraction', clip_on=False, fontsize=30) 
                 
 
 plt.savefig('figs/posteriors/'+file_name+'.png')  

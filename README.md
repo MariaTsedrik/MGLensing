@@ -4,10 +4,12 @@ Repository containing a likelihood for photometric probes with [emulated nonline
 
 ## To-do list for Maria
 * de-bug check_ranges in Theory
-* add TATT
+* new likelihood 
 
 
 ## To-do list for Ottavia
 * compare with CosmoSIS
 * photo-z uncertainties 
+* sigma8_tot to sigma8_cold
+* power-law extrpolation of power spectra
 

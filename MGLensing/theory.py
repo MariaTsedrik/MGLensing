@@ -69,7 +69,7 @@ EmulatorRanges = {
         'w0':           {'p1': -2.,        'p2': -0.5},    
         'wa':           {'p1': -0.5,         'p2': 0.5}, 
         },        
-    'baryons':
+    'bcemu':
         {
         'log10Mc_bcemu':    {'p1': 11.4,         'p2': 14.6}, 
         'thej_bcemu':       {'p1': 2.6,          'p2': 7.4},
@@ -78,13 +78,19 @@ EmulatorRanges = {
         'delta_bcemu':      {'p1': 3.8,          'p2': 10.2},
         'eta_bcemu':        {'p1': 0.085,        'p2': 0.365},
         'deta_bcemu':       {'p1': 0.085,        'p2': 0.365},
-        'log10Tagn':    {'p1': 7.6,         'p2': 8.3},
+        },
+    'hm_bar':
+        {    
+        'log10Tagn':    {'p1': 7.6,         'p2': 8.3}
+        },
+    'bacco_bfc':
+        {    
         'log10Mc_bc':   {'p1': 9.,           'p2': 15.}, 
         'eta_bc':       {'p1': -0.69,        'p2': 0.69},
         'beta_bc':      {'p1': -1.,          'p2': 0.69},
         'log10Mz0_bc':  {'p1': 9.,           'p2': 13.},
         'thetaout_bc':  {'p1': 0.,           'p2': 0.47},
-        'thetainn_bc':  {'p1': -2.,          'p2': -0.52},
+        'thetainn_bc':  {'p1': -2.,          'p2': -0.523},
         'log10Minn_bc': {'p1': 9.,           'p2': 13.5}
         }
 
@@ -202,7 +208,9 @@ class Theory:
                     & np.all(val <= EmulatorRanges[which_emu][par]['p2'])
                     ), message
         else:    
-            status = all(EmulatorRanges[which_emu][par]['p1'] <= params[par] <= EmulatorRanges[which_emu][par]['p2'] for par in eva_pars)
+            if not all(EmulatorRanges[which_emu][par_i]['p1'] <= params[par_i] <= EmulatorRanges[which_emu][par_i]['p2'] for par_i in eva_pars):
+                status = False
+                #print('STATUS!!!', status) 
         return status
         
     def get_a_s(self, params, flag_once=False):
@@ -276,16 +284,17 @@ class Theory:
             if not status_:
                 return status_
             status = self.get_emu_status(params, 'HMcode', flag_once)
-            return  status
         elif  model['nl_model']==NL_MODEL_BACCO:       
             status_, params['sigma8_cb'] = self.get_sigma8_cb(params)
             if not status_:
                 return status_
             status = self.get_emu_status(params, 'bacco', flag_once)
-            return  status
-        if  model['baryon_model']!=NO_BARYONS:
-            status = self.get_emu_status(params, 'baryons', flag_once)
-            return  status
+        if  model['baryon_model']==BARYONS_BCEMU:
+            status = self.get_emu_status(params, 'bcemu', flag_once)
+        elif  model['baryon_model']==BARYONS_HMCODE:
+            status = self.get_emu_status(params, 'hm_bar', flag_once)
+        elif  model['baryon_model']==BARYONS_BACCO:
+            status = self.get_emu_status(params, 'bacco_bfc', flag_once)
         if params['w0'] + params['wa'] >= 0:
             status = False
         return  status 
@@ -295,16 +304,20 @@ class Theory:
         if  model['nl_model']==NL_MODEL_HMCODE:
             if not all(EmulatorRanges['HMcode'][par_i]['p1'] <= params[par_i] <= EmulatorRanges['HMcode'][par_i]['p2'] for par_i in EmulatorRanges['HMcode']):
                 status = False
-                return  status
         elif  model['nl_model']==NL_MODEL_BACCO:   
             params['sigma8_cb'] = params['sigma8']    
             if not all(EmulatorRanges['bacco'][par_i]['p1'] <= params[par_i] <= EmulatorRanges['bacco'][par_i]['p2'] for par_i in EmulatorRanges['bacco']):
                 status = False
-                return  status
-        if  model['baryon_model']!=NO_BARYONS:
-            if not all(EmulatorRanges['baryons'][par_i]['p1'] <= params[par_i] <= EmulatorRanges['baryons'][par_i]['p2'] for par_i in EmulatorRanges['baryons']):
+        if  model['baryon_model']==BARYONS_BCEMU:
+            if not all(EmulatorRanges['bcemu'][par_i]['p1'] <= params[par_i] <= EmulatorRanges['bcemu'][par_i]['p2'] for par_i in EmulatorRanges['bcemu']):
                 status = False
-                return  status
+        elif  model['baryon_model']==BARYONS_HMCODE:
+            if not all(EmulatorRanges['hm_bar'][par_i]['p1'] <= params[par_i] <= EmulatorRanges['hm_bar'][par_i]['p2'] for par_i in EmulatorRanges['bhm_bar']):
+                status = False
+        elif  model['baryon_model']==BARYONS_BACCO:
+            if not all(EmulatorRanges['bacco_bfc'][par_i]['p1'] <= params[par_i] <= EmulatorRanges['bacco_bfc'][par_i]['p2'] for par_i in EmulatorRanges['bacco_bfc']):
+                status = False
+
         if params['w0'] + params['wa'] >= 0:
             status = False        
         return  status     
@@ -347,7 +360,8 @@ class Theory:
                of the parameter range check.
         """
         param_dic_all = self.apply_relations(param_dic)
-        #status = self.check_ranges_simple(param_dic_all, model_dic)
+        # before we were using a simple boundary-check:
+        # status = self.check_ranges_simple(param_dic_all, model_dic)
         status = self.check_ranges(param_dic_all, model_dic, False)
         return param_dic_all, status
 
