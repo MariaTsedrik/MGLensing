@@ -10,6 +10,13 @@ from .specs import EuclidSetUp, LSSTSetUp
 from .likelihood import MGLike
 from datetime import timedelta
 
+NL_MODEL_HMCODE = 0
+NL_MODEL_BACCO = 1
+NL_MODEL_NDGP = 2
+NL_MODEL_GAMMAZ = 3
+NL_MODEL_MUSIGMA = 4
+NL_MODEL_IDE = 5
+
 class MGL():
     def __init__(self, config_file):
         """
@@ -148,21 +155,21 @@ class MGL():
 
     def get_cell_shear(self, params, nl_model, baryon_model=0, ia_model=0):
         ez, rz, k = self.Theo.get_ez_rz_k(params, self.Survey.zz_integr)
-        dz = self.Theo.get_growth(params, self.Survey.zz_integr, nl_model)
+        dz, _ = self.Theo.get_growth(params, self.Survey.zz_integr, nl_model)
         pk = self.Theo.get_pmm(params, k, self.Survey.lbin, self.Survey.zz_integr, nl_model, baryon_model)
         cl_ll, _ = self.Theo.get_cell_shear(params, ez, rz, dz, pk, ia_model)
         return  self.Survey.l_wl, cl_ll
     
     def get_wl_kernel(self, params, nl_model, ia_model=0):
         ez, rz, _ = self.Theo.get_ez_rz_k(params, self.Survey.zz_integr)
-        dz = self.Theo.get_growth(params, self.Survey.zz_integr, nl_model)
+        dz, _ = self.Theo.get_growth(params, self.Survey.zz_integr, nl_model)
         omega_m = params['Omega_m']
         w_l = self.Theo.get_wl_kernel(omega_m, params, ez, rz, dz, ia_model)
         return w_l
     
     def get_ia_kernel(self, params, nl_model, ia_model=0):
         ez, _, _ = self.Theo.get_ez_rz_k(params, self.Survey.zz_integr)
-        dz = self.Theo.get_growth(params, self.Survey.zz_integr, nl_model)
+        dz, _ = self.Theo.get_growth(params, self.Survey.zz_integr, nl_model)
         omega_m = params['Omega_m']
         w_ia = self.Theo.get_ia_kernel(omega_m, params, ez, dz, self.Survey.eta_z_s, self.Survey.zz_integr, ia_model)
         return w_ia
@@ -180,7 +187,7 @@ class MGL():
     
     def get_cell_galgal(self, params, nl_model, bias_model, baryon_model=0, ia_model=0):
         ez, rz, k = self.Theo.get_ez_rz_k(params, self.Survey.zz_integr)
-        dz = self.Theo.get_growth(params, self.Survey.zz_integr, nl_model)
+        dz, _ = self.Theo.get_growth(params, self.Survey.zz_integr, nl_model)
         pk = self.Theo.get_pmm(params, k, self.Survey.lbin, self.Survey.zz_integr, nl_model, baryon_model)
         pmm = pk
         pgg = pk
@@ -197,6 +204,36 @@ class MGL():
     def get_expansion_and_rcom(self, params):
         ez, rz, _ = self.Theo.get_ez_rz_k(params, self.Survey.zz_integr)
         return ez, rz
+    
+    def get_sigma8_from_a_s_from_chain(self, params, nl_model):
+        _ = self.Theo.get_emu_status(params, 'HMcode', flag_once=True)
+        if nl_model==NL_MODEL_HMCODE or nl_model==NL_MODEL_BACCO:
+            sigma8 = self.Theo.HMcode2020Emulator.get_sigma8(params)
+        else: 
+            sigma8_gr = self.Theo.HMcode2020Emulator.get_sigma8(params) 
+            len_chain = len(sigma8_gr) 
+            D_rescale = np.zeros(len_chain)
+            for i in range(len_chain):
+                print(i, '/', len_chain)
+                params_growth = {
+                    'Omega_m': params['Omega_m'][i],
+                    'h' : params['h'][i],
+                    'w0': 0.,
+                    'wa': -1.,
+                    'log10Omega_rc': params['log10Omega_rc'][i] if 'log10Omega_rc' in params else 1.,
+                    'gamma0': params['gamma0'][i] if 'gamma0' in params else 0.55,
+                    'gamma1': params['gamma1'][i] if 'gamma1' in params else 0.,
+                    'mu0': params['mu0'][i] if 'mu0' in params else 0.,
+                    'Ads': params['Ads'][i] if 'Ads' in params else 0.,
+                    }
+                _, dz0_gr = self.Theo.get_growth(params_growth, [1.],  nl_model=0)
+                params_growth['w0'] = params['w0'][i] if 'w0' in params else -1.
+                _, dz0_mg = self.Theo.get_growth(params_growth, [1.],  nl_model=nl_model)
+                D_rescale[i] = dz0_mg/dz0_gr
+            sigma8 = sigma8_gr*D_rescale
+        return sigma8
+
+        
 
     def gen_output_header(self):
         """

@@ -169,13 +169,13 @@ class Theory:
             params['sigma8'] = params['S8']/sqrt(params['Omega_m']/0.3)   
         return params
 
-    def _get_emu_status(self, coordinates, which_emu, flag_once=False):
+    def get_emu_status(self, params, which_emu, flag_once=False):
         """
         Checks the relevant boundaries of emulators.
 
         Parameters:
         ----------
-        coordinates (dict): a set of coordinates in parameter space
+        params (dict): a set of coordinates in parameter space
         which_emu (str) : kind of emulator: options are 'HMcode', 'bacco', 'bacco_lin',
                                             'baryons'
         flag_once (boolean): set to false within a chain, set to true for a single data computation
@@ -186,51 +186,39 @@ class Theory:
 
         Raises:
         ------
-        KeyError: If the coordinates do not contain the necessary parameters
+        KeyError: If the parameter is outside its allowed ranges: what is this parameter and which are the correct ranges.
         """
-        # parameters currently available
-        avail_pars = coordinates.keys()
         # parameters strictly needed to evaluate the emulator
         eva_pars = EmulatorRanges[which_emu].keys()
-        if flag_once:
-            # parameters needed for a computation
-            comp_pars = list(set(eva_pars)-set(avail_pars))
-            miss_pars = list(set(comp_pars))
-
-            if miss_pars:
-                print(f"{which_emu} emulator:")
-                print(f"  Please add the parameter(s) {miss_pars}"
-                    f" to your coordinates!")
-                raise KeyError(f"{which_emu} emulator: coordinates need the"
-                            f" following parameters: ", miss_pars)
-        pp = [coordinates[p] for p in eva_pars]
+        pp = [params[p] for p in eva_pars]
         status = True
-        for i, par in enumerate(eva_pars):
-            val = pp[i]
-            if flag_once:
-                message = 'Param {}={} out of bounds [{}, {}]'.format(
+        if flag_once:
+            for i, par in enumerate(eva_pars):
+                val = pp[i]
+                message = 'Parameter {}={} out of bounds [{}, {}]'.format(
                 par, val, EmulatorRanges[which_emu][par]['p1'],
                 EmulatorRanges[which_emu][par]['p2'])
                 assert (np.all(val >= EmulatorRanges[which_emu][par]['p1'])
                     & np.all(val <= EmulatorRanges[which_emu][par]['p2'])
                     ), message
-            else:    
-                status = (np.all(val >= EmulatorRanges[which_emu][par]['p1'])
-                    & np.all(val <= EmulatorRanges[which_emu][par]['p2']))
+        else:    
+            status = all(EmulatorRanges[which_emu][par]['p1'] <= params[par] <= EmulatorRanges[which_emu][par]['p2'] for par in eva_pars)
         return status
         
     def get_a_s(self, params, flag_once=False):
         if 'As' in params:
             return True, params['As']
         else:
-            params['sigma8_cb'] = params['sigma8'] #from_sigma8_to_sigma8_cb
-            status = self._get_emu_status(params, 'bacco_lin', flag_once)
+            # to-do: add from_sigma8_to_sigma8_cb
+            # make distinction between sigma8_cold and sigma8
+            params['sigma8_cb'] = params['sigma8'] 
+            status = self.get_emu_status(params, 'bacco_lin', flag_once)
             if not status:
                 return False, np.nan
             else:
                 params_bacco = {
                 'ns'            :  params['ns'],
-                'sigma8_cold'   :  params['sigma8_cb'], # for future make distinction between sigma8_cold and sigma8
+                'sigma8_cold'   :  params['sigma8_cb'], 
                 'hubble'        :  params['h'],
                 'omega_baryon'  :  params['Omega_b'],
                 'omega_cold'    :  params['Omega_cb'], 
@@ -239,8 +227,8 @@ class Theory:
                 'wa'            :  params['wa'],
                 'expfactor'     :  1    
                 }
-                As = self.BaccoEmulator.baccoemulator.get_A_s(**params_bacco)
-                return True, As
+                a_s = self.BaccoEmulator.baccoemulator.get_A_s(**params_bacco)
+                return True, a_s
     
     def get_sigma8_cb(self, params, flag_once=False):
         if 'sigma8' in params:
@@ -249,7 +237,7 @@ class Theory:
             params['sigma8_cb'] = params['sigma8']     
             return True, params['sigma8_cb'] 
         else: 
-            status = self._get_emu_status(params, 'bacco_lin', flag_once)
+            status = self.get_emu_status(params, 'bacco_lin', flag_once)
             if not status:
                 return False, np.nan
             else:
@@ -267,33 +255,37 @@ class Theory:
                 sigma8_cb = self.BaccoEmulator.baccoemulator.get_sigma8(cold=True, **params_bacco)
                 return True, sigma8_cb
     
-    def get_sigma8_from_a_s(self, params):
-        #which_emu='HMcode'
-        raise NotImplementedError("get_sigma8_from_As is not implemented yet")
     
     def check_ranges(self, params, model, flag_once=False):
         """
-        Check the parameter ranges for the model.
+        Check the parameter ranges in emulators for the model.
+
         Parameters:
+        -----------
         params (dict): Dictionary containing the parameters to be checked.                  
         model (dict): Dictionary containing the model-specific parameters.
-        flag_once (boolean): set to false within a chain, set to true for a single data computation
+        flag_once (boolean): set to false within a chain, set to true for a single data computation 
+
         Returns:
+        -------
         boolean: status of the parameter range check.
         """
         status = True
         if  model['nl_model']==NL_MODEL_HMCODE:
-            status, params['As'] = self.get_As(params, flag_once)
-            if not status:
-                return status
-            status = self._get_emu_status(params, 'HMcode', flag_once)
+            status_, params['As'] = self.get_a_s(params, flag_once)
+            if not status_:
+                return status_
+            status = self.get_emu_status(params, 'HMcode', flag_once)
+            return  status
         elif  model['nl_model']==NL_MODEL_BACCO:       
-            status, params['sigma8_cb'] = self.get_sigma8_cb(params)
-            if not status:
-                return status
-            status = self._get_emu_status(params, 'bacco', flag_once)
+            status_, params['sigma8_cb'] = self.get_sigma8_cb(params)
+            if not status_:
+                return status_
+            status = self.get_emu_status(params, 'bacco', flag_once)
+            return  status
         if  model['baryon_model']!=NO_BARYONS:
-            status = self._get_emu_status(params, 'baryons', flag_once)
+            status = self.get_emu_status(params, 'baryons', flag_once)
+            return  status
         if params['w0'] + params['wa'] >= 0:
             status = False
         return  status 
@@ -302,19 +294,17 @@ class Theory:
         status = True
         if  model['nl_model']==NL_MODEL_HMCODE:
             if not all(EmulatorRanges['HMcode'][par_i]['p1'] <= params[par_i] <= EmulatorRanges['HMcode'][par_i]['p2'] for par_i in EmulatorRanges['HMcode']):
-                #raise ValueError("Not all parameters are within HMcode2020Emu ranges!")
                 status = False
+                return  status
         elif  model['nl_model']==NL_MODEL_BACCO:   
             params['sigma8_cb'] = params['sigma8']    
             if not all(EmulatorRanges['bacco'][par_i]['p1'] <= params[par_i] <= EmulatorRanges['bacco'][par_i]['p2'] for par_i in EmulatorRanges['bacco']):
-                #raise ValueError("Not all parameters are within baccoemu ranges!")
                 status = False
+                return  status
         if  model['baryon_model']!=NO_BARYONS:
-            if any( params[par_i] < EmulatorRanges['baryons'][par_i]['p1'] or 
-                    params[par_i] > EmulatorRanges['baryons'][par_i]['p2']
-                    for par_i in params if par_i in EmulatorRanges['baryons']):
-                #raise ValueError("Not all baryonic parameters are within allowed ranges!")
+            if not all(EmulatorRanges['baryons'][par_i]['p1'] <= params[par_i] <= EmulatorRanges['baryons'][par_i]['p2'] for par_i in EmulatorRanges['baryons']):
                 status = False
+                return  status
         if params['w0'] + params['wa'] >= 0:
             status = False        
         return  status     
@@ -357,7 +347,8 @@ class Theory:
                of the parameter range check.
         """
         param_dic_all = self.apply_relations(param_dic)
-        status = self.check_ranges_simple(param_dic_all, model_dic)
+        #status = self.check_ranges_simple(param_dic_all, model_dic)
+        status = self.check_ranges(param_dic_all, model_dic, False)
         return param_dic_all, status
 
     def get_ez_rz_k(self, params_dic, zz):
@@ -418,7 +409,9 @@ class Theory:
         --------
         dz : numpy.ndarray
             Normalized growth factor array corresponding to the input redshift values.
-        
+        dz0 : float
+            Growth factor at redshift zero.
+            
         Raises:
         -------
         ValueError
@@ -448,8 +441,9 @@ class Theory:
             raise ValueError("Invalid mg_model option.")    
         dz = da[::-1] 
         # growth factor should be normalised to z=0
-        dz = dz[1:]/dz[0]
-        return dz
+        dz0 = dz[0]
+        dz = dz[1:]/dz0
+        return dz, dz0
     
     def get_ia_kernel(self, omega_m, params_dic, ez, dz, eta_z_s, zz_integr, ia_model=0):
         """
@@ -920,7 +914,7 @@ class Theory:
         # compute background
         ez, rz, k = self.get_ez_rz_k(params_dic, self.Survey.zz_integr)
         # compute growth factor
-        dz = self.get_growth(params_dic, self.Survey.zz_integr, model_dic['nl_model'])
+        dz, _ = self.get_growth(params_dic, self.Survey.zz_integr, model_dic['nl_model'])
         # compute matter-matter power spectrum
         pk = self.get_pmm(params_dic, k, self.Survey.lbin, self.Survey.zz_integr, model_dic['nl_model'], model_dic['baryon_model'])
         # compute weak lensing angular power spectra
@@ -982,7 +976,7 @@ class Theory:
         # compute background
         ez, rz, k = self.get_ez_rz_k(params_dic, self.Survey.zz_integr)
         # compute growth factor
-        dz = self.get_growth(params_dic, self.Survey.zz_integr, model_dic['nl_model'])
+        dz, _ = self.get_growth(params_dic, self.Survey.zz_integr, model_dic['nl_model'])
         # compute matter-matter power spectrum
         pk = self.get_pmm(params_dic, k, self.Survey.lbin, self.Survey.zz_integr, model_dic['nl_model'], model_dic['baryon_model'])
         # find matter-galaxy and galaxy-galaxy power spectra

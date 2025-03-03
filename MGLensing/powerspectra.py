@@ -83,6 +83,10 @@ class HMcode2020():
         kbin_left_bb = len(self.kh_l[self.kh_l<self.kh_bb[0]])
         self.kh_barboost = np.concatenate((self.kh_l[self.kh_l<self.kh_bb[0]], self.kh_bb))
         self.boost_left = np.ones((self.nz_pk, kbin_left_bb))
+        self.cp_sigma8_model = cosmopower_NN(restore=True, 
+                      restore_filename=dirname+'/../emulators/sigma8_emu',
+                      )
+
 
 
     def get_pk_interp(self, params_dic):
@@ -163,6 +167,32 @@ class HMcode2020():
         for index_l, index_z in index_pknn:
             pk_m_l[index_l, index_z] = pk_l_interp(zz_integr[index_z], k[index_l,index_z])
         return pk_m_l
+    
+    def get_sigma8(self, params_dic):
+        ns   = params_dic['ns']
+        a_s   = params_dic['As']
+        h    = params_dic['h']
+        w0    = params_dic['w0']
+        wa    = params_dic['wa']
+        omega_b = params_dic['Omega_b']
+        omega_c = params_dic['Omega_c']
+        m_nu  = params_dic['Mnu']
+        len_chain = len(ns)
+        params_hmcode = {
+                'ns'            :  ns,
+                'As'            :  a_s,
+                'hubble'        :  h,
+                'omega_baryon'  :  omega_b,
+                'omega_cdm'     :  omega_c,
+                'neutrino_mass' :  m_nu,
+                'w0'            :  w0,
+                'wa'            :  wa,
+                'z'             :  np.zeros(len_chain)
+            }
+        sigma8_emu = self.cp_sigma8_model.predictions_np(params_hmcode)
+        sigma8 = sigma8_emu[:, 0]
+        return sigma8
+
 
 class BaccoEmu():
     """

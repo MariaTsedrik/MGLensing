@@ -23,7 +23,7 @@ def read_last_header_line(file_path):
     else:
         return []
 
-file_paths = [
+file_paths = [    'chains/chain_lsst_test_bacco_3x2pt_nobar_heft_w0wa_vary_cosmo_ia_b1L_b2L_and_bs2L.txt',
     'chains/chain_lsst_test_bacco_3x2pt_nobar_heft_w0wa_vary_cosmo_ia_b1L_and_b2L.txt',
     'chains/chain_lsst_test_bacco_3x2pt_nobar_heft_w0wa_vary_cosmo_ia_and_b1L.txt',
     'chains/chain_lsst_test_bacco_3x2pt_nobar_heft_w0wa_vary_cosmo_and_ia.txt', 
@@ -31,6 +31,7 @@ file_paths = [
 
 file_name = 'lsst_test_posterior_cosmo_vars'
 legend_labels = [
+'cosmo+ia+b1+b2+bs2: 2:51:05',
 'cosmo+ia+b1+b2: 2:07:11',
 'cosmo+ia+b1: 1:38:32',
 'cosmo+ia: 0:50:57',
@@ -63,7 +64,7 @@ for i in range(n_samples):
 
 
 ModelPars = chains_info[0]['pars']
-colors = ['tab:orange', 'tab:blue', 'tab:green', 'tab:red']
+colors = ['tab:orange', 'tab:blue', 'tab:green', 'tab:red', 'tab:purple', 'tab:olive', 'tab:cyan']
 from matplotlib import rc
 rc('text', usetex=True)
 rc('font',**{'family':'serif','serif':['Times']})
@@ -81,10 +82,10 @@ g.triangle_plot(samples,
     ModelPars,
 legend_labels = legend_labels,
 legend_loc = 'upper right',
-contour_args = [{'filled':True, 'color': colors[0]}, 
-{'filled':True, 'color': colors[1], 'ls': '-'}, {'filled':True, 'color': colors[2], 'ls': '-'}, {'filled':True, 'color': colors[3], 'ls': '-'}], 
-line_args=[ {'color': colors[0]}, 
-{'color': colors[1], 'ls': '-'}, {'color': colors[2], 'ls': '-'},  {'color': colors[3], 'ls': '-'}])
+contour_args = [{'filled':True, 'color': colors[0]}, {'filled':True, 'color': colors[1], 'ls': '-'}, {'filled':True, 'color': colors[2], 'ls': '-'},
+                {'filled':True, 'color': colors[3], 'ls': '-'},  {'filled':True, 'color': colors[4], 'ls': '-'},  {'filled':True, 'color': colors[5], 'ls': '-'}], 
+line_args=[ {'color': colors[0], 'ls': '-'}, {'color': colors[1], 'ls': '-'}, {'color': colors[2], 'ls': '-'}, 
+            {'color': colors[3], 'ls': '-'}, {'color': colors[4], 'ls': '-'}, {'color': colors[5], 'ls': '-'}])
 
 
 
