@@ -197,7 +197,6 @@ class Theory:
         # parameters strictly needed to evaluate the emulator
         eva_pars = EmulatorRanges[which_emu].keys()
         pp = [params[p] for p in eva_pars]
-        status = True
         if flag_once:
             for i, par in enumerate(eva_pars):
                 val = pp[i]
@@ -209,9 +208,9 @@ class Theory:
                     ), message
         else:    
             if not all(EmulatorRanges[which_emu][par_i]['p1'] <= params[par_i] <= EmulatorRanges[which_emu][par_i]['p2'] for par_i in eva_pars):
-                status = False
-                #print('STATUS!!!', status) 
-        return status
+                return False
+        return True
+        
         
     def get_a_s(self, params, flag_once=False):
         if 'As' in params:
@@ -278,49 +277,28 @@ class Theory:
         -------
         boolean: status of the parameter range check.
         """
-        status = True
         if  model['nl_model']==NL_MODEL_HMCODE:
             status_, params['As'] = self.get_a_s(params, flag_once)
             if not status_:
                 return status_
-            status = self.get_emu_status(params, 'HMcode', flag_once)
+            status_nl = self.get_emu_status(params, 'HMcode', flag_once)
         elif  model['nl_model']==NL_MODEL_BACCO:       
             status_, params['sigma8_cb'] = self.get_sigma8_cb(params)
             if not status_:
                 return status_
-            status = self.get_emu_status(params, 'bacco', flag_once)
+            status_nl = self.get_emu_status(params, 'bacco', flag_once)
         if  model['baryon_model']==BARYONS_BCEMU:
-            status = self.get_emu_status(params, 'bcemu', flag_once)
+            status_b = self.get_emu_status(params, 'bcemu', flag_once)
         elif  model['baryon_model']==BARYONS_HMCODE:
-            status = self.get_emu_status(params, 'hm_bar', flag_once)
+            status_b = self.get_emu_status(params, 'hm_bar', flag_once)
         elif  model['baryon_model']==BARYONS_BACCO:
-            status = self.get_emu_status(params, 'bacco_bfc', flag_once)
+            status_b = self.get_emu_status(params, 'bacco_bfc', flag_once)
+        status = status_nl and status_b
+        # check the w0-wa condition
         if params['w0'] + params['wa'] >= 0:
             status = False
         return  status 
 
-    def check_ranges_simple(self, params, model):
-        status = True
-        if  model['nl_model']==NL_MODEL_HMCODE:
-            if not all(EmulatorRanges['HMcode'][par_i]['p1'] <= params[par_i] <= EmulatorRanges['HMcode'][par_i]['p2'] for par_i in EmulatorRanges['HMcode']):
-                status = False
-        elif  model['nl_model']==NL_MODEL_BACCO:   
-            params['sigma8_cb'] = params['sigma8']    
-            if not all(EmulatorRanges['bacco'][par_i]['p1'] <= params[par_i] <= EmulatorRanges['bacco'][par_i]['p2'] for par_i in EmulatorRanges['bacco']):
-                status = False
-        if  model['baryon_model']==BARYONS_BCEMU:
-            if not all(EmulatorRanges['bcemu'][par_i]['p1'] <= params[par_i] <= EmulatorRanges['bcemu'][par_i]['p2'] for par_i in EmulatorRanges['bcemu']):
-                status = False
-        elif  model['baryon_model']==BARYONS_HMCODE:
-            if not all(EmulatorRanges['hm_bar'][par_i]['p1'] <= params[par_i] <= EmulatorRanges['hm_bar'][par_i]['p2'] for par_i in EmulatorRanges['bhm_bar']):
-                status = False
-        elif  model['baryon_model']==BARYONS_BACCO:
-            if not all(EmulatorRanges['bacco_bfc'][par_i]['p1'] <= params[par_i] <= EmulatorRanges['bacco_bfc'][par_i]['p2'] for par_i in EmulatorRanges['bacco_bfc']):
-                status = False
-
-        if params['w0'] + params['wa'] >= 0:
-            status = False        
-        return  status     
 
     def check_pars_ini(self, param_dic, model_dic, flag_once=True):
         """
@@ -360,8 +338,6 @@ class Theory:
                of the parameter range check.
         """
         param_dic_all = self.apply_relations(param_dic)
-        # before we were using a simple boundary-check:
-        # status = self.check_ranges_simple(param_dic_all, model_dic)
         status = self.check_ranges(param_dic_all, model_dic, False)
         return param_dic_all, status
 

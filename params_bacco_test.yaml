@@ -2,10 +2,10 @@
 #               COSMOLOGY                      #
 ################################################
 Omega_m:
-  type: 'F'
+  type: 'U'
   p0: 0.31
-  p1: 0.28
-  p2: 0.34
+  p1: 0.2 #0.28
+  p2: 0.4 #0.34
 
 
 
@@ -190,32 +190,32 @@ log10Mc_bc:
   p1: 9.
   p2: 15.  
 eta_bc: 
-  type: 'U'
+  type: 'F'
   p0: -0.3
   p1: -0.69
   p2: 0.69  
 beta_bc: 
-  type: 'U'
+  type: 'F'
   p0: -0.22 
   p1: -1.
   p2: 0.69 
 log10Mz0_bc: 
-  type: 'U'
+  type: 'F'
   p0: 10.5
   p1: 9.
   p2: 13.  
 thetaout_bc: 
-  type: 'U'
+  type: 'F'
   p0: 0.25
   p1: 0.
   p2: 0.47  
 thetainn_bc: 
-  type: 'U'
+  type: 'F'
   p0: -0.86
   p1: -2.
   p2: -0.52
 log10Minn_bc: 
-  type: 'U'
+  type: 'F'
   p0: 12.4  
   p1: 9.
   p2: 13.5
