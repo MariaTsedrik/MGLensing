@@ -1,6 +1,6 @@
 # MGlensing
 
-Repository containing a likelihood (based on [this](https://github.com/Sefa76/photometric_fofR/tree/main)) for photometric probes with [emulated nonlinear power spectra](https://github.com/nebblu/ReACT-emus?tab=readme-ov-file) and various other emulators.
+Repository containing a likelihood (based on [this pipeline](https://github.com/Sefa76/photometric_fofR/tree/main)) for photometric probes with [emulated nonlinear power spectra](https://github.com/nebblu/ReACT-emus?tab=readme-ov-file) and various other emulators.
 
 
 The purpose of this code:
@@ -29,6 +29,30 @@ This code is not complete to perform a real data analysis (yet), but is a fairly
     - BCemu;
     - BACCO-emulator.
 
+## How to run
+
+Modify "config.yaml" file and specify
+* Observables;
+* Specifics of your survey;
+* Modelling for your mock synthetic data;
+* Modelling for your theoretical predictions;
+* File-paths with fiducial data points and priors;
+* Output-file name.
+
+
+You can then run a test likelihood computation:
+```python
+import MGLensing
+
+MGL = MGLensing.MGL("config.yaml")
+MGL.test() 
+```
+
+Following files provide examples of using MGL:
+* test_plot.py and test_plot_kernels.py : compute and plot observables and modelling components;
+* test_mcmc_run.py: run an MCMC chain with [Nautilus sampler](https://github.com/johannesulf/nautilus);
+* test_plot_posterior.py: plot posterior distributions with GetDist;
+* test_postprocess_S8.py: compute sigma8 and S8 from a chain.
 
 ## Documentation
 ...tbd...
