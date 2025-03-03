@@ -14,7 +14,7 @@ This code is not complete to perform a real data analysis (yet), but is a fairly
 
 ## Available Models
 - BACCO-emulator and HMcode2020-emulator: 
-    - LCDM, wCDM and $w_0w_a$CDM.
+    - LCDM, wCDM and $w_0w_a$ CDM.
 - ReACT-based emulators: 
     - normal branch of [DGP gravity](https://arxiv.org/abs/hep-th/0005016) (nDGP); 
     - [Growth index parametrisation](https://arxiv.org/abs/astro-ph/0507263) and [Time-dependent growth index](https://arxiv.org/abs/2304.07281) with Screening;
@@ -40,7 +40,7 @@ This code is not complete to perform a real data analysis (yet), but is a fairly
 
 
 ## To-do list for Ottavia
-* compare with CosmoSIS
+* compare with CosmoSIS and CCL
 * photo-z uncertainties 
 * sigma8_tot to sigma8_cold
 * power-law extrpolation of power spectra
