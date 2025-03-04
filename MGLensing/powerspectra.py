@@ -4,7 +4,7 @@ import numpy as np
 from cosmopower import cosmopower_NN
 import baccoemu 
 import os
-from math import log10
+from math import log10, log
 
 dirname = os.path.split(__file__)[0]
 
@@ -86,6 +86,7 @@ class HMcode2020():
         self.cp_sigma8_model = cosmopower_NN(restore=True, 
                       restore_filename=dirname+'/../emulators/sigma8_emu',
                       )
+        self.emu_name = 'HMcode2020'
 
 
 
@@ -281,6 +282,7 @@ class BaccoEmu():
         self.aa_all = np.concatenate((self.aa_l_high, self.aa_nl))
         self.zz_all_bacco = np.concatenate((self.z_nl_bacco, self.z_l_high))
         self.zz_max = z_max_l
+        self.emu_name = 'BACCO'
 
     def get_pk_interp(self, params_dic):
         ns   = params_dic['ns']
@@ -485,6 +487,7 @@ class BCemulator():
         self.kh_barboost = np.concatenate((self.kh_l[self.kh_l<self.k_bfc[0]], self.k_bfc))
         self.boost_left = np.ones((len(self.z_bfc), kbin_left_bb))
         self.kmax_bcemu = kmax_bcemu
+        self.emu_name = 'BCEmu'
         
 
     def get_barboost_interp(self, params_dic):
@@ -522,3 +525,310 @@ class BCemulator():
         for index_l, index_z in index_pknn:
                 boost_bar[index_l, index_z] = boost_bar_interp(min(zz_integr[index_z], 2.), k[index_l,index_z])
         return boost_bar
+
+class BoostReACT():
+    def __init__(self):
+        self.zz_pk = np.array([0., 0.01,  0.12, 0.24, 0.38, 0.52, 0.68, 0.86, 1.05, 1.27, 1.5, 1.76, 2.04, 2.36, 2.5, 3.0]) # these numers are hand-picked
+        self.aa_pk = np.array(1./(1.+self.zz_pk[::-1])) # should be increasing
+        self.nz_pk = len(self.zz_pk)
+        self.zz_max = self.zz_pk[-1]
+        self.cp_nl_hmcode_model = cosmopower_NN(restore=True, 
+                      restore_filename=dirname+'/../emulators/log10_total_matter_nonlinear_emu',
+                      )
+        self.kh_nl = self.cp_nl_model.modes # 0.01..50. h/Mpc    
+        self.cp_l_model = cosmopower_NN(restore=True, 
+                      restore_filename=dirname+'/../emulators/log10_total_matter_linear_emu',
+                      )
+        self.kh_l = self.cp_l_model.modes # 3.7e-4..50. h/Mpc 
+        self.kh_l_left = self.kh_l[self.kh_l<self.kh_nl[0]]
+        self.kh = np.concatenate((self.kh_l_left, self.kh_nl))
+        
+    def get_pk_react(self, params_dic, k, lbin, zz_integr, mg_boost_l_interp):
+        pk_m_l  = np.zeros((lbin, len(zz_integr)), 'float64')
+        index_pknn = np.array(np.where((k > k_min_h_by_mpc) & (k < k_max_h_by_mpc))).transpose()
+        pk_l_interp = self.get_pk_hmcode_interp(params_dic)
+        for index_l, index_z in index_pknn:
+            pk_m_l[index_l, index_z] = pk_l_interp(zz_integr[index_z], k[index_l,index_z])*mg_boost_l_interp(min(zz_integr[index_z], 2.5), k[index_l,index_z])
+        return pk_m_l  
+
+    def get_pk_hmcode_interp(self, params_dic):
+        ns   = params_dic['ns']
+        a_s   = params_dic['As']
+        h    = params_dic['h']
+        omega_b = params_dic['Omega_b']
+        omega_c = params_dic['Omega_c']
+        params_hmcode = {
+                'ns'            :  np.full(self.nz_pk, ns),
+                'As'            :  np.full(self.nz_pk, a_s),
+                'hubble'        :  np.full(self.nz_pk, h),
+                'omega_baryon'  :  np.full(self.nz_pk, omega_b),
+                'omega_cdm'     :  np.full(self.nz_pk, omega_c),
+                'neutrino_mass' :  np.zeros(self.nz_pk),
+                'w0'            :  np.full(self.nz_pk, -1.),
+                'wa'            :  np.zeros(self.nz_pk, 0.),
+                'z'             :  self.zz_pk
+            }
+        pnl_cp  = self.cp_nl_model.ten_to_predictions_np(params_hmcode)
+        plin_cp = self.cp_l_model.ten_to_predictions_np(params_hmcode)
+        plin_left = plin_cp[:, self.kh_l<self.kh_nl[0]]
+        pnl  = np.concatenate((plin_left, pnl_cp),axis=1)
+        pnl_interp = RectBivariateSpline(self.zz_pk,
+                            self.kh,
+                            pnl,
+                            kx=1, ky=1)     
+        return  pnl_interp
+
+def boost_right_extrap(mg_boost, log_k, k_last, kh_nl_right_boost, zz_boost):
+    boost_last_entry, boost_lastlast_entry = mg_boost[:, -1], mg_boost[:, -2]
+    m = np.array([log(boost_last_entry[i] / boost_lastlast_entry[i]) / log_k for i in range(zz_boost)])
+    mg_boost_right = boost_last_entry[:, np.newaxis] *(kh_nl_right_boost[np.newaxis, :]/k_last)**m[:, np.newaxis]
+    return mg_boost_right    
+class DGPReACT(BoostReACT):
+    def __init__(self):
+        super().__init__()
+        print('initialising nDGP')
+        self.cp_nl_ngdp_model = cosmopower_NN(restore=True, 
+                      restore_filename=dirname+'/../emulators/react_boost_nDGP_emu_v2',
+                      )
+        self.kh_nl_boost = self.cp_nl_ngdp_model.modes # 0.01..5. h/Mpc 
+        self.zz_boost = np.minimum(self.zz_pk, 2.5)
+        self.kh_l_left_boost = self.kh_l[self.kh_l<self.kh_nl_boost[0]]
+        self.kh_nl_right_boost = self.kh_nl[self.kh_nl>self.kh_nl_boost[-1]]
+        self.kh_nl_boost_tot = np.concatenate((self.kh_l_left_boost, self.kh_nl_boost, self.kh_nl_right_boost))
+        self.k_nl_boost_last = self.kh_nl_boost[-1]
+        self.k_nl_boost_lastlast = self.kh_nl_boost[-2]
+        self.log_k = log(self.k_nl_boost_last / self.k_nl_boost_lastlast)
+        self.emu_name = 'nDGP_ReACT'
+        
+
+    def get_mg_boost_interp(self, params_dic):
+        ns   = params_dic['ns']
+        a_s   = params_dic['As']
+        h    = params_dic['h']
+        omega_b = params_dic['Omega_b']
+        omega_m = params_dic['Omega_m']
+        omega_nu  = params_dic['Omega_nu']
+        omegarc    = 10**params_dic['log10Omega_rc']
+        params_react = {
+                'ns'            :  np.full(self.nz_pk, ns),
+                'As'            :  np.full(self.nz_pk, a_s),
+                'H0'            :  np.full(self.nz_pk, h*100),
+                'Omega_b'       :  np.full(self.nz_pk, omega_b),
+                'Omega_m'       :  np.full(self.nz_pk, omega_m),
+                'Omega_nu'      :  np.full(self.nz_pk, omega_nu),
+                'omegarc'       :  np.full(self.nz_pk, omegarc),
+                'z'             :  self.zz_boost
+            }
+        mg_boost = self.cp_nl_ngdp_model.predictions_np(params_react) 
+        # constant extrapolation for k<0.01 h/Mpc
+        mg_boost_left = np.full(len(self.kh_l_left_boost), mg_boost[0])
+        # power law extrapolation for k>5 h/Mpc
+        mg_boost_right = boost_right_extrap(mg_boost, self.log_k, self.k_nl_boost_last, self.kh_nl_right_boost, self.zz_boost)
+        # combine mg_boost at all scales
+        mg_boost_k = np.concatenate((mg_boost_left, mg_boost, mg_boost_right))
+        # interpolate
+        mg_boost_interp = RectBivariateSpline(self.zz_boost,
+                    self.kh_nl_boost_tot,
+                    mg_boost_k,
+                    kx=1, ky=1)
+        return  mg_boost_interp
+    
+    def get_pk(self, params_dic, k, lbin, zz_integr):
+        mg_boost_l_interp = self.get_mg_boost_interp(params_dic)
+        pk_m_l = self.get_pk_react(params_dic, k, lbin, zz_integr, mg_boost_l_interp)
+        return pk_m_l
+    
+
+class GammaReACT(BoostReACT):
+    def __init__(self):
+        super().__init__()
+        print('initialising Growth Index Parametrisation')
+        # to-do: update with new version
+        self.cp_nl_ngdp_model = cosmopower_NN(restore=True, 
+                      restore_filename=dirname+'/../emulators/react_boost_gLEMURSzzz', 
+                      )
+        self.kh_nl_boost = self.cp_nl_ngdp_model.modes # 0.01..5. h/Mpc 
+        self.zz_boost = np.minimum(self.zz_pk, 2.5)
+        self.kh_l_left_boost = self.kh_l[self.kh_l<self.kh_nl_boost[0]]
+        self.kh_nl_right_boost = self.kh_nl[self.kh_nl>self.kh_nl_boost[-1]]
+        self.kh_nl_boost_tot = np.concatenate((self.kh_l_left_boost, self.kh_nl_boost, self.kh_nl_right_boost))
+        self.k_nl_boost_last = self.kh_nl_boost[-1]
+        self.k_nl_boost_lastlast = self.kh_nl_boost[-2]
+        self.log_k = log(self.k_nl_boost_last / self.k_nl_boost_lastlast)
+        self.emu_name = 'Linder_z_ReACT'
+        
+
+    def get_mg_boost_interp(self, params_dic):
+        ns   = params_dic['ns']
+        a_s   = params_dic['As']
+        h    = params_dic['h']
+        omega_b = params_dic['Omega_b']
+        omega_m = params_dic['Omega_m']
+        omega_nu  = params_dic['Omega_nu']
+        gamma0    = params_dic['gamma0']
+        gamma1    = params_dic['gamma1']
+        q1    = params_dic['q1']
+        params_react = {
+                'ns'            :  np.full(self.nz_pk, ns),
+                'As'            :  np.full(self.nz_pk, a_s),
+                'H0'            :  np.full(self.nz_pk, h*100),
+                'Omega_b'       :  np.full(self.nz_pk, omega_b),
+                'Omega_m'       :  np.full(self.nz_pk, omega_m),
+                'Omega_nu'      :  np.full(self.nz_pk, omega_nu),
+                'gamma0'        :  np.full(self.nz_pk, gamma0),
+                'gamma1'        :  np.full(self.nz_pk, gamma1),
+                'q1'            :  np.full(self.nz_pk, q1),
+                'z'             :  self.zz_boost
+            }
+        mg_boost = self.cp_nl_ngdp_model.predictions_np(params_react) 
+        # constant extrapolation for k<0.01 h/Mpc
+        mg_boost_left = np.full(len(self.kh_l_left_boost), mg_boost[0])
+        # power law extrapolation for k>5 h/Mpc
+        mg_boost_right = boost_right_extrap(mg_boost, self.log_k, self.k_nl_boost_last, self.kh_nl_right_boost, self.zz_boost)
+        # combine mg_boost at all scales
+        mg_boost_k = np.concatenate((mg_boost_left, mg_boost, mg_boost_right))
+        # interpolate
+        mg_boost_interp = RectBivariateSpline(self.zz_boost,
+                    self.kh_nl_boost_tot,
+                    mg_boost_k,
+                    kx=1, ky=1)
+        return  mg_boost_interp
+    
+    def get_pk(self, params_dic, k, lbin, zz_integr):
+        mg_boost_l_interp = self.get_mg_boost_interp(params_dic)
+        pk_m_l = self.get_pk_react(params_dic, k, lbin, zz_integr, mg_boost_l_interp)
+        return pk_m_l
+    
+
+class MuSigmaReACT():
+    def __init__(self):
+        print('initialising mu-Sigma')
+        self.zz_pk = np.array([0., 0.01,  0.12, 0.24, 0.38, 0.52, 0.68, 0.86, 1.05, 1.27, 1.5, 1.76, 2.04, 2.36, 2.5, 3.0]) # these numers are hand-picked
+        self.aa_pk = np.array(1./(1.+self.zz_pk[::-1])) # should be increasing
+        self.nz_pk = len(self.zz_pk)
+        self.zz_max = self.zz_pk[-1]
+        # to-do: update with new version
+        self.cp_nl_musigma_model = cosmopower_NN(restore=True, 
+                      restore_filename=dirname+'/../emulators/MuSigma_nonlinearboost_extAs', 
+                      )
+        self.kh_nl_boost = self.cp_nl_musigma_model.modes # 0.01..10. h/Mpc
+        self.cp_lin_musigma_model = cosmopower_NN(restore=True, 
+                      restore_filename=dirname+'/../emulators/MuSigma_linear_log10ps_extAs', 
+                      )
+        self.kh_l = self.cp_lin_musigma_model.modes # 1.e-4..50. h/Mpc
+        self.zz_boost = np.minimum(self.zz_pk, 2.5)
+        self.kh_l_left_boost = self.kh_l[self.kh_l<self.kh_nl_boost[0]]
+        self.kh_nl_right_boost = self.kh_l[self.kh_l>self.kh_nl_boost[-1]]
+        self.kh_nl_boost_tot = np.concatenate((self.kh_l_left_boost, self.kh_nl_boost, self.kh_nl_right_boost))
+        self.k_nl_boost_last = self.kh_nl_boost[-1]
+        self.k_nl_boost_lastlast = self.kh_nl_boost[-2]
+        self.log_k = log(self.k_nl_boost_last / self.k_nl_boost_lastlast)
+        self.emu_name = 'mu_Sigma_ReACT'
+        
+
+    def get_pk_nl_interp(self, params_dic):
+        ns   = params_dic['ns']
+        a_s   = params_dic['As']
+        h    = params_dic['h']
+        omega_b = params_dic['Omega_b']
+        omega_m = params_dic['Omega_m']
+        omega_nu  = params_dic['Omega_nu']
+        mu0    = params_dic['mu0']
+        sigma0    = params_dic['sigma0']
+        q1    = params_dic['q1']
+        params_react = {
+                'ns'            :  np.full(self.nz_pk, ns),
+                'As'            :  np.full(self.nz_pk, a_s),
+                'H0'            :  np.full(self.nz_pk, h*100),
+                'Omega_b'       :  np.full(self.nz_pk, omega_b),
+                'Omega_m'       :  np.full(self.nz_pk, omega_m),
+                'Omega_nu'      :  np.full(self.nz_pk, omega_nu),
+                'mu0'           :  np.full(self.nz_pk, mu0),
+                'sigma0'        :  np.full(self.nz_pk, sigma0),
+                'q1'            :  np.full(self.nz_pk, q1),
+                'z'             :  self.zz_boost
+            }
+        mg_boost = self.cp_nl_musigma_model.predictions_np(params_react) 
+        mg_pk_lin = self.cp_lin_musigma_model.ten_to_predictions_np(params_react)
+        # constant extrapolation for k<0.01 h/Mpc
+        mg_boost_left = np.ones(len(self.kh_l_left_boost))
+        # power law extrapolation for k>10 h/Mpc
+        mg_boost_right = boost_right_extrap(mg_boost, self.log_k, self.k_nl_boost_last, self.kh_nl_right_boost, self.zz_boost)
+        # combine mg_boost at all scales
+        mg_boost_k = np.concatenate((mg_boost_left, mg_boost, mg_boost_right))
+        # interpolate
+        mg_boost_interp = RectBivariateSpline(self.zz_boost,
+                    self.kh_nl_boost_tot,
+                    mg_boost_k,
+                    kx=1, ky=1)
+        mg_plin_interp = RectBivariateSpline(self.zz_boost,
+                    self.kh_l,
+                    mg_pk_lin,
+                    kx=1, ky=1)
+        return  mg_boost_interp, mg_plin_interp
+    
+    def get_pk(self, params_dic, k, lbin, zz_integr):
+        pk_m_l  = np.zeros((lbin, len(zz_integr)), 'float64')
+        index_pknn = np.array(np.where((k > k_min_h_by_mpc) & (k < k_max_h_by_mpc))).transpose()
+        mg_boost_l_interp, pk_l_interp = self.get_pk_nl_interp(params_dic)
+        for index_l, index_z in index_pknn:
+            pk_m_l[index_l, index_z] = pk_l_interp(min(zz_integr[index_z], 2.5), k[index_l,index_z])*mg_boost_l_interp(min(zz_integr[index_z], 2.5), k[index_l,index_z])
+        return pk_m_l  
+    
+
+class DarkScatteringReACT(BoostReACT):
+    def __init__(self):
+        super().__init__()
+        print('initialising Dark Scattering')
+        self.cp_nl_ds_model = cosmopower_NN(restore=True, 
+                      restore_filename=dirname+'/../emulators/DS_nonlinear_cp_NN_S8', 
+                      )
+        self.kh_nl_boost = self.cp_nl_ds_model.modes # 1e-3..10. h/Mpc
+        self.zz_boost = np.minimum(self.zz_pk, 2.5)
+        self.kh_nl_right_boost = self.kh_l[self.kh_l>self.kh_nl_boost[-1]]
+        self.kh_nl_boost_tot = np.concatenate((self.kh_nl_boost, self.kh_nl_right_boost))
+        self.k_nl_boost_last = self.kh_nl_boost[-1]
+        self.k_nl_boost_lastlast = self.kh_nl_boost[-2]
+        self.log_k = log(self.k_nl_boost_last / self.k_nl_boost_lastlast)
+        self.emu_name = 'Dark_Scattering_ReACT'
+        
+
+    def get_pk_nl_interp(self, params_dic):
+        ns   = params_dic['ns']
+        s8   = params_dic['S8']
+        h    = params_dic['h']
+        ombh2 = params_dic['Ombh2']
+        omch2 = params_dic['Omch2']
+        m_nu  = params_dic['Mnu']
+        w0    = params_dic['w0']
+        ads    = params_dic['Ads']
+        params_react = {
+                'n_s'            :  np.full(self.nz_pk, ns),
+                'S_8'            :  np.full(self.nz_pk, s8),
+                'h'            :  np.full(self.nz_pk, h),
+                'omega_b'       :  np.full(self.nz_pk, ombh2),
+                'omega_cdm'     :  np.full(self.nz_pk, omch2),
+                'm_nu'          :  np.full(self.nz_pk, m_nu),
+                'w'             :  np.full(self.nz_pk, w0),
+                'A'             :  np.full(self.nz_pk, ads),
+                'z'             :  self.zz_boost
+            }
+        mg_pk_nl = self.cp_nl_ds_model.ten_to_predictions_np(params_react)
+        # power law extrapolation for k>10 h/Mpc
+        mg_pk_nl_right = boost_right_extrap(mg_pk_nl, self.log_k, self.k_nl_boost_last, self.kh_nl_right_boost, self.zz_boost)
+        # combine mg_boost at all scales
+        mg_pnl_k = np.concatenate((mg_pk_nl, mg_pk_nl_right))
+        # interpolate
+        mg_pnl_interp = RectBivariateSpline(self.zz_boost,
+                    self.kh_nl_boost_tot,
+                    mg_pnl_k,
+                    kx=1, ky=1)
+        return  mg_pnl_interp
+    
+    def get_pk(self, params_dic, k, lbin, zz_integr):
+        pk_m_l  = np.zeros((lbin, len(zz_integr)), 'float64')
+        index_pknn = np.array(np.where((k > k_min_h_by_mpc) & (k < k_max_h_by_mpc))).transpose()
+        pk_l_interp = self.get_pk_nl_interp(params_dic)
+        for index_l, index_z in index_pknn:
+            pk_m_l[index_l, index_z] = pk_l_interp(min(zz_integr[index_z], 2.5), k[index_l,index_z])
+        return pk_m_l  

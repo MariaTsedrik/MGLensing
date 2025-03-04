@@ -46,7 +46,6 @@ data:
   #Nonlinear power spectrum
   #     0 -> HMcode
   #     1 -> bacco
-  #----- not implemented yet:
   #     2 -> nDGP
   #     3 -> gLEMURS
   #     4 -> μ-Σ 
@@ -74,7 +73,6 @@ theory:
   #Nonlinear power spectrum
   #     0 -> HMcode
   #     1 -> bacco
-  #----- not implemented yet:
   #     2 -> nDGP
   #     3 -> gLEMURS
   #     4 -> μ-Σ 

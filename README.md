@@ -17,7 +17,7 @@ This code is not complete to perform a real data analysis (yet), but is a fairly
     - $\Lambda$ CDM, $w$ CDM and $w_0w_a$ CDM with neutrinos.
 - ReACT-based emulators: 
     - normal branch of [DGP gravity](https://arxiv.org/abs/hep-th/0005016) (nDGP); 
-    - [Growth index parametrisation](https://arxiv.org/abs/astro-ph/0507263) and [Time-dependent growth index](https://arxiv.org/abs/2304.07281) with Screening;
+    - [growth index parametrisation](https://arxiv.org/abs/astro-ph/0507263) and [time-dependent growth index](https://arxiv.org/abs/2304.07281) with Screening;
     - $\mu-\Sigma$ parametrisation with Screening;
     - Interacting Dark Energy also known as [Dark Scattering](https://arxiv.org/abs/1605.05623).
 - Galaxy bias:
@@ -36,7 +36,7 @@ Modify "config.yaml" file and specify
 * Specifics of your survey;
 * Modelling for your mock synthetic data;
 * Modelling for your theoretical predictions;
-* File-paths with fiducial data points and priors;
+* File-paths with fiducial data points (e.g., "params_data.yaml") and priors (e.g., params_bacco_test.yaml);
 * Output-file name.
 
 
@@ -52,7 +52,7 @@ Following files provide examples of using MGL:
 * test_plot.py and test_plot_kernels.py : compute and plot observables and modelling components;
 * test_mcmc_run.py: run an MCMC chain with [Nautilus sampler](https://github.com/johannesulf/nautilus);
 * test_plot_posterior.py: plot posterior distributions with GetDist;
-* test_postprocess_S8.py: compute sigma8 and S8 from a chain.
+* test_postprocess_S8.py: compute $\sigma_8$ and $S_8$ from a chain.
 
 ## Documentation
 ...tbd...

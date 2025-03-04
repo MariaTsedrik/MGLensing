@@ -2,9 +2,10 @@ import numpy as np
 import MGrowth as mg
 from scipy.integrate import trapezoid, quad
 from scipy import interpolate as itp
-from .powerspectra import HMcode2020, BCemulator, BaccoEmu
+from .powerspectra import HMcode2020, BCemulator, BaccoEmu, DGPReACT, GammaReACT, MuSigmaReACT, DarkScatteringReACT
 from math import sqrt, log, exp, pow, log10
 import os
+
 os.environ['TF_CPP_MIN_LOG_LEVEL'] = '3'  
 # Suppress TensorFlow warnings
 
@@ -13,14 +14,14 @@ H0_h_c = 1./2997.92458
 # =100/c in Mpc/h Hubble constant conversion factor
 C_IA = 0.0134 
 # =dimensionsless, C x rho_crit 
-
+a_arr_for_mu = np.logspace(-5., 1., 512)
 
 NL_MODEL_HMCODE = 0
 NL_MODEL_BACCO = 1
 NL_MODEL_NDGP = 2
 NL_MODEL_GAMMAZ = 3
 NL_MODEL_MUSIGMA = 4
-NL_MODEL_IDE = 5
+NL_MODEL_DS = 5
 
 
 NO_BARYONS = 0
@@ -98,6 +99,11 @@ EmulatorRanges = {
 
 
 cosmo_names = ["Omega_m", "Omega_b", "Omega_c", "Omega_cb", "Omega_nu", "Ombh2", "Omnuh2", "fb", "h", "Mnu", "ns", "w0", "wa"]
+def check_zmax(zmax, emu_obj):
+    emu_z_max = emu_obj.zz_max
+    if zmax > emu_z_max:
+        raise ValueError(f'Survey z_max must not exceed zz_max in the power spectrum computation for {emu_obj.emu_name}!')
+        
 
 class Theory:
     def __init__(self, SurveyClass):
@@ -105,14 +111,19 @@ class Theory:
         # load classes with emulators
         # to-do: load only the ones actually used in the code
         self.HMcode2020Emulator = HMcode2020()
-        if self.Survey.zmax > self.HMcode2020Emulator.zz_max:
-            raise ValueError('Survey z_max must not exceed zz_max in the power spectrum computation for HMcode2020!')
+        check_zmax(self.Survey.zmax, self.HMcode2020Emulator)
         self.BCemulator = BCemulator()
-        if self.Survey.zmax > self.BCemulator.zz_max:
-            raise ValueError('Survey z_max must not exceed zz_max in the power spectrum computation for BCemulator!')
+        check_zmax(self.Survey.zmax, self.BCemulator)
         self.BaccoEmulator = BaccoEmu()
-        if self.Survey.zmax > self.BaccoEmulator.zz_max:
-            raise ValueError('Survey z_max must not exceed zz_max in the power spectrum computation for BaccoEmulator!')
+        check_zmax(self.Survey.zmax, self.BaccoEmulator)
+        self.DGPEmulator = DGPReACT()
+        check_zmax(self.Survey.zmax, self.DGPEmulator)
+        self.GammazEmulator = GammaReACT()
+        check_zmax(self.Survey.zmax, self.GammazEmulator)
+        self.MuSigmaEmulator = MuSigmaReACT()
+        check_zmax(self.Survey.zmax, self.MuSigmaEmulator)
+        self.DSEmulator = DarkScatteringReACT()
+        check_zmax(self.Survey.zmax, self.DSEmulator)
 
     def check_consistency(self, params): 
         if 'h' not in params.keys():
@@ -297,6 +308,13 @@ class Theory:
         # check the w0-wa condition
         if params['w0'] + params['wa'] >= 0:
             status = False
+        # check the mu-Sigma condition
+        if params['mu0'] > (2.*params['sigma0']+1.):
+            status = False    
+        # check the DS condition
+        if params['w0']!=-1.:
+            if params['Ads']/(1. + params['w0']) < 0:
+                status = False       
         return  status 
 
 
@@ -426,7 +444,23 @@ class Theory:
             cosmo = mg.Linder_gamma_a(background)
             gamma0 = params_dic['gamma0'] 
             gamma1 = params_dic['gamma1'] 
-            da, _ = cosmo.growth_parameters(gamma=gamma0, gamma1=gamma1)  
+            da, _ = cosmo.growth_parameters(gamma=gamma0, gamma1=gamma1)
+        elif nl_model==NL_MODEL_MUSIGMA:
+            omega_m = params_dic['Omega_m']
+            w0 = params_dic['w0']
+            wa = params_dic['wa']
+            omega_lambda = (1.-omega_m)* pow(a_arr_for_mu, -3.*(1.+w0+wa)) * np.exp(-3.*wa*(1.-a_arr_for_mu))
+            e2 = omega_m/a_arr_for_mu**3+omega_lambda
+            cosmo = mg.mu_a(background)
+            mu0 = params_dic['mu0'] 
+            mu0_arr = 1.+mu0/e2
+            mu_interpolator = itp.interp1d(a_arr_for_mu, mu0_arr, bounds_error=False,
+                kind='cubic') 
+            da, _ = cosmo.growth_parameters(mu_interp=mu_interpolator) 
+        elif nl_model==NL_MODEL_DS:
+            cosmo = mg.IDE(background)
+            xi = params_dic['Ads']/(1.+params_dic['w0'])
+            da, _ = cosmo.growth_parameters(xi=xi)             
         else:
             raise ValueError("Invalid mg_model option.")    
         dz = da[::-1] 
@@ -866,6 +900,14 @@ class Theory:
             pk = self.HMcode2020Emulator.get_pk(params_dic, k, lbin, zz_integr)
         elif nl_model == NL_MODEL_BACCO:
             pk = self.BaccoEmulator.get_pk(params_dic, k, lbin, zz_integr)
+        elif nl_model == NL_MODEL_NDGP:
+            pk = self.DGPEmulator.get_pk(params_dic, k, lbin, zz_integr)
+        elif nl_model == NL_MODEL_GAMMAZ:
+            pk = self.GammazEmulator.get_pk(params_dic, k, lbin, zz_integr)
+        elif nl_model == NL_MODEL_MUSIGMA:
+            pk = self.MuSigmaEmulator.get_pk(params_dic, k, lbin, zz_integr)
+        elif nl_model == NL_MODEL_DS:
+            pk = self.DSEmulator.get_pk(params_dic, k, lbin, zz_integr)      
         else:
             raise ValueError("Invalid nl_model option.")
         # add baryonic boost
@@ -970,7 +1012,15 @@ class Theory:
         pgg = pk
         pgg_extr = None
         if model_dic['bias_model'] == BIAS_HEFT:
-            pgg, pgg_extr = self.BaccoEmulator.get_heft(params_dic, k, self.Survey.lbin, self.Survey.zz_integr)
+            if model_dic['nl_model']!=0 or model_dic['nl_model']!=1:
+                # re-scale for modified gravity
+                # pgm dimensions are (15, ell, z_integr)
+                dz, _ = self.get_growth(params_dic, self.Survey.zz_integr, model_dic['nl_model'])
+                dz_norm, _ = self.get_growth(params_dic, self.Survey.zz_integr,  nl_model=0)
+                dz_rescale = dz/dz_norm
+                pgg, pgg_extr = self.BaccoEmulator.get_heft(params_dic, k, self.Survey.lbin, self.Survey.zz_integr)*dz_rescale[np.newaxis, np.newaxis, :]*dz_rescale[np.newaxis, np.newaxis, :]
+            else:    
+                pgg, pgg_extr = self.BaccoEmulator.get_heft(params_dic, k, self.Survey.lbin, self.Survey.zz_integr)               
         cl_gg, _ = self.get_cell_galclust(params_dic, ez, rz, k, pgg, pgg_extr, model_dic['bias_model'])
         # create an interpolator at the binned ells
         spline_gg = np.empty((self.Survey.nbin, self.Survey.nbin), dtype=(list, 3))
@@ -994,9 +1044,18 @@ class Theory:
             pk = self.get_pk_nl(params_dic, k, self.Survey.lbin, self.Survey.zz_integr, model_dic['nl_model'])
             bar_boost = self.get_bar_boost(params_dic, k, self.Survey.lbin, self.Survey.zz_integr, model_dic['baryon_model'])
             pmm = pk*bar_boost
-            # find matter-galaxy and galaxy-galaxy power spectra without galaxy-bias
-            pgg, pgg_extr = pgm, pgm_extr = self.BaccoEmulator.get_heft(params_dic, k, self.Survey.lbin, self.Survey.zz_integr) 
+            if model_dic['nl_model']!=0 or model_dic['nl_model']!=1:
+                # re-scale for modified gravity
+                # pgm dimensions are (15, ell, z_integr)
+                dz, _ = self.get_growth(params_dic, self.Survey.zz_integr, model_dic['nl_model'])
+                dz_norm, _ = self.get_growth(params_dic, self.Survey.zz_integr,  nl_model=0)
+                dz_rescale = dz/dz_norm
+                pgg, pgg_extr = pgm, pgm_extr = self.BaccoEmulator.get_heft(params_dic, k, self.Survey.lbin, self.Survey.zz_integr) * dz_rescale[np.newaxis, np.newaxis, :]*dz_rescale[np.newaxis, np.newaxis, :]
+            else:
+                # find matter-galaxy and galaxy-galaxy power spectra without galaxy-bias
+                pgg, pgg_extr = pgm, pgm_extr = self.BaccoEmulator.get_heft(params_dic, k, self.Survey.lbin, self.Survey.zz_integr) 
             pgm, pgm_extr = pgm*np.sqrt(bar_boost), pgm_extr*np.sqrt(bar_boost) 
+            
         else: 
             # compute matter-matter power spectrum with baryonic feedback
             pmm = self.get_pmm(params_dic, k, self.Survey.lbin, self.Survey.zz_integr, model_dic['nl_model'], model_dic['baryon_model'])

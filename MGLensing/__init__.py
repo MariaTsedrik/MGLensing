@@ -32,6 +32,9 @@ class MGL():
             self.Survey = LSSTSetUp(self.config_dic['specs']['survey_info'], self.config_dic['specs']['scale_cuts'])  
         else:
             raise ValueError('Invalid survey name')   
+        
+        if self.Survey.zz_integr[0]==0.:
+            raise ValueError('Invalid smallest redshift: z_min>0!!!')  
  
         self.path = self.config_dic.get('path', './')
         self.chain_name = self.config_dic['output']['chain_name']
@@ -136,7 +139,15 @@ class MGL():
     def get_bpgm(self, params, nl_model, bias_model, baryon_model=0):
         _, _, k = self.Theo.get_ez_rz_k(params, self.Survey.zz_integr)
         if bias_model==2:
-            pgm, pgm_extr = self.Theo.BaccoEmulator.get_heft(params, k, self.Survey.lbin, self.Survey.zz_integr) 
+            if nl_model!=0 or nl_model!=1:
+                # re-scale for modified gravity
+                # pgm dimensions are (15, ell, z_integr)
+                dz, _ = self.get_growth(params, self.Survey.zz_integr, nl_model)
+                dz_norm, _ = self.get_growth(params, self.Survey.zz_integr,  nl_model=0)
+                dz_rescale = dz/dz_norm
+                pgm, pgm_extr = self.Theo.BaccoEmulator.get_heft(params, k, self.Survey.lbin, self.Survey.zz_integr)*dz_rescale[np.newaxis, np.newaxis, :]*dz_rescale[np.newaxis, np.newaxis, :]
+            else:
+                pgm, pgm_extr = self.Theo.BaccoEmulator.get_heft(params, k, self.Survey.lbin, self.Survey.zz_integr) 
         else:
             pgm = self.Theo.get_pmm(params, k, self.Survey.lbin, self.Survey.zz_integr, nl_model, baryon_model)  
             pgm_extr = None
@@ -146,7 +157,15 @@ class MGL():
     def get_bpgg(self, params, nl_model, bias_model, baryon_model=0):
         _, _, k = self.Theo.get_ez_rz_k(params, self.Survey.zz_integr)
         if bias_model==2:
-            pgg, pgg_extr = self.Theo.BaccoEmulator.get_heft(params, k, self.Survey.lbin, self.Survey.zz_integr) 
+            if nl_model!=0 or nl_model!=1:
+                # re-scale for modified gravity
+                # pgm dimensions are (15, ell, z_integr)
+                dz, _ = self.get_growth(params, self.Survey.zz_integr, nl_model)
+                dz_norm, _ = self.get_growth(params, self.Survey.zz_integr,  nl_model=0)
+                dz_rescale = dz/dz_norm
+                pgg, pgg_extr = self.Theo.BaccoEmulator.get_heft(params, k, self.Survey.lbin, self.Survey.zz_integr)*dz_rescale[np.newaxis, np.newaxis, :]*dz_rescale[np.newaxis, np.newaxis, :]
+            else:
+                pgg, pgg_extr = self.Theo.BaccoEmulator.get_heft(params, k, self.Survey.lbin, self.Survey.zz_integr) 
         else:
             pgg = self.Theo.get_pmm(params, k, self.Survey.lbin, self.Survey.zz_integr, nl_model, baryon_model) 
             pgg_extr = None
@@ -178,7 +197,15 @@ class MGL():
     def get_cell_galclust(self, params, nl_model, bias_model, baryon_model=0):
         ez, rz, k = self.Theo.get_ez_rz_k(params, self.Survey.zz_integr)
         if bias_model == 2:
-            pgg, pgg_extr = self.Theo.BaccoEmulator.get_heft(params, k, self.Survey.lbin, self.Survey.zz_integr)
+            if nl_model!=0 or nl_model!=1:
+                # re-scale for modified gravity
+                # pgm dimensions are (15, ell, z_integr)
+                dz, _ = self.get_growth(params, self.Survey.zz_integr, nl_model)
+                dz_norm, _ = self.get_growth(params, self.Survey.zz_integr,  nl_model=0)
+                dz_rescale = dz/dz_norm
+                pgg, pgg_extr = self.Theo.BaccoEmulator.get_heft(params, k, self.Survey.lbin, self.Survey.zz_integr)*dz_rescale[np.newaxis, np.newaxis, :]*dz_rescale[np.newaxis, np.newaxis, :]
+            else:
+                pgg, pgg_extr = self.Theo.BaccoEmulator.get_heft(params, k, self.Survey.lbin, self.Survey.zz_integr)
         else:
             pgg = self.Theo.get_pmm(params, k, self.Survey.lbin, self.Survey.zz_integr, nl_model, baryon_model)
             pgg_extr = None
@@ -195,7 +222,15 @@ class MGL():
         pgm_extr = None
         pgg_extr = None
         if bias_model == 2:
-            pgg, pgg_extr = pgm, pgm_extr = self.Theo.BaccoEmulator.get_heft(params, k, self.Survey.lbin, self.Survey.zz_integr) 
+            if nl_model!=0 or nl_model!=1:
+                # re-scale for modified gravity
+                # pgm dimensions are (15, ell, z_integr)
+                dz, _ = self.get_growth(params, self.Survey.zz_integr, nl_model)
+                dz_norm, _ = self.get_growth(params, self.Survey.zz_integr,  nl_model=0)
+                dz_rescale = dz/dz_norm
+                pgg, pgg_extr = pgm, pgm_extr = self.Theo.BaccoEmulator.get_heft(params, k, self.Survey.lbin, self.Survey.zz_integr) * dz_rescale[np.newaxis, np.newaxis, :]*dz_rescale[np.newaxis, np.newaxis, :]
+            else:
+                pgg, pgg_extr = pgm, pgm_extr = self.Theo.BaccoEmulator.get_heft(params, k, self.Survey.lbin, self.Survey.zz_integr) 
         _, w_l = self.Theo.get_cell_shear(params, ez, rz, dz, pmm, ia_model)
         _, w_g = self.Theo.get_cell_galclust(params, ez, rz, k, pgg, pgg_extr, bias_model)    
         cl_lg, cl_gl = self.Theo.get_cell_cross(params, ez, rz, k, pgm, pgm_extr, w_l, w_g, bias_model)   

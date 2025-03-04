@@ -38,9 +38,13 @@ elif MGLtest.probe == '3x2pt':
 else:
     raise ValueError('Check the probe name!')      
 
-def main():
+# Ensure the directories exist
+os.makedirs('chains', exist_ok=True)
+os.makedirs('chains/hdf5', exist_ok=True)
+
+def main():    
     sampler = Sampler(prior, log_probability_function, 
-                                filepath='chains/hdf5/'+MGLtest.hdf5_name+'.hdf5', resume=MGLtest.mcmc_resume, n_live=MGLtest.mcmc_nlive, pool=MGLtest.mcmc_pool)
+                      filepath='chains/hdf5/'+MGLtest.hdf5_name+'.hdf5', resume=MGLtest.mcmc_resume, n_live=MGLtest.mcmc_nlive, pool=MGLtest.mcmc_pool)
     start = time.time()
     sampler.run(verbose=MGLtest.mcmc_verbose, discard_exploration=True)
     log_z = sampler.evidence()
