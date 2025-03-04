@@ -93,9 +93,54 @@ EmulatorRanges = {
         'thetaout_bc':  {'p1': 0.,           'p2': 0.47},
         'thetainn_bc':  {'p1': -2.,          'p2': -0.523},
         'log10Minn_bc': {'p1': 9.,           'p2': 13.5}
-        }
+        },
+    'ndgp_react':
+        {
+        'Omega_m':      {'p1':0.27,           'p2':0.34}, 
+        'Omega_b':      {'p1':0.04044,        'p2':0.05686}, 
+        'h':            {'p1':0.62,           'p2':0.74},
+        'ns':           {'p1':0.92,           'p2':1.0},
+        'As':           {'p1':1.5e-09,        'p2':2.7e-09},
+        'Mnu':          {'p1':0.,             'p2':0.5},
+        'log10Omega_rc':{'p1':-3.,            'p2':2.},
+        },       
+    'gammaz_react':
+        {
+        'Omega_m':      {'p1':0.29,            'p2':0.34}, 
+        'Omega_b':      {'p1':0.04044,         'p2':0.05686}, 
+        'h':            {'p1':0.629,           'p2':0.731},
+        'ns':           {'p1':0.9432,          'p2':0.9862},
+        'As':           {'p1':1.5e-09,         'p2':2.7e-09},
+        'Omega_nu':     {'p1':0.,              'p2':0.00317},
+        'gamma0':       {'p1':0.,              'p2':1.},
+        'gamma1':       {'p1':-0.7,            'p2':0.7},
+        'q1':           {'p1':-2.,             'p2':2.}
+        },     
+    'musigma_react':
+        {
+        'Omega_m':      {'p1':0.2,            'p2':0.6}, 
+        'Omega_b':      {'p1':0.03,           'p2':0.07}, 
+        'h':            {'p1':0.58,           'p2':0.8},
+        'ns':           {'p1':0.93,           'p2':1.0},
+        'As':           {'p1':0.5e-09,        'p2':5.e-09},
+        'Mnu':          {'p1':0.,             'p2':0.6},
+        'mu0':          {'p1':-0.9999,        'p2':2.9999},
+        'sigma0':       {'p1':-1.,            'p2':3.},
+        'q1':           {'p1':-2.,            'p2':2.}
+        },    
+    'ds_react':
+        {
+        'Ombh2':        {'p1':0.01875,            'p2':0.02625}, 
+        'Omch2':        {'p1':0.05,           'p2':0.255}, 
+        'h':            {'p1':0.64,           'p2':0.82},
+        'ns':           {'p1':0.84,           'p2':1.1},
+        'S8':           {'p1':0.6,        'p2':0.9},
+        'Mnu':          {'p1':0.,             'p2':0.2},
+        'w0':           {'p1':-1.3,            'p2':-0.7},
+        'Ads':           {'p1':-30.,            'p2':30.}
+        },    
 
-}
+}            
 
 
 cosmo_names = ["Omega_m", "Omega_b", "Omega_c", "Omega_cb", "Omega_nu", "Ombh2", "Omnuh2", "fb", "h", "Mnu", "ns", "w0", "wa"]
@@ -298,6 +343,15 @@ class Theory:
             if not status_:
                 return status_
             status_nl = self.get_emu_status(params, 'bacco', flag_once)
+        elif  model['nl_model']==NL_MODEL_NDGP:       
+            status_nl = self.get_emu_status(params, 'ndgp_react', flag_once)
+        elif  model['nl_model']==NL_MODEL_GAMMAZ:       
+            status_nl = self.get_emu_status(params, 'gammaz_react', flag_once)
+        elif  model['nl_model']==NL_MODEL_MUSIGMA:       
+            status_nl = self.get_emu_status(params, 'musigma_react', flag_once)
+        elif  model['nl_model']==NL_MODEL_DS:       
+            status_nl = self.get_emu_status(params, 'ds_react', flag_once)    
+
         if  model['baryon_model']==BARYONS_BCEMU:
             status_b = self.get_emu_status(params, 'bcemu', flag_once)
         elif  model['baryon_model']==BARYONS_HMCODE:
