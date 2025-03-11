@@ -51,7 +51,7 @@ data:
   #     3 -> gLEMURS
   #     4 -> μ-Σ 
   #     5 -> Dark Scattering (Interacting Dark Energy)
-  bias_model: 2
+  bias_model: 0
   # Photometric galaxy bias model (redshift dependence)
   #     0 -> constant linear bias within bins
   #     1 -> (b1, b2) constant within bins
@@ -67,6 +67,11 @@ data:
   #     1 -> Tagn HMcode
   #     2 -> bcemu
   #     3 -> bacco
+  photoz_err_model: 2
+  # Photo-z error on n(z) model
+  #     0 -> no photo-z error
+  #     1 -> additive mode, n(z') = n(z + dz)
+  #     2 -> multiplicative mode, n(z') = n(z(1 + dz))
   params: ./params_data.yaml
 
 theory:
@@ -79,7 +84,7 @@ theory:
   #     3 -> gLEMURS
   #     4 -> μ-Σ 
   #     5 -> Dark Scattering (Interacting Dark Energy)
-  bias_model: 2
+  bias_model: 0
   # Photometric galaxy bias model (redshift dependence)
   #     0 -> linear interpolation
   #     1 -> constant within bins
@@ -95,10 +100,15 @@ theory:
   #     1 -> Tagn HMcode
   #     2 -> bcemu
   #     3 -> bacco
-  params: ./params_bacco_test.yaml
+  photoz_err_model: 2
+  # Photo-z error on n(z) model
+  #     0 -> no photo-z error
+  #     1 -> additive mode, n(z') = n(z + dz)
+  #     2 -> multiplicative mode, n(z') = n(z(1 + dz))
+  params: ./params_photoz_test.yaml
 
 output: 
-  chain_name: lsst_bacco_3x2pt_nobar_heft_test
+  chain_name: 11Mar-lsst-3x2-cosmo-biggerPhotozMul
 sampler: 
   mcmc:
     verbose: True
@@ -106,7 +116,7 @@ sampler:
     n_live: 1000
     pool: 14
     resume: False
-    hdf5_name: 'bacco_3x2pt_nobar'
+    hdf5_name: '11Mar-lsst-3x2-cosmo-biggerPhotozMul'
   #----- not implemented yet:  
   minimiser:
     verbose: True

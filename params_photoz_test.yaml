@@ -77,132 +77,55 @@ betaIA:
   p0: 0. #2.17
 
 
-b1L_1:
+b1_1:
   type: 'F'  
-  p0: 0.239 
+  p0: 1.239 
   p1: 0.
   p2: 2.        
-b1L_2:
+b1_2:
   type: 'F'
-  p0: 0.378
+  p0: 1.378
   p1: 0.
   p2: 2.     
-b1L_3:
+b1_3:
   type: 'F'
-  p0: 0.525
+  p0: 1.525
   p1: 0.
   p2: 2.    
-b1L_4:
+b1_4:
   type: 'F'
-  p0: 0.677
+  p0: 1.677
   p1: 0.
   p2: 2.               
-b1L_5:
+b1_5:
   type: 'F'
-  p0: 0.832 
+  p0: 1.832 
   p1: 0.
   p2: 2.     
 
-b2L_1:
-  type: 'F'
-  p0: 0.46036128 
-  p1: 0.
-  p2: 2.        
-b2L_2:
-  type: 'F'
-  p0: 0.4845956 
-  p1: 0.
-  p2: 2.           
-b2L_3:
-  type: 'F'
-  p0: 0.5480625 
-  p1: 0.
-  p2: 2.         
-b2L_4:
-  type: 'F'
-  p0: 0.65459134 
-  p1: 0.
-  p2: 2.                    
-b2L_5:
-  type: 'F'
-  p0: 0.80604922 
-  p1: 0.
-  p2: 2.     
-
-bs2L_1:
-  type: 'F'
-  p0: 0.
-  p1: -2.
-  p2: 2.             
-bs2L_2:
-  type: 'F'
-  p0: 0.
-  p1: -2.
-  p2: 2.          
-bs2L_3:
-  type: 'F'
-  p0: 0.
-  p1: -2.
-  p2: 2.          
-bs2L_4:
-  type: 'F'
-  p0: 0.
-  p1: -2.
-  p2: 2.                      
-bs2L_5:
-  type: 'F'
-  p0: 0.
-  p1: -2.
-  p2: 2.            
-
-blaplL_1:
-  type: 'F'
-  p0: 0.
-  p1: -2.
-  p2: 2. 
-blaplL_2:
-  type: 'F'
-  p0: 0.
-  p1: -2.
-  p2: 2.  
-blaplL_3:
-  type: 'F'
-  p0: 0.
-  p1: -2.
-  p2: 2. 
-blaplL_4:
-  type: 'F'
-  p0: 0.
-  p1: -2.
-  p2: 2.           
-blaplL_5:
-  type: 'F'
-  p0: 0.
-  p1: -2.
-  p2: 2.  
 
 deltaz_1:
-  type: 'F'
+  type: 'G'
   p0: 0.0
   p1: 0.0
   p2: 0.0292 
 deltaz_2:
-  type: 'F'
+  type: 'G'
   p0: 0.0
   p1: 0.0
   p2: 0.0334 
 deltaz_3:
-  type: 'F'
+  type: 'G'
   p0: 0.0
   p1: 0.0
   p2: 0.0382 
 deltaz_4:
-  type: 'F'
+  type: 'G'
   p0: 0.0
   p1: 0.0
   p2: 0.0452 
 deltaz_5:
-  type: 'F'
+  type: 'G'
   p0: 0.0
   p1: 0.0
   p2: 0.0634  

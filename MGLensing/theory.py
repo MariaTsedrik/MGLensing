@@ -35,6 +35,10 @@ BIAS_LIN = 0
 BIAS_B1B2 = 1
 BIAS_HEFT = 2
 
+PHOTOZ_NONE = 0
+PHOTOZ_ADD = 1
+PHOTOZ_MULT = 2
+
 
 EmulatorRanges = {
     'HMcode':
@@ -359,6 +363,32 @@ class Theory:
         param_dic_all = self.apply_relations(param_dic)
         status = self.check_ranges_simple(param_dic_all, model_dic)
         return param_dic_all, status
+    
+    def add_photoz_error(self, params_dic, nz, photoz_err_model=0):
+        '''
+        Add photo-z error to the redshift distribution of galaxies.
+        Parameters:
+        -----------
+        params_dic : dict
+            Dictionary containing photo-z error parameters.
+        nz : numpy.ndarray
+            Array of redshift distribution of galaxies.
+        photoz_err_model : int, optional
+            Integer specifying the photo-z error model to use. Default is 0.
+            '''
+        deltaz = np.array([params_dic['deltaz_'+str(i+1)] for i in range(self.Survey.nbin)])
+        nz_biased = np.zeros((len(self.Survey.zz_integr), self.Survey.nbin))
+        for i in range(self.Survey.nbin):
+            f = itp.interp1d(self.Survey.zz_integr, nz[:,i], fill_value=0.0, bounds_error=False)
+            # additive mode
+            if photoz_err_model == PHOTOZ_ADD:
+                nz_biased[:,i] = f(self.Survey.zz_integr - deltaz[i])
+            # multiplicative mode
+            if photoz_err_model == PHOTOZ_MULT:  
+                nz_biased[:,i] = f(self.Survey.zz_integr * (1 - deltaz[i]))
+            # normalize
+            nz_biased[:,i] /= np.trapz(nz_biased[:,i], self.Survey.zz_integr)
+        return nz_biased
 
     def get_ez_rz_k(self, params_dic, zz):
         """
@@ -451,7 +481,7 @@ class Theory:
         dz = dz[1:]/dz[0]
         return dz
     
-    def get_ia_kernel(self, omega_m, params_dic, ez, dz, eta_z_s, zz_integr, ia_model=0):
+    def get_ia_kernel(self, omega_m, params_dic, ez, dz, eta_z_s, zz_integr, ia_model=0, photoz_err_model=0):
         """
         Calculate the intrinsic alignment (IA) kernel in units of h/Mpc. The amplitude is given by 
 
@@ -492,6 +522,9 @@ class Theory:
         w_ia : array_like
             Intrinsic alignment kernel.
         """
+        if photoz_err_model!=PHOTOZ_NONE:
+            eta_z_s = self.add_photoz_error(params_dic, eta_z_s, photoz_err_model)
+            
         if ia_model==IA_NLA:
             w_ia_p = eta_z_s * ez[:,None] * H0_h_c
             a_ia = params_dic['aIA'] 
@@ -505,7 +538,7 @@ class Theory:
             raise NotImplementedError('TATT not implememnted yet')
         return w_ia
     
-    def get_wl_kernel(self, omega_m, params_dic, ez, rz, dz, ia_model=0):
+    def get_wl_kernel(self, omega_m, params_dic, ez, rz, dz, ia_model=0, photoz_err_model=0):
         """
         Calculate the weak lensing kernel, in units of units of h/Mpc: 
         .. math::
@@ -537,18 +570,19 @@ class Theory:
         w_l : array-like
             Weak lensing kernel.
         """
-        # to-do: change to a function with varying photo-z errors
         eta_z_s =  self.Survey.eta_z_s 
+        if photoz_err_model!=PHOTOZ_NONE:
+            eta_z_s = self.add_photoz_error(params_dic, eta_z_s, photoz_err_model)
         # in the integrand dimensions are (bin_i, zz_integr, zz_integr)
         integrand = 3./2.*H0_h_c**2. * omega_m * rz[None,:,None]*(1.+self.Survey.zz_integr[None,:,None])*eta_z_s.T[:,None,:]*(1.-rz[None,:,None]/rz[None,None,:])
         # integrate along the third dimension in zz_integr
         w_gamma  = trapezoid(np.triu(integrand), self.Survey.zz_integr,axis=-1).T
         # add an extra dimension to w_gamma as we might have ell-dependence in the IA-kernel due to the scale-dependent linear growth
         # sum the lensing and intrinsic alignment kernels together
-        w_l = w_gamma[None,:,:] + self.get_ia_kernel(omega_m, params_dic, ez, dz, eta_z_s, self.Survey.zz_integr, ia_model)
+        w_l = w_gamma[None,:,:] + self.get_ia_kernel(omega_m, params_dic, ez, dz, eta_z_s, self.Survey.zz_integr, ia_model, photoz_err_model)
         return w_l
     
-    def get_cell_shear(self, params_dic, ez, rz, dz, pk, ia_model=0):
+    def get_cell_shear(self, params_dic, ez, rz, dz, pk, ia_model=0, photoz_err_model=0):
         """
         Calculate the weak lensing power spectrum (C_ell):
         .. math::
@@ -569,6 +603,8 @@ class Theory:
             Array of matter power spectrum values.
         ia_model : int, optional
             Intrinsic alignment model (default is 0).
+        photoz_err_model : int, optional
+            Photo-z error model (default is 0).
 
         Returns:
         --------
@@ -579,7 +615,7 @@ class Theory:
         """
         omega_m = params_dic['Omega_m']
         # compute weak lensing kernel
-        w_l = self.get_wl_kernel(omega_m, params_dic, ez, rz, dz, ia_model)
+        w_l = self.get_wl_kernel(omega_m, params_dic, ez, rz, dz, ia_model, photoz_err_model)
         # compute the integrand with dimensions (ell, z_integr, bin_i, bin_j)
         cl_ll_int = w_l[:,:,:,None] * w_l[:,:,None,:] * pk[:,:,None,None] / ez[None,:,None,None] / rz[None,:,None,None] / rz[None,:,None,None] / H0_h_c
         # integrate along the z_integr-direction
@@ -667,7 +703,7 @@ class Theory:
             raise ValueError("Invalid bias_model option.")
         return bpgg
 
-    def get_gg_kernel(self, ez):
+    def get_gg_kernel(self, ez, params_dic, photoz_err_model=0):
         """
         Calculate the galaxy-galaxy lensing kernel, , in units of units of h/Mpc: 
         .. math::
@@ -683,15 +719,17 @@ class Theory:
         numpy.ndarray
             The galaxy-galaxy lensing kernel with shape (1, zbin_integr, nbin).
         """
-        # to-do: change to a function with varying photo-z errors
         eta_z_l = self.Survey.eta_z_l  
+        if photoz_err_model!=PHOTOZ_NONE:
+            eta_z_l = self.add_photoz_error(params_dic, eta_z_l, photoz_err_model)
+
         w_g = np.zeros((self.Survey.zbin_integr, self.Survey.nbin), 'float64')
         w_g = ez[:, None] * H0_h_c * eta_z_l
         # add an extra dimension, now (ell, z_integr, bin_i)
         w_g = w_g[None, :, :]
         return w_g
     
-    def get_cell_galclust(self, params_dic, ez, rz, k, pgg, pgg_extr, bias_model=0):
+    def get_cell_galclust(self, params_dic, ez, rz, k, pgg, pgg_extr, bias_model=0, photoz_err_model=0):
         """
         Compute the galaxy clustering angular power spectrum:
         .. math::
@@ -713,6 +751,8 @@ class Theory:
             Extrapolated galaxy-galaxy power spectrum.
         bias_model : int, optional
             Bias model to use (default is 0).
+        photoz_err_model : int, optional
+            Photo-z error model (default is 0).
 
         Returns:
         --------
@@ -722,7 +762,7 @@ class Theory:
             Photo galaxy clustering kernel.
         """
         # compute photo galaxy clustering kernel
-        w_g = self.get_gg_kernel(ez)
+        w_g = self.get_gg_kernel(ez, params_dic, photoz_err_model)
         # compute galaxy-galaxy power spectrum
         bpgg = self.get_bpgg(params_dic, k, pgg, pgg_extr, self.Survey.nbin, bias_model)
         # compute integrand with the dimensions of (ell, z_integr, bin_i, bin_j)
@@ -924,7 +964,7 @@ class Theory:
         # compute matter-matter power spectrum
         pk = self.get_pmm(params_dic, k, self.Survey.lbin, self.Survey.zz_integr, model_dic['nl_model'], model_dic['baryon_model'])
         # compute weak lensing angular power spectra
-        cl_wl, _ = self.get_cell_shear(params_dic, ez, rz, dz, pk, model_dic['ia_model'])
+        cl_wl, _ = self.get_cell_shear(params_dic, ez, rz, dz, pk, model_dic['ia_model'], model_dic['photoz_err_model'])
         # create an interpolator at the binned ells
         spline_ll = np.empty((self.Survey.nbin, self.Survey.nbin), dtype=(list, 3))
         for bin1 in range(self.Survey.nbin):
@@ -965,7 +1005,7 @@ class Theory:
         pgg_extr = None
         if model_dic['bias_model'] == BIAS_HEFT:
             pgg, pgg_extr = self.BaccoEmulator.get_heft(params_dic, k, self.Survey.lbin, self.Survey.zz_integr)
-        cl_gg, _ = self.get_cell_galclust(params_dic, ez, rz, k, pgg, pgg_extr, model_dic['bias_model'])
+        cl_gg, _ = self.get_cell_galclust(params_dic, ez, rz, k, pgg, pgg_extr, model_dic['bias_model'], model_dic['photoz_err_model'])
         # create an interpolator at the binned ells
         spline_gg = np.empty((self.Survey.nbin, self.Survey.nbin), dtype=(list, 3))
         for bin1 in range(self.Survey.nbin):
@@ -995,7 +1035,7 @@ class Theory:
             pgg, pgg_extr = pgm, pgm_extr = self.BaccoEmulator.get_heft(params_dic, k, self.Survey.lbin, self.Survey.zz_integr) 
         # compute weak lensing angular power spectra cl_ll(l, bin_i, bin_j)
         # window function w_l(l,z,bin) in units of h/Mpc
-        cl_ll, w_l = self.get_cell_shear(params_dic, ez, rz, dz, pmm, model_dic['ia_model'])
+        cl_ll, w_l = self.get_cell_shear(params_dic, ez, rz, dz, pmm, model_dic['ia_model'], model_dic['photoz_err_model'])
         spline_ll = np.empty((self.Survey.nbin, self.Survey.nbin), dtype=(list, 3))
         # create an interpolator at the binned ells
         for bin1 in range(self.Survey.nbin):
@@ -1004,7 +1044,7 @@ class Theory:
                     self.Survey.l_wl[:], cl_ll[:, bin1, bin2]))    
         # compute photometric galaxy clustring angular power spectra cl_gg(l, bin_i, bin_j)
         # window function w_g(l,z,bin) in units of h/Mpc
-        cl_gg, w_g = self.get_cell_galclust(params_dic, ez, rz, k, pgg, pgg_extr, model_dic['bias_model'])    
+        cl_gg, w_g = self.get_cell_galclust(params_dic, ez, rz, k, pgg, pgg_extr, model_dic['bias_model'], model_dic['photoz_err_model'])    
         spline_gg = np.empty((self.Survey.nbin, self.Survey.nbin), dtype=(list, 3))
         # create an interpolator at the binned ells
         for bin1 in range(self.Survey.nbin):

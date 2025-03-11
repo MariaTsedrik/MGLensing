@@ -51,6 +51,12 @@ blaplL_3: 'b_{\nabla^2 \rm L}^3'
 blaplL_4: 'b_{\nabla^2 \rm L}^4'
 blaplL_5: 'b_{\nabla^2 \rm L}^5'
 
+deltaz_1 : '\delta_z^1'
+deltaz_2 : '\delta_z^2'
+deltaz_3 : '\delta_z^3'
+deltaz_4 : '\delta_z^4'
+deltaz_5 : '\delta_z^5'
+
 ################################################
 #               Baryons                        #
 ################################################
