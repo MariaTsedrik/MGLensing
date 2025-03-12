@@ -535,7 +535,7 @@ class BoostReACT():
         self.cp_nl_hmcode_model = cosmopower_NN(restore=True, 
                       restore_filename=dirname+'/../emulators/log10_total_matter_nonlinear_emu',
                       )
-        self.kh_nl = self.cp_nl_model.modes # 0.01..50. h/Mpc    
+        self.kh_nl = self.cp_nl_hmcode_model.modes # 0.01..50. h/Mpc    
         self.cp_l_model = cosmopower_NN(restore=True, 
                       restore_filename=dirname+'/../emulators/log10_total_matter_linear_emu',
                       )
@@ -583,6 +583,8 @@ def boost_right_extrap(mg_boost, log_k, k_last, kh_nl_right_boost, zz_boost):
     m = np.array([log(boost_last_entry[i] / boost_lastlast_entry[i]) / log_k for i in range(zz_boost)])
     mg_boost_right = boost_last_entry[:, np.newaxis] *(kh_nl_right_boost[np.newaxis, :]/k_last)**m[:, np.newaxis]
     return mg_boost_right    
+
+
 class DGPReACT(BoostReACT):
     def __init__(self):
         super().__init__()

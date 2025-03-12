@@ -355,14 +355,16 @@ class Theory:
             status_nl = self.get_emu_status(params, 'musigma_react', flag_once)
         elif  model['nl_model']==NL_MODEL_DS:       
             status_nl = self.get_emu_status(params, 'ds_react', flag_once)    
-
-        if  model['baryon_model']==BARYONS_BCEMU:
-            status_b = self.get_emu_status(params, 'bcemu', flag_once)
-        elif  model['baryon_model']==BARYONS_HMCODE:
-            status_b = self.get_emu_status(params, 'hm_bar', flag_once)
-        elif  model['baryon_model']==BARYONS_BACCO:
-            status_b = self.get_emu_status(params, 'bacco_bfc', flag_once)
-        status = status_nl and status_b
+        if model['baryon_model']!=NO_BARYONS:
+            if  model['baryon_model']==BARYONS_BCEMU:
+                status_b = self.get_emu_status(params, 'bcemu', flag_once)
+            elif  model['baryon_model']==BARYONS_HMCODE:
+                status_b = self.get_emu_status(params, 'hm_bar', flag_once)
+            elif  model['baryon_model']==BARYONS_BACCO:
+                status_b = self.get_emu_status(params, 'bacco_bfc', flag_once)
+            status = status_nl and status_b
+        else:
+            status = status_nl
         # check the w0-wa condition
         if params['w0'] + params['wa'] >= 0:
             status = False
@@ -1115,8 +1117,6 @@ class Theory:
                 pgg, pgg_extr = self.BaccoEmulator.get_heft(params_dic, k, self.Survey.lbin, self.Survey.zz_integr)*dz_rescale[np.newaxis, np.newaxis, :]*dz_rescale[np.newaxis, np.newaxis, :]
             else:    
                 pgg, pgg_extr = self.BaccoEmulator.get_heft(params_dic, k, self.Survey.lbin, self.Survey.zz_integr)               
-        cl_gg, _ = self.get_cell_galclust(params_dic, ez, rz, k, pgg, pgg_extr, model_dic['bias_model'])
-            pgg, pgg_extr = self.BaccoEmulator.get_heft(params_dic, k, self.Survey.lbin, self.Survey.zz_integr)
         cl_gg, _ = self.get_cell_galclust(params_dic, ez, rz, k, pgg, pgg_extr, model_dic['bias_model'], model_dic['photoz_err_model'])
         # create an interpolator at the binned ells
         spline_gg = np.empty((self.Survey.nbin, self.Survey.nbin), dtype=(list, 3))

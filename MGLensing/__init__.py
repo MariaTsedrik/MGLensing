@@ -223,8 +223,8 @@ class MGL():
         pgg_extr = None
         if bias_model == 2:
             pgg, pgg_extr = pgm, pgm_extr = self.Theo.BaccoEmulator.get_heft(params, k, self.Survey.lbin, self.Survey.zz_integr) 
-        _, w_l = self.Theo.get_cell_shear(params, ez, rz, dz, pmm, ia_model, photoz_err_model)
-        _, w_g = self.Theo.get_cell_galclust(params, ez, rz, k, pgg, pgg_extr, bias_model, photoz_err_model)    
+            _, w_l = self.Theo.get_cell_shear(params, ez, rz, dz, pmm, ia_model, photoz_err_model)
+            _, w_g = self.Theo.get_cell_galclust(params, ez, rz, k, pgg, pgg_extr, bias_model, photoz_err_model)    
             if nl_model!=0 or nl_model!=1:
                 # re-scale for modified gravity
                 # pgm dimensions are (15, ell, z_integr)
@@ -366,7 +366,7 @@ class MGL():
             test_time = finish-start
         elif self.probe=='WL':
             start = time.time()
-            test_like = self.Like.loglikelihood_det_WL(dic_test, self.theo_model_dic)    
+            test_like = self.Like.loglikelihood_det_wl(dic_test, self.theo_model_dic)    
             finish = time.time()
             test_time = finish-start
         elif self.probe=='GC':
