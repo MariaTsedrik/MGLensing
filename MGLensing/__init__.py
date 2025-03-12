@@ -146,39 +146,39 @@ class MGL():
         bpgg = self.Theo.get_bpgg(params, k, pgg, pgg_extr, self.Survey.nbin, bias_model)
         return k, bpgg
 
-    def get_cell_shear(self, params, nl_model, baryon_model=0, ia_model=0):
+    def get_cell_shear(self, params, nl_model, baryon_model=0, ia_model=0, photoz_err_model=0):
         ez, rz, k = self.Theo.get_ez_rz_k(params, self.Survey.zz_integr)
         dz = self.Theo.get_growth(params, self.Survey.zz_integr, nl_model)
         pk = self.Theo.get_pmm(params, k, self.Survey.lbin, self.Survey.zz_integr, nl_model, baryon_model)
-        cl_ll, _ = self.Theo.get_cell_shear(params, ez, rz, dz, pk, ia_model)
+        cl_ll, _ = self.Theo.get_cell_shear(params, ez, rz, dz, pk, ia_model, photoz_err_model)
         return  self.Survey.l_wl, cl_ll
     
-    def get_wl_kernel(self, params, nl_model, ia_model=0):
+    def get_wl_kernel(self, params, nl_model, ia_model=0, photoz_err_model=0):
         ez, rz, _ = self.Theo.get_ez_rz_k(params, self.Survey.zz_integr)
         dz = self.Theo.get_growth(params, self.Survey.zz_integr, nl_model)
         omega_m = params['Omega_m']
-        w_l = self.Theo.get_wl_kernel(omega_m, params, ez, rz, dz, ia_model)
+        w_l = self.Theo.get_wl_kernel(omega_m, params, ez, rz, dz, ia_model, photoz_err_model)
         return w_l
     
-    def get_ia_kernel(self, params, nl_model, ia_model=0):
+    def get_ia_kernel(self, params, nl_model, ia_model=0, photoz_err_model=0):
         ez, _, _ = self.Theo.get_ez_rz_k(params, self.Survey.zz_integr)
         dz = self.Theo.get_growth(params, self.Survey.zz_integr, nl_model)
         omega_m = params['Omega_m']
-        w_ia = self.Theo.get_ia_kernel(omega_m, params, ez, dz, self.Survey.eta_z_s, self.Survey.zz_integr, ia_model)
+        w_ia = self.Theo.get_ia_kernel(omega_m, params, ez, dz, self.Survey.eta_z_s, self.Survey.zz_integr, ia_model, photoz_err_model)
         return w_ia
 
 
-    def get_cell_galclust(self, params, nl_model, bias_model, baryon_model=0):
+    def get_cell_galclust(self, params, nl_model, bias_model, baryon_model=0, photoz_err_model=0):
         ez, rz, k = self.Theo.get_ez_rz_k(params, self.Survey.zz_integr)
         if bias_model == 2:
             pgg, pgg_extr = self.Theo.BaccoEmulator.get_heft(params, k, self.Survey.lbin, self.Survey.zz_integr)
         else:
             pgg = self.Theo.get_pmm(params, k, self.Survey.lbin, self.Survey.zz_integr, nl_model, baryon_model)
             pgg_extr = None
-        cl_gg, _ = self.Theo.get_cell_galclust(params, ez, rz, k, pgg, pgg_extr, bias_model)
+        cl_gg, _ = self.Theo.get_cell_galclust(params, ez, rz, k, pgg, pgg_extr, bias_model, photoz_err_model)
         return self.Survey.l_gc, cl_gg
     
-    def get_cell_galgal(self, params, nl_model, bias_model, baryon_model=0, ia_model=0):
+    def get_cell_galgal(self, params, nl_model, bias_model, baryon_model=0, ia_model=0, photoz_err_model=0):
         ez, rz, k = self.Theo.get_ez_rz_k(params, self.Survey.zz_integr)
         dz = self.Theo.get_growth(params, self.Survey.zz_integr, nl_model)
         pk = self.Theo.get_pmm(params, k, self.Survey.lbin, self.Survey.zz_integr, nl_model, baryon_model)
@@ -189,8 +189,8 @@ class MGL():
         pgg_extr = None
         if bias_model == 2:
             pgg, pgg_extr = pgm, pgm_extr = self.Theo.BaccoEmulator.get_heft(params, k, self.Survey.lbin, self.Survey.zz_integr) 
-        _, w_l = self.Theo.get_cell_shear(params, ez, rz, dz, pmm, ia_model)
-        _, w_g = self.Theo.get_cell_galclust(params, ez, rz, k, pgg, pgg_extr, bias_model)    
+        _, w_l = self.Theo.get_cell_shear(params, ez, rz, dz, pmm, ia_model, photoz_err_model)
+        _, w_g = self.Theo.get_cell_galclust(params, ez, rz, k, pgg, pgg_extr, bias_model, photoz_err_model)    
         cl_lg, cl_gl = self.Theo.get_cell_cross(params, ez, rz, k, pgm, pgm_extr, w_l, w_g, bias_model)   
         return self.Survey.l_xc, cl_lg, cl_gl 
     
@@ -248,6 +248,7 @@ class MGL():
         #   - Galaxy Bias Model: {get_model_label(self.data_model_dic.get("bias_model", -1), "bias_model")} ({self.data_model_dic.get("bias_model", "N/A")})
         #   - Intrinsic Alignments: {get_model_label(self.data_model_dic.get("ia_model", -1), "ia_model")} ({self.data_model_dic.get("ia_model", "N/A")})
         #   - Baryon Model: {get_model_label(self.data_model_dic.get("baryon_model", -1), "baryon_model")} ({self.data_model_dic.get("baryon_model", "N/A")})
+        #   - Photo-z error Model: {get_model_label(self.data_model_dic.get("photoz_err_model", -1), "photoz_err_model")} ({self.data_model_dic.get("photoz_err_model", "N/A")})
         #   - Parameters: 
         """
         for par_i in self.params_data_dic.keys():
@@ -260,6 +261,7 @@ class MGL():
         #   - Galaxy Bias Model: {get_model_label(self.theo_model_dic.get("bias_model", -1), "bias_model")} ({self.theo_model_dic.get("bias_model", "N/A")})
         #   - Intrinsic Alignments: {get_model_label(self.theo_model_dic.get("ia_model", -1), "ia_model")} ({self.theo_model_dic.get("ia_model", "N/A")})
         #   - Baryon Model: {get_model_label(self.theo_model_dic.get("baryon_model", -1), "baryon_model")} ({self.theo_model_dic.get("baryon_model", "N/A")})
+        #   - Photo-z error Model: {get_model_label(self.theo_model_dic.get("photoz_err_model", -1), "photoz_err_model")} ({self.theo_model_dic.get("photoz_err_model", "N/A")})
         #   - Parameter priors:
         """
         for par_i in self.params_priors.keys():
