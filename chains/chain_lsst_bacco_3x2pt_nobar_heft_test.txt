@@ -1,0 +1,114 @@
+# 
+#         ##############################################################
+#         # Cosmology Pipeline Configuration
+#         #------------------------------------------------------------
+#         # Observable: WL+XC+GC
+#         # Sky Fraction (fsky): 0.5
+#         # Redshift Binning: 5 bins (0.01 ≤ z ≤ 3.0)
+#         # for n(z) LSST-like
+#         # Lensing & Clustering Scales:
+#         #   - l_min: 20
+#         #   - l_max (WL): 2000
+#         #   - l_max (GC, XC): 900
+#         #
+#         # Data Model:
+#         #   - Nonlinear Power Spectrum: bacco (1)
+#         #   - Galaxy Bias Model: bacco (2)
+#         #   - Intrinsic Alignments: zNLA (0)
+#         #   - Baryon Model: no baryons (0)
+#         #   - Parameters: 
+#         
+#             #       - Omega_m: 0.31
+#             #       - Ombh2: 0.02268
+#             #       - h: 0.68
+#             #       - sigma8: 0.83
+#             #       - ns: 0.97
+#             #       - Mnu: 0.0
+#             #       - w0: -1.0
+#             #       - wa: 0.0
+#             #       - aIA: 0.1446
+#             #       - etaIA: 2.21
+#             #       - betaIA: 0.0
+#             #       - b1_1: 1.239
+#             #       - b1_2: 1.378
+#             #       - b1_3: 1.525
+#             #       - b1_4: 1.677
+#             #       - b1_5: 1.832
+#             #       - b2_1: 0.0
+#             #       - b2_2: 0.0
+#             #       - b2_3: 0.0
+#             #       - b2_4: 0.0
+#             #       - b2_5: 0.0
+#             #       - b1L_1: 0.239
+#             #       - b1L_2: 0.378
+#             #       - b1L_3: 0.525
+#             #       - b1L_4: 0.677
+#             #       - b1L_5: 0.832
+#             #       - b2L_1: 0.46036128
+#             #       - b2L_2: 0.4845956
+#             #       - b2L_3: 0.5480625
+#             #       - b2L_4: 0.65459134
+#             #       - b2L_5: 0.80604922
+#             #       - bs2L_1: 0.0
+#             #       - bs2L_2: 0.0
+#             #       - bs2L_3: 0.0
+#             #       - bs2L_4: 0.0
+#             #       - bs2L_5: 0.0
+#             #       - blaplL_1: 0.0
+#             #       - blaplL_2: 0.0
+#             #       - blaplL_3: 0.0
+#             #       - blaplL_4: 0.0
+#             #       - blaplL_5: 0.0
+#             #       - TCMB: 2.7255
+#             #       - nnu: 3.044
+#             #       - Omega_b: 0.04904844290657439
+#             #       - Omnuh2: 0.0
+#             #       - Omega_nu: 0.0
+#             #       - Omega_cb: 0.31
+#             #       - Omega_c: 0.2609515570934256
+#             #       - fb: 0.15822078356959482
+#             #       - sigma8_cb: 0.83
+#         #
+#         # Theory Model:
+#         #   - Nonlinear Power Spectrum: bacco (1)
+#         #   - Galaxy Bias Model: bacco (2)
+#         #   - Intrinsic Alignments: zNLA (0)
+#         #   - Baryon Model: no baryons (0)
+#         #   - Parameter priors:
+#         
+#            #       - Omega_m: [0.28,0.34]
+#            #       - Ombh2: N(0.02268,0.00038)
+#            #       - h: [0.6,0.76]
+#            #       - sigma8: [0.78,0.88]
+#            #       - ns: N(0.97,0.004)
+#            #       - Mnu: 0.0
+#            #       - w0: [-1.15,-0.85]
+#            #       - wa: [-0.3,0.3]
+#            #       - aIA: [-1.0,5.0]
+#            #       - etaIA: [-5.0,5.0]
+#            #       - betaIA: 0.0
+#            #       - b1L_1: [0.0,2.0]
+#            #       - b1L_2: [0.0,2.0]
+#            #       - b1L_3: [0.0,2.0]
+#            #       - b1L_4: [0.0,2.0]
+#            #       - b1L_5: [0.0,2.0]
+#            #       - b2L_1: [0.0,2.0]
+#            #       - b2L_2: [0.0,2.0]
+#            #       - b2L_3: [0.0,2.0]
+#            #       - b2L_4: [0.0,2.0]
+#            #       - b2L_5: [0.0,2.0]
+#            #       - bs2L_1: [-2.0,2.0]
+#            #       - bs2L_2: [-2.0,2.0]
+#            #       - bs2L_3: [-2.0,2.0]
+#            #       - bs2L_4: [-2.0,2.0]
+#            #       - bs2L_5: [-2.0,2.0]
+#            #       - blaplL_1: [-2.0,2.0]
+#            #       - blaplL_2: [-2.0,2.0]
+#            #       - blaplL_3: [-2.0,2.0]
+#            #       - blaplL_4: [-2.0,2.0]
+#            #       - blaplL_5: [-2.0,2.0]
+#         ##############################################################
+#              Omega_m          Ombh2          h          sigma8          ns          w0          wa          aIA          etaIA          b1L_1          b1L_2          b1L_3          b1L_4          b1L_5          b2L_1          b2L_2          b2L_3          b2L_4          b2L_5          bs2L_1          bs2L_2          bs2L_3          bs2L_4          bs2L_5          blaplL_1          blaplL_2          blaplL_3          blaplL_4          blaplL_5        log_w   log_l
+#         ##############################################################
+#         # loglikelihood = -6018752.5 evaluation took  0.3675272464752197 s (--> 0:00:00.367527 hh:mm:ss)
+#         

@@ -10,6 +10,13 @@ from .specs import EuclidSetUp, LSSTSetUp
 from .likelihood import MGLike
 from datetime import timedelta
 
+NL_MODEL_HMCODE = 0
+NL_MODEL_BACCO = 1
+NL_MODEL_NDGP = 2
+NL_MODEL_GAMMAZ = 3
+NL_MODEL_MUSIGMA = 4
+NL_MODEL_IDE = 5
+
 class MGL():
     def __init__(self, config_file):
         """
@@ -25,6 +32,9 @@ class MGL():
             self.Survey = LSSTSetUp(self.config_dic['specs']['survey_info'], self.config_dic['specs']['scale_cuts'])  
         else:
             raise ValueError('Invalid survey name')   
+        
+        if self.Survey.zz_integr[0]==0.:
+            raise ValueError('Invalid smallest redshift: z_min>0!!!')  
  
         self.path = self.config_dic.get('path', './')
         self.chain_name = self.config_dic['output']['chain_name']
@@ -90,32 +100,32 @@ class MGL():
             survey (object): An object containing survey-specific information, including ell values.
 
         Sets:
-            cov_observ (ndarray): The computed covariance matrix.
-            cov_observ_high (ndarray, optional): The block of the covariance for l>l_jump for shear, as we assume that lmax_gc<lmax_wl.
+            cov_obs (ndarray): The computed covariance matrix.
+            cov_obs_high (ndarray, optional): The block of the covariance for l>l_jump for shear, as we assume that lmax_gc<lmax_wl.
             det_obs (float): The determinant of the covariance matrix.
             det_obs_high (float, optional): The determinant of the high-ell shear covariance matrix for '3x2pt' probe.
             ells_one_probe (ndarray, optional): The ell values for the 'WL' or 'GC' probe.
         """
 
         if self.probe=='3x2pt':
-            cov_observ, cov_observ_high = self.Theo.compute_covariance_3x2pt(self.params_data_dic, self.data_model_dic)
-            det_obs = np.linalg.det(cov_observ) 
-            det_obs_high = np.linalg.det(cov_observ_high) 
-            data_dic = {'cov_observ': cov_observ, 'cov_observ_high': cov_observ_high, 
+            cov_obs, cov_obs_high = self.Theo.compute_covariance_3x2pt(self.params_data_dic, self.data_model_dic)
+            det_obs = np.linalg.det(cov_obs) 
+            det_obs_high = np.linalg.det(cov_obs_high) 
+            data_dic = {'cov_obs': cov_obs, 'cov_obs_high': cov_obs_high, 
                         'det_obs': det_obs, 'det_obs_high': det_obs_high,
                         'ells': self.Survey.ells_wl}
         elif self.probe=='WL':
-            cov_observ = self.Theo.compute_covariance_wl(self.params_data_dic, self.data_model_dic)
-            det_obs = np.linalg.det(cov_observ) 
+            cov_obs = self.Theo.compute_covariance_wl(self.params_data_dic, self.data_model_dic)
+            det_obs = np.linalg.det(cov_obs) 
             ells_one_probe = self.Survey.ells_wl
-            data_dic = {'cov_observ': cov_observ, 
+            data_dic = {'cov_obs': cov_obs, 
                 'det_obs': det_obs,
                 'ells': ells_one_probe}
         elif self.probe=='GC':
-            cov_observ = self.Theo.compute_covariance_gc(self.params_data_dic, self.data_model_dic)
-            det_obs = np.linalg.det(cov_observ) 
+            cov_obs = self.Theo.compute_covariance_gc(self.params_data_dic, self.data_model_dic)
+            det_obs = np.linalg.det(cov_obs) 
             ells_one_probe = self.Survey.ells_gc 
-            data_dic = {'cov_observ': cov_observ, 
+            data_dic = {'cov_obs': cov_obs, 
                         'det_obs': det_obs,
                         'ells': ells_one_probe}
             
@@ -129,7 +139,15 @@ class MGL():
     def get_bpgm(self, params, nl_model, bias_model, baryon_model=0):
         _, _, k = self.Theo.get_ez_rz_k(params, self.Survey.zz_integr)
         if bias_model==2:
-            pgm, pgm_extr = self.Theo.BaccoEmulator.get_heft(params, k, self.Survey.lbin, self.Survey.zz_integr) 
+            if nl_model!=0 or nl_model!=1:
+                # re-scale for modified gravity
+                # pgm dimensions are (15, ell, z_integr)
+                dz, _ = self.get_growth(params, self.Survey.zz_integr, nl_model)
+                dz_norm, _ = self.get_growth(params, self.Survey.zz_integr,  nl_model=0)
+                dz_rescale = dz/dz_norm
+                pgm, pgm_extr = self.Theo.BaccoEmulator.get_heft(params, k, self.Survey.lbin, self.Survey.zz_integr)*dz_rescale[np.newaxis, np.newaxis, :]*dz_rescale[np.newaxis, np.newaxis, :]
+            else:
+                pgm, pgm_extr = self.Theo.BaccoEmulator.get_heft(params, k, self.Survey.lbin, self.Survey.zz_integr) 
         else:
             pgm = self.Theo.get_pmm(params, k, self.Survey.lbin, self.Survey.zz_integr, nl_model, baryon_model)  
             pgm_extr = None
@@ -139,7 +157,15 @@ class MGL():
     def get_bpgg(self, params, nl_model, bias_model, baryon_model=0):
         _, _, k = self.Theo.get_ez_rz_k(params, self.Survey.zz_integr)
         if bias_model==2:
-            pgg, pgg_extr = self.Theo.BaccoEmulator.get_heft(params, k, self.Survey.lbin, self.Survey.zz_integr) 
+            if nl_model!=0 or nl_model!=1:
+                # re-scale for modified gravity
+                # pgm dimensions are (15, ell, z_integr)
+                dz, _ = self.get_growth(params, self.Survey.zz_integr, nl_model)
+                dz_norm, _ = self.get_growth(params, self.Survey.zz_integr,  nl_model=0)
+                dz_rescale = dz/dz_norm
+                pgg, pgg_extr = self.Theo.BaccoEmulator.get_heft(params, k, self.Survey.lbin, self.Survey.zz_integr)*dz_rescale[np.newaxis, np.newaxis, :]*dz_rescale[np.newaxis, np.newaxis, :]
+            else:
+                pgg, pgg_extr = self.Theo.BaccoEmulator.get_heft(params, k, self.Survey.lbin, self.Survey.zz_integr) 
         else:
             pgg = self.Theo.get_pmm(params, k, self.Survey.lbin, self.Survey.zz_integr, nl_model, baryon_model) 
             pgg_extr = None
@@ -148,21 +174,21 @@ class MGL():
 
     def get_cell_shear(self, params, nl_model, baryon_model=0, ia_model=0, photoz_err_model=0):
         ez, rz, k = self.Theo.get_ez_rz_k(params, self.Survey.zz_integr)
-        dz = self.Theo.get_growth(params, self.Survey.zz_integr, nl_model)
+        dz, _ = self.Theo.get_growth(params, self.Survey.zz_integr, nl_model)
         pk = self.Theo.get_pmm(params, k, self.Survey.lbin, self.Survey.zz_integr, nl_model, baryon_model)
         cl_ll, _ = self.Theo.get_cell_shear(params, ez, rz, dz, pk, ia_model, photoz_err_model)
         return  self.Survey.l_wl, cl_ll
     
     def get_wl_kernel(self, params, nl_model, ia_model=0, photoz_err_model=0):
         ez, rz, _ = self.Theo.get_ez_rz_k(params, self.Survey.zz_integr)
-        dz = self.Theo.get_growth(params, self.Survey.zz_integr, nl_model)
+        dz, _ = self.Theo.get_growth(params, self.Survey.zz_integr, nl_model)
         omega_m = params['Omega_m']
         w_l = self.Theo.get_wl_kernel(omega_m, params, ez, rz, dz, ia_model, photoz_err_model)
         return w_l
     
     def get_ia_kernel(self, params, nl_model, ia_model=0, photoz_err_model=0):
         ez, _, _ = self.Theo.get_ez_rz_k(params, self.Survey.zz_integr)
-        dz = self.Theo.get_growth(params, self.Survey.zz_integr, nl_model)
+        dz, _ = self.Theo.get_growth(params, self.Survey.zz_integr, nl_model)
         omega_m = params['Omega_m']
         w_ia = self.Theo.get_ia_kernel(omega_m, params, ez, dz, self.Survey.eta_z_s, self.Survey.zz_integr, ia_model, photoz_err_model)
         return w_ia
@@ -171,7 +197,15 @@ class MGL():
     def get_cell_galclust(self, params, nl_model, bias_model, baryon_model=0, photoz_err_model=0):
         ez, rz, k = self.Theo.get_ez_rz_k(params, self.Survey.zz_integr)
         if bias_model == 2:
-            pgg, pgg_extr = self.Theo.BaccoEmulator.get_heft(params, k, self.Survey.lbin, self.Survey.zz_integr)
+            if nl_model!=0 or nl_model!=1:
+                # re-scale for modified gravity
+                # pgm dimensions are (15, ell, z_integr)
+                dz, _ = self.get_growth(params, self.Survey.zz_integr, nl_model)
+                dz_norm, _ = self.get_growth(params, self.Survey.zz_integr,  nl_model=0)
+                dz_rescale = dz/dz_norm
+                pgg, pgg_extr = self.Theo.BaccoEmulator.get_heft(params, k, self.Survey.lbin, self.Survey.zz_integr)*dz_rescale[np.newaxis, np.newaxis, :]*dz_rescale[np.newaxis, np.newaxis, :]
+            else:
+                pgg, pgg_extr = self.Theo.BaccoEmulator.get_heft(params, k, self.Survey.lbin, self.Survey.zz_integr)
         else:
             pgg = self.Theo.get_pmm(params, k, self.Survey.lbin, self.Survey.zz_integr, nl_model, baryon_model)
             pgg_extr = None
@@ -180,7 +214,7 @@ class MGL():
     
     def get_cell_galgal(self, params, nl_model, bias_model, baryon_model=0, ia_model=0, photoz_err_model=0):
         ez, rz, k = self.Theo.get_ez_rz_k(params, self.Survey.zz_integr)
-        dz = self.Theo.get_growth(params, self.Survey.zz_integr, nl_model)
+        dz, _ = self.Theo.get_growth(params, self.Survey.zz_integr, nl_model)
         pk = self.Theo.get_pmm(params, k, self.Survey.lbin, self.Survey.zz_integr, nl_model, baryon_model)
         pmm = pk
         pgg = pk
@@ -191,12 +225,53 @@ class MGL():
             pgg, pgg_extr = pgm, pgm_extr = self.Theo.BaccoEmulator.get_heft(params, k, self.Survey.lbin, self.Survey.zz_integr) 
         _, w_l = self.Theo.get_cell_shear(params, ez, rz, dz, pmm, ia_model, photoz_err_model)
         _, w_g = self.Theo.get_cell_galclust(params, ez, rz, k, pgg, pgg_extr, bias_model, photoz_err_model)    
+            if nl_model!=0 or nl_model!=1:
+                # re-scale for modified gravity
+                # pgm dimensions are (15, ell, z_integr)
+                dz, _ = self.get_growth(params, self.Survey.zz_integr, nl_model)
+                dz_norm, _ = self.get_growth(params, self.Survey.zz_integr,  nl_model=0)
+                dz_rescale = dz/dz_norm
+                pgg, pgg_extr = pgm, pgm_extr = self.Theo.BaccoEmulator.get_heft(params, k, self.Survey.lbin, self.Survey.zz_integr) * dz_rescale[np.newaxis, np.newaxis, :]*dz_rescale[np.newaxis, np.newaxis, :]
+            else:
+                pgg, pgg_extr = pgm, pgm_extr = self.Theo.BaccoEmulator.get_heft(params, k, self.Survey.lbin, self.Survey.zz_integr) 
+        _, w_l = self.Theo.get_cell_shear(params, ez, rz, dz, pmm, ia_model)
+        _, w_g = self.Theo.get_cell_galclust(params, ez, rz, k, pgg, pgg_extr, bias_model)    
         cl_lg, cl_gl = self.Theo.get_cell_cross(params, ez, rz, k, pgm, pgm_extr, w_l, w_g, bias_model)   
         return self.Survey.l_xc, cl_lg, cl_gl 
     
     def get_expansion_and_rcom(self, params):
         ez, rz, _ = self.Theo.get_ez_rz_k(params, self.Survey.zz_integr)
         return ez, rz
+    
+    def get_sigma8_from_a_s_from_chain(self, params, nl_model):
+        _ = self.Theo.get_emu_status(params, 'HMcode', flag_once=True)
+        if nl_model==NL_MODEL_HMCODE or nl_model==NL_MODEL_BACCO:
+            sigma8 = self.Theo.HMcode2020Emulator.get_sigma8(params)
+        else: 
+            sigma8_gr = self.Theo.HMcode2020Emulator.get_sigma8(params) 
+            len_chain = len(sigma8_gr) 
+            D_rescale = np.zeros(len_chain)
+            for i in range(len_chain):
+                print(i, '/', len_chain)
+                params_growth = {
+                    'Omega_m': params['Omega_m'][i],
+                    'h' : params['h'][i],
+                    'w0': 0.,
+                    'wa': -1.,
+                    'log10Omega_rc': params['log10Omega_rc'][i] if 'log10Omega_rc' in params else 1.,
+                    'gamma0': params['gamma0'][i] if 'gamma0' in params else 0.55,
+                    'gamma1': params['gamma1'][i] if 'gamma1' in params else 0.,
+                    'mu0': params['mu0'][i] if 'mu0' in params else 0.,
+                    'Ads': params['Ads'][i] if 'Ads' in params else 0.,
+                    }
+                _, dz0_gr = self.Theo.get_growth(params_growth, [1.],  nl_model=0)
+                params_growth['w0'] = params['w0'][i] if 'w0' in params else -1.
+                _, dz0_mg = self.Theo.get_growth(params_growth, [1.],  nl_model=nl_model)
+                D_rescale[i] = dz0_mg/dz0_gr
+            sigma8 = sigma8_gr*D_rescale
+        return sigma8
+
+        
 
     def gen_output_header(self):
         """

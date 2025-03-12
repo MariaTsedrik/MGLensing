@@ -16,7 +16,7 @@ wa: 'w_a'
 ################################################
 #               Nuisances                      #
 ################################################
-aIA: 'a_{\rm IA}'
+aIA: 'A_{\rm IA}'
 etaIA: '\eta_{\rm IA}'
 betaIA: '\beta_{\rm IA}'
 b1_1: 'b_1^1'      
@@ -60,12 +60,11 @@ deltaz_5 : '\delta_z^5'
 ################################################
 #               Baryons                        #
 ################################################
-#nu_Mc_bcemu: 0.0
-#log10Mc_bcemu: 13.32
-#thej_bcemu: 4.235
-#mu_bcemu: 0.93 
-#gamma_bcemu: 2.25
-#delta_bcemu: 6.40
-#eta_bcemu: 0.15
-#deta_bcemu: 0.14
+log10Mc_bc: '\log_{10}{M^{\rm bc}_{\rm c}}'
+eta_bc: '\eta^{\rm bc}'
+beta_bc: '\beta^{\rm bc}' 
+log10Mz0_bc: '\log_{10}{M^{\rm bc}_{z_0}}'
+thetaout_bc: '\theta^{\rm bc}_{\rm out}'
+thetainn_bc: '\theta^{\rm bc}_{\rm inn}'
+log10Minn_bc: '\log_{10}{M^{\rm bc}_{\rm inn}}'
 

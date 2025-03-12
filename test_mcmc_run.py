@@ -12,10 +12,15 @@ os.environ["OMP_NUM_THREADS"] = "1"
 
 MGLtest = MGLensing.MGL("config.yaml")
 
-def log_probability_function(pars):
+def log_probability_function_3x2pt(pars):
     param_dic = pars | MGLtest.params_fixed
     return MGLtest.Like.loglikelihood_det_3x2pt(param_dic, MGLtest.theo_model_dic)
-
+def log_probability_function_wl(pars):
+    param_dic = pars | MGLtest.params_fixed
+    return MGLtest.Like.loglikelihood_det_wl(param_dic, MGLtest.theo_model_dic)
+def log_probability_function_gc(pars):
+    param_dic = pars | MGLtest.params_fixed
+    return MGLtest.Like.loglikelihood_det_gc(param_dic, MGLtest.theo_model_dic)
 
 prior = Prior()
 for par_i in MGLtest.params_model:
@@ -24,9 +29,22 @@ for par_i in MGLtest.params_model:
     elif MGLtest.params_priors[par_i]['type'] == 'U':
         prior.add_parameter(par_i, dist=(MGLtest.params_priors[par_i]['p1'] , MGLtest.params_priors[par_i]['p2']))
 
-def main():
+if MGLtest.probe == 'WL':
+    log_probability_function = log_probability_function_wl
+elif MGLtest.probe == 'GC':
+    log_probability_function = log_probability_function_gc    
+elif MGLtest.probe == '3x2pt':
+    log_probability_function = log_probability_function_3x2pt
+else:
+    raise ValueError('Check the probe name!')      
+
+# Ensure the directories exist
+os.makedirs('chains', exist_ok=True)
+os.makedirs('chains/hdf5', exist_ok=True)
+
+def main():    
     sampler = Sampler(prior, log_probability_function, 
-                                filepath='chains/hdf5/'+MGLtest.hdf5_name+'.hdf5', resume=MGLtest.mcmc_resume, n_live=MGLtest.mcmc_nlive, pool=MGLtest.mcmc_pool)
+                      filepath='chains/hdf5/'+MGLtest.hdf5_name+'.hdf5', resume=MGLtest.mcmc_resume, n_live=MGLtest.mcmc_nlive, pool=MGLtest.mcmc_pool)
     start = time.time()
     sampler.run(verbose=MGLtest.mcmc_verbose, discard_exploration=True)
     log_z = sampler.evidence()

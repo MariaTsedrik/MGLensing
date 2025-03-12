@@ -1,5 +1,5 @@
-observable: '3x2pt'
-#Observables
+observable: 'WL'
+#Observables 
 #     'WL' -> shear-shear
 #     'GC' -> photo-clustering
 #     '3x2pt' -> 3x2pt: shear-shear, photo-clustering, galaxy-galaxy lensing
@@ -46,7 +46,6 @@ data:
   #Nonlinear power spectrum
   #     0 -> HMcode
   #     1 -> bacco
-  #----- not implemented yet:
   #     2 -> nDGP
   #     3 -> gLEMURS
   #     4 -> μ-Σ 
@@ -61,7 +60,7 @@ data:
   #     0 -> zNLA
   #----- not implemented yet:
   #     1 -> TATT
-  baryon_model: 0
+  baryon_model: 3
   # Baryonic flag
   #     0 -> no baryons
   #     1 -> Tagn HMcode
@@ -79,7 +78,6 @@ theory:
   #Nonlinear power spectrum
   #     0 -> HMcode
   #     1 -> bacco
-  #----- not implemented yet:
   #     2 -> nDGP
   #     3 -> gLEMURS
   #     4 -> μ-Σ 
@@ -94,7 +92,7 @@ theory:
   #     0 -> zNLA
   #----- not implemented yet:
   #     1 -> TATT
-  baryon_model: 0
+  baryon_model: 3
   # Baryonic flag
   #     0 -> no baryons
   #     1 -> Tagn HMcode
@@ -108,15 +106,15 @@ theory:
   params: ./params_photoz_test.yaml
 
 output: 
-  chain_name: 11Mar-lsst-3x2-cosmo-biggerPhotozMul
+  chain_name: params_debug
 sampler: 
   mcmc:
     verbose: True
     n_eff: 10000
     n_live: 1000
-    pool: 14
+    pool: 20
     resume: False
-    hdf5_name: '11Mar-lsst-3x2-cosmo-biggerPhotozMul'
+    hdf5_name: 'params_debug'
   #----- not implemented yet:  
   minimiser:
     verbose: True

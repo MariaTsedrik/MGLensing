@@ -2,9 +2,10 @@ import numpy as np
 import MGrowth as mg
 from scipy.integrate import trapezoid, quad
 from scipy import interpolate as itp
-from .powerspectra import HMcode2020, BCemulator, BaccoEmu
+from .powerspectra import HMcode2020, BCemulator, BaccoEmu, DGPReACT, GammaReACT, MuSigmaReACT, DarkScatteringReACT
 from math import sqrt, log, exp, pow, log10
 import os
+
 os.environ['TF_CPP_MIN_LOG_LEVEL'] = '3'  
 # Suppress TensorFlow warnings
 
@@ -13,14 +14,14 @@ H0_h_c = 1./2997.92458
 # =100/c in Mpc/h Hubble constant conversion factor
 C_IA = 0.0134 
 # =dimensionsless, C x rho_crit 
-
+a_arr_for_mu = np.logspace(-5., 1., 512)
 
 NL_MODEL_HMCODE = 0
 NL_MODEL_BACCO = 1
 NL_MODEL_NDGP = 2
 NL_MODEL_GAMMAZ = 3
 NL_MODEL_MUSIGMA = 4
-NL_MODEL_IDE = 5
+NL_MODEL_DS = 5
 
 
 NO_BARYONS = 0
@@ -73,7 +74,7 @@ EmulatorRanges = {
         'w0':           {'p1': -2.,        'p2': -0.5},    
         'wa':           {'p1': -0.5,         'p2': 0.5}, 
         },        
-    'baryons':
+    'bcemu':
         {
         'log10Mc_bcemu':    {'p1': 11.4,         'p2': 14.6}, 
         'thej_bcemu':       {'p1': 2.6,          'p2': 7.4},
@@ -82,20 +83,76 @@ EmulatorRanges = {
         'delta_bcemu':      {'p1': 3.8,          'p2': 10.2},
         'eta_bcemu':        {'p1': 0.085,        'p2': 0.365},
         'deta_bcemu':       {'p1': 0.085,        'p2': 0.365},
-        'log10Tagn':    {'p1': 7.6,         'p2': 8.3},
+        },
+    'hm_bar':
+        {    
+        'log10Tagn':    {'p1': 7.6,         'p2': 8.3}
+        },
+    'bacco_bfc':
+        {    
         'log10Mc_bc':   {'p1': 9.,           'p2': 15.}, 
         'eta_bc':       {'p1': -0.69,        'p2': 0.69},
         'beta_bc':      {'p1': -1.,          'p2': 0.69},
         'log10Mz0_bc':  {'p1': 9.,           'p2': 13.},
         'thetaout_bc':  {'p1': 0.,           'p2': 0.47},
-        'thetainn_bc':  {'p1': -2.,          'p2': -0.52},
+        'thetainn_bc':  {'p1': -2.,          'p2': -0.523},
         'log10Minn_bc': {'p1': 9.,           'p2': 13.5}
-        }
+        },
+    'ndgp_react':
+        {
+        'Omega_m':      {'p1':0.27,           'p2':0.34}, 
+        'Omega_b':      {'p1':0.04044,        'p2':0.05686}, 
+        'h':            {'p1':0.62,           'p2':0.74},
+        'ns':           {'p1':0.92,           'p2':1.0},
+        'As':           {'p1':1.5e-09,        'p2':2.7e-09},
+        'Mnu':          {'p1':0.,             'p2':0.5},
+        'log10Omega_rc':{'p1':-3.,            'p2':2.},
+        },       
+    'gammaz_react':
+        {
+        'Omega_m':      {'p1':0.29,            'p2':0.34}, 
+        'Omega_b':      {'p1':0.04044,         'p2':0.05686}, 
+        'h':            {'p1':0.629,           'p2':0.731},
+        'ns':           {'p1':0.9432,          'p2':0.9862},
+        'As':           {'p1':1.5e-09,         'p2':2.7e-09},
+        'Omega_nu':     {'p1':0.,              'p2':0.00317},
+        'gamma0':       {'p1':0.,              'p2':1.},
+        'gamma1':       {'p1':-0.7,            'p2':0.7},
+        'q1':           {'p1':-2.,             'p2':2.}
+        },     
+    'musigma_react':
+        {
+        'Omega_m':      {'p1':0.2,            'p2':0.6}, 
+        'Omega_b':      {'p1':0.03,           'p2':0.07}, 
+        'h':            {'p1':0.58,           'p2':0.8},
+        'ns':           {'p1':0.93,           'p2':1.0},
+        'As':           {'p1':0.5e-09,        'p2':5.e-09},
+        'Mnu':          {'p1':0.,             'p2':0.6},
+        'mu0':          {'p1':-0.9999,        'p2':2.9999},
+        'sigma0':       {'p1':-1.,            'p2':3.},
+        'q1':           {'p1':-2.,            'p2':2.}
+        },    
+    'ds_react':
+        {
+        'Ombh2':        {'p1':0.01875,            'p2':0.02625}, 
+        'Omch2':        {'p1':0.05,           'p2':0.255}, 
+        'h':            {'p1':0.64,           'p2':0.82},
+        'ns':           {'p1':0.84,           'p2':1.1},
+        'S8':           {'p1':0.6,        'p2':0.9},
+        'Mnu':          {'p1':0.,             'p2':0.2},
+        'w0':           {'p1':-1.3,            'p2':-0.7},
+        'Ads':           {'p1':-30.,            'p2':30.}
+        },    
 
-}
+}            
 
 
 cosmo_names = ["Omega_m", "Omega_b", "Omega_c", "Omega_cb", "Omega_nu", "Ombh2", "Omnuh2", "fb", "h", "Mnu", "ns", "w0", "wa"]
+def check_zmax(zmax, emu_obj):
+    emu_z_max = emu_obj.zz_max
+    if zmax > emu_z_max:
+        raise ValueError(f'Survey z_max must not exceed zz_max in the power spectrum computation for {emu_obj.emu_name}!')
+        
 
 class Theory:
     def __init__(self, SurveyClass):
@@ -103,14 +160,19 @@ class Theory:
         # load classes with emulators
         # to-do: load only the ones actually used in the code
         self.HMcode2020Emulator = HMcode2020()
-        if self.Survey.zmax > self.HMcode2020Emulator.zz_max:
-            raise ValueError('Survey z_max must not exceed zz_max in the power spectrum computation for HMcode2020!')
+        check_zmax(self.Survey.zmax, self.HMcode2020Emulator)
         self.BCemulator = BCemulator()
-        if self.Survey.zmax > self.BCemulator.zz_max:
-            raise ValueError('Survey z_max must not exceed zz_max in the power spectrum computation for BCemulator!')
+        check_zmax(self.Survey.zmax, self.BCemulator)
         self.BaccoEmulator = BaccoEmu()
-        if self.Survey.zmax > self.BaccoEmulator.zz_max:
-            raise ValueError('Survey z_max must not exceed zz_max in the power spectrum computation for BaccoEmulator!')
+        check_zmax(self.Survey.zmax, self.BaccoEmulator)
+        self.DGPEmulator = DGPReACT()
+        check_zmax(self.Survey.zmax, self.DGPEmulator)
+        self.GammazEmulator = GammaReACT()
+        check_zmax(self.Survey.zmax, self.GammazEmulator)
+        self.MuSigmaEmulator = MuSigmaReACT()
+        check_zmax(self.Survey.zmax, self.MuSigmaEmulator)
+        self.DSEmulator = DarkScatteringReACT()
+        check_zmax(self.Survey.zmax, self.DSEmulator)
 
     def check_consistency(self, params): 
         if 'h' not in params.keys():
@@ -173,13 +235,13 @@ class Theory:
             params['sigma8'] = params['S8']/sqrt(params['Omega_m']/0.3)   
         return params
 
-    def _get_emu_status(self, coordinates, which_emu, flag_once=False):
+    def get_emu_status(self, params, which_emu, flag_once=False):
         """
         Checks the relevant boundaries of emulators.
 
         Parameters:
         ----------
-        coordinates (dict): a set of coordinates in parameter space
+        params (dict): a set of coordinates in parameter space
         which_emu (str) : kind of emulator: options are 'HMcode', 'bacco', 'bacco_lin',
                                             'baryons'
         flag_once (boolean): set to false within a chain, set to true for a single data computation
@@ -190,51 +252,40 @@ class Theory:
 
         Raises:
         ------
-        KeyError: If the coordinates do not contain the necessary parameters
+        KeyError: If the parameter is outside its allowed ranges: what is this parameter and which are the correct ranges.
         """
-        # parameters currently available
-        avail_pars = coordinates.keys()
         # parameters strictly needed to evaluate the emulator
         eva_pars = EmulatorRanges[which_emu].keys()
+        pp = [params[p] for p in eva_pars]
         if flag_once:
-            # parameters needed for a computation
-            comp_pars = list(set(eva_pars)-set(avail_pars))
-            miss_pars = list(set(comp_pars))
-
-            if miss_pars:
-                print(f"{which_emu} emulator:")
-                print(f"  Please add the parameter(s) {miss_pars}"
-                    f" to your coordinates!")
-                raise KeyError(f"{which_emu} emulator: coordinates need the"
-                            f" following parameters: ", miss_pars)
-        pp = [coordinates[p] for p in eva_pars]
-        status = True
-        for i, par in enumerate(eva_pars):
-            val = pp[i]
-            if flag_once:
-                message = 'Param {}={} out of bounds [{}, {}]'.format(
+            for i, par in enumerate(eva_pars):
+                val = pp[i]
+                message = 'Parameter {}={} out of bounds [{}, {}]'.format(
                 par, val, EmulatorRanges[which_emu][par]['p1'],
                 EmulatorRanges[which_emu][par]['p2'])
                 assert (np.all(val >= EmulatorRanges[which_emu][par]['p1'])
                     & np.all(val <= EmulatorRanges[which_emu][par]['p2'])
                     ), message
-            else:    
-                status = (np.all(val >= EmulatorRanges[which_emu][par]['p1'])
-                    & np.all(val <= EmulatorRanges[which_emu][par]['p2']))
-        return status
+        else:    
+            if not all(EmulatorRanges[which_emu][par_i]['p1'] <= params[par_i] <= EmulatorRanges[which_emu][par_i]['p2'] for par_i in eva_pars):
+                return False
+        return True
+        
         
     def get_a_s(self, params, flag_once=False):
         if 'As' in params:
             return True, params['As']
         else:
-            params['sigma8_cb'] = params['sigma8'] #from_sigma8_to_sigma8_cb
-            status = self._get_emu_status(params, 'bacco_lin', flag_once)
+            # to-do: add from_sigma8_to_sigma8_cb
+            # make distinction between sigma8_cold and sigma8
+            params['sigma8_cb'] = params['sigma8'] 
+            status = self.get_emu_status(params, 'bacco_lin', flag_once)
             if not status:
                 return False, np.nan
             else:
                 params_bacco = {
                 'ns'            :  params['ns'],
-                'sigma8_cold'   :  params['sigma8_cb'], # for future make distinction between sigma8_cold and sigma8
+                'sigma8_cold'   :  params['sigma8_cb'], 
                 'hubble'        :  params['h'],
                 'omega_baryon'  :  params['Omega_b'],
                 'omega_cold'    :  params['Omega_cb'], 
@@ -243,8 +294,8 @@ class Theory:
                 'wa'            :  params['wa'],
                 'expfactor'     :  1    
                 }
-                As = self.BaccoEmulator.baccoemulator.get_A_s(**params_bacco)
-                return True, As
+                a_s = self.BaccoEmulator.baccoemulator.get_A_s(**params_bacco)
+                return True, a_s
     
     def get_sigma8_cb(self, params, flag_once=False):
         if 'sigma8' in params:
@@ -253,7 +304,7 @@ class Theory:
             params['sigma8_cb'] = params['sigma8']     
             return True, params['sigma8_cb'] 
         else: 
-            status = self._get_emu_status(params, 'bacco_lin', flag_once)
+            status = self.get_emu_status(params, 'bacco_lin', flag_once)
             if not status:
                 return False, np.nan
             else:
@@ -271,57 +322,59 @@ class Theory:
                 sigma8_cb = self.BaccoEmulator.baccoemulator.get_sigma8(cold=True, **params_bacco)
                 return True, sigma8_cb
     
-    def get_sigma8_from_a_s(self, params):
-        #which_emu='HMcode'
-        raise NotImplementedError("get_sigma8_from_As is not implemented yet")
     
     def check_ranges(self, params, model, flag_once=False):
         """
-        Check the parameter ranges for the model.
+        Check the parameter ranges in emulators for the model.
+
         Parameters:
+        -----------
         params (dict): Dictionary containing the parameters to be checked.                  
         model (dict): Dictionary containing the model-specific parameters.
-        flag_once (boolean): set to false within a chain, set to true for a single data computation
+        flag_once (boolean): set to false within a chain, set to true for a single data computation 
+
         Returns:
+        -------
         boolean: status of the parameter range check.
         """
-        status = True
         if  model['nl_model']==NL_MODEL_HMCODE:
-            status, params['As'] = self.get_As(params, flag_once)
-            if not status:
-                return status
-            status = self._get_emu_status(params, 'HMcode', flag_once)
+            status_, params['As'] = self.get_a_s(params, flag_once)
+            if not status_:
+                return status_
+            status_nl = self.get_emu_status(params, 'HMcode', flag_once)
         elif  model['nl_model']==NL_MODEL_BACCO:       
-            status, params['sigma8_cb'] = self.get_sigma8_cb(params)
-            if not status:
-                return status
-            status = self._get_emu_status(params, 'bacco', flag_once)
-        if  model['baryon_model']!=NO_BARYONS:
-            status = self._get_emu_status(params, 'baryons', flag_once)
+            status_, params['sigma8_cb'] = self.get_sigma8_cb(params)
+            if not status_:
+                return status_
+            status_nl = self.get_emu_status(params, 'bacco', flag_once)
+        elif  model['nl_model']==NL_MODEL_NDGP:       
+            status_nl = self.get_emu_status(params, 'ndgp_react', flag_once)
+        elif  model['nl_model']==NL_MODEL_GAMMAZ:       
+            status_nl = self.get_emu_status(params, 'gammaz_react', flag_once)
+        elif  model['nl_model']==NL_MODEL_MUSIGMA:       
+            status_nl = self.get_emu_status(params, 'musigma_react', flag_once)
+        elif  model['nl_model']==NL_MODEL_DS:       
+            status_nl = self.get_emu_status(params, 'ds_react', flag_once)    
+
+        if  model['baryon_model']==BARYONS_BCEMU:
+            status_b = self.get_emu_status(params, 'bcemu', flag_once)
+        elif  model['baryon_model']==BARYONS_HMCODE:
+            status_b = self.get_emu_status(params, 'hm_bar', flag_once)
+        elif  model['baryon_model']==BARYONS_BACCO:
+            status_b = self.get_emu_status(params, 'bacco_bfc', flag_once)
+        status = status_nl and status_b
+        # check the w0-wa condition
         if params['w0'] + params['wa'] >= 0:
             status = False
+        # check the mu-Sigma condition
+        if params['mu0'] > (2.*params['sigma0']+1.):
+            status = False    
+        # check the DS condition
+        if params['w0']!=-1.:
+            if params['Ads']/(1. + params['w0']) < 0:
+                status = False       
         return  status 
 
-    def check_ranges_simple(self, params, model):
-        status = True
-        if  model['nl_model']==NL_MODEL_HMCODE:
-            if not all(EmulatorRanges['HMcode'][par_i]['p1'] <= params[par_i] <= EmulatorRanges['HMcode'][par_i]['p2'] for par_i in EmulatorRanges['HMcode']):
-                #raise ValueError("Not all parameters are within HMcode2020Emu ranges!")
-                status = False
-        elif  model['nl_model']==NL_MODEL_BACCO:   
-            params['sigma8_cb'] = params['sigma8']    
-            if not all(EmulatorRanges['bacco'][par_i]['p1'] <= params[par_i] <= EmulatorRanges['bacco'][par_i]['p2'] for par_i in EmulatorRanges['bacco']):
-                #raise ValueError("Not all parameters are within baccoemu ranges!")
-                status = False
-        if  model['baryon_model']!=NO_BARYONS:
-            if any( params[par_i] < EmulatorRanges['baryons'][par_i]['p1'] or 
-                    params[par_i] > EmulatorRanges['baryons'][par_i]['p2']
-                    for par_i in params if par_i in EmulatorRanges['baryons']):
-                #raise ValueError("Not all baryonic parameters are within allowed ranges!")
-                status = False
-        if params['w0'] + params['wa'] >= 0:
-            status = False        
-        return  status     
 
     def check_pars_ini(self, param_dic, model_dic, flag_once=True):
         """
@@ -361,7 +414,7 @@ class Theory:
                of the parameter range check.
         """
         param_dic_all = self.apply_relations(param_dic)
-        status = self.check_ranges_simple(param_dic_all, model_dic)
+        status = self.check_ranges(param_dic_all, model_dic, False)
         return param_dic_all, status
     
     def add_photoz_error(self, params_dic, nz, photoz_err_model=0):
@@ -448,7 +501,9 @@ class Theory:
         --------
         dz : numpy.ndarray
             Normalized growth factor array corresponding to the input redshift values.
-        
+        dz0 : float
+            Growth factor at redshift zero.
+            
         Raises:
         -------
         ValueError
@@ -473,13 +528,30 @@ class Theory:
             cosmo = mg.Linder_gamma_a(background)
             gamma0 = params_dic['gamma0'] 
             gamma1 = params_dic['gamma1'] 
-            da, _ = cosmo.growth_parameters(gamma=gamma0, gamma1=gamma1)  
+            da, _ = cosmo.growth_parameters(gamma=gamma0, gamma1=gamma1)
+        elif nl_model==NL_MODEL_MUSIGMA:
+            omega_m = params_dic['Omega_m']
+            w0 = params_dic['w0']
+            wa = params_dic['wa']
+            omega_lambda = (1.-omega_m)* pow(a_arr_for_mu, -3.*(1.+w0+wa)) * np.exp(-3.*wa*(1.-a_arr_for_mu))
+            e2 = omega_m/a_arr_for_mu**3+omega_lambda
+            cosmo = mg.mu_a(background)
+            mu0 = params_dic['mu0'] 
+            mu0_arr = 1.+mu0/e2
+            mu_interpolator = itp.interp1d(a_arr_for_mu, mu0_arr, bounds_error=False,
+                kind='cubic') 
+            da, _ = cosmo.growth_parameters(mu_interp=mu_interpolator) 
+        elif nl_model==NL_MODEL_DS:
+            cosmo = mg.IDE(background)
+            xi = params_dic['Ads']/(1.+params_dic['w0'])
+            da, _ = cosmo.growth_parameters(xi=xi)             
         else:
             raise ValueError("Invalid mg_model option.")    
         dz = da[::-1] 
         # growth factor should be normalised to z=0
-        dz = dz[1:]/dz[0]
-        return dz
+        dz0 = dz[0]
+        dz = dz[1:]/dz0
+        return dz, dz0
     
     def get_ia_kernel(self, omega_m, params_dic, ez, dz, eta_z_s, zz_integr, ia_model=0, photoz_err_model=0):
         """
@@ -922,6 +994,14 @@ class Theory:
             pk = self.HMcode2020Emulator.get_pk(params_dic, k, lbin, zz_integr)
         elif nl_model == NL_MODEL_BACCO:
             pk = self.BaccoEmulator.get_pk(params_dic, k, lbin, zz_integr)
+        elif nl_model == NL_MODEL_NDGP:
+            pk = self.DGPEmulator.get_pk(params_dic, k, lbin, zz_integr)
+        elif nl_model == NL_MODEL_GAMMAZ:
+            pk = self.GammazEmulator.get_pk(params_dic, k, lbin, zz_integr)
+        elif nl_model == NL_MODEL_MUSIGMA:
+            pk = self.MuSigmaEmulator.get_pk(params_dic, k, lbin, zz_integr)
+        elif nl_model == NL_MODEL_DS:
+            pk = self.DSEmulator.get_pk(params_dic, k, lbin, zz_integr)      
         else:
             raise ValueError("Invalid nl_model option.")
         # add baryonic boost
@@ -936,6 +1016,28 @@ class Theory:
                 raise ValueError("Invalid baryon_model option.")
             pk *= boost_bar
         return pk
+    
+    def get_pk_nl(self, params_dic, k, lbin, zz_integr, nl_model=0):
+        if nl_model == NL_MODEL_HMCODE:
+            pk = self.HMcode2020Emulator.get_pk(params_dic, k, lbin, zz_integr)
+        elif nl_model == NL_MODEL_BACCO:
+            pk = self.BaccoEmulator.get_pk(params_dic, k, lbin, zz_integr)
+        else:
+            raise ValueError("Invalid nl_model option.")
+        return pk
+
+    def get_bar_boost(self, params_dic, k, lbin, zz_integr, baryon_model=0):
+        if baryon_model == NO_BARYONS:
+            boost_bar = np.ones((lbin, len(zz_integr)), 'float64')
+        elif baryon_model == BARYONS_HMCODE:
+            boost_bar = self.HMcode2020Emulator.get_barboost(params_dic, k, lbin, zz_integr)
+        elif baryon_model == BARYONS_BCEMU:
+            boost_bar = self.BCemulator.get_barboost(params_dic, k, lbin, zz_integr)
+        elif baryon_model == BARYONS_BACCO:
+            boost_bar = self.BaccoEmulator.get_barboost(params_dic, k, lbin, zz_integr)
+        else:
+            raise ValueError("Invalid baryon_model option.")
+        return boost_bar
 
     def compute_covariance_wl(self, params_dic, model_dic):
         """
@@ -960,11 +1062,11 @@ class Theory:
         # compute background
         ez, rz, k = self.get_ez_rz_k(params_dic, self.Survey.zz_integr)
         # compute growth factor
-        dz = self.get_growth(params_dic, self.Survey.zz_integr, model_dic['nl_model'])
+        dz, _ = self.get_growth(params_dic, self.Survey.zz_integr, model_dic['nl_model'])
         # compute matter-matter power spectrum
-        pk = self.get_pmm(params_dic, k, self.Survey.lbin, self.Survey.zz_integr, model_dic['nl_model'], model_dic['baryon_model'])
+        pmm = self.get_pmm(params_dic, k, self.Survey.lbin, self.Survey.zz_integr, model_dic['nl_model'], model_dic['baryon_model'])
         # compute weak lensing angular power spectra
-        cl_wl, _ = self.get_cell_shear(params_dic, ez, rz, dz, pk, model_dic['ia_model'], model_dic['photoz_err_model'])
+        cl_wl, _ = self.get_cell_shear(params_dic, ez, rz, dz, pmm, model_dic['ia_model'])
         # create an interpolator at the binned ells
         spline_ll = np.empty((self.Survey.nbin, self.Survey.nbin), dtype=(list, 3))
         for bin1 in range(self.Survey.nbin):
@@ -1004,6 +1106,16 @@ class Theory:
         pgg = pk
         pgg_extr = None
         if model_dic['bias_model'] == BIAS_HEFT:
+            if model_dic['nl_model']!=0 or model_dic['nl_model']!=1:
+                # re-scale for modified gravity
+                # pgm dimensions are (15, ell, z_integr)
+                dz, _ = self.get_growth(params_dic, self.Survey.zz_integr, model_dic['nl_model'])
+                dz_norm, _ = self.get_growth(params_dic, self.Survey.zz_integr,  nl_model=0)
+                dz_rescale = dz/dz_norm
+                pgg, pgg_extr = self.BaccoEmulator.get_heft(params_dic, k, self.Survey.lbin, self.Survey.zz_integr)*dz_rescale[np.newaxis, np.newaxis, :]*dz_rescale[np.newaxis, np.newaxis, :]
+            else:    
+                pgg, pgg_extr = self.BaccoEmulator.get_heft(params_dic, k, self.Survey.lbin, self.Survey.zz_integr)               
+        cl_gg, _ = self.get_cell_galclust(params_dic, ez, rz, k, pgg, pgg_extr, model_dic['bias_model'])
             pgg, pgg_extr = self.BaccoEmulator.get_heft(params_dic, k, self.Survey.lbin, self.Survey.zz_integr)
         cl_gg, _ = self.get_cell_galclust(params_dic, ez, rz, k, pgg, pgg_extr, model_dic['bias_model'], model_dic['photoz_err_model'])
         # create an interpolator at the binned ells
@@ -1022,17 +1134,30 @@ class Theory:
         # compute background
         ez, rz, k = self.get_ez_rz_k(params_dic, self.Survey.zz_integr)
         # compute growth factor
-        dz = self.get_growth(params_dic, self.Survey.zz_integr, model_dic['nl_model'])
-        # compute matter-matter power spectrum
-        pk = self.get_pmm(params_dic, k, self.Survey.lbin, self.Survey.zz_integr, model_dic['nl_model'], model_dic['baryon_model'])
-        # find matter-galaxy and galaxy-galaxy power spectra
-        pmm = pk
-        pgg = pk
-        pgg_extr = None
-        pgm = pk 
-        pgm_extr = None
+        dz, _ = self.get_growth(params_dic, self.Survey.zz_integr, model_dic['nl_model'])
         if model_dic['bias_model'] == BIAS_HEFT:
-            pgg, pgg_extr = pgm, pgm_extr = self.BaccoEmulator.get_heft(params_dic, k, self.Survey.lbin, self.Survey.zz_integr) 
+            # compute matter-matter power spectrum with gravity only
+            pk = self.get_pk_nl(params_dic, k, self.Survey.lbin, self.Survey.zz_integr, model_dic['nl_model'])
+            bar_boost = self.get_bar_boost(params_dic, k, self.Survey.lbin, self.Survey.zz_integr, model_dic['baryon_model'])
+            pmm = pk*bar_boost
+            if model_dic['nl_model']!=0 or model_dic['nl_model']!=1:
+                # re-scale for modified gravity
+                # pgm dimensions are (15, ell, z_integr)
+                dz, _ = self.get_growth(params_dic, self.Survey.zz_integr, model_dic['nl_model'])
+                dz_norm, _ = self.get_growth(params_dic, self.Survey.zz_integr,  nl_model=0)
+                dz_rescale = dz/dz_norm
+                pgg, pgg_extr = pgm, pgm_extr = self.BaccoEmulator.get_heft(params_dic, k, self.Survey.lbin, self.Survey.zz_integr) * dz_rescale[np.newaxis, np.newaxis, :]*dz_rescale[np.newaxis, np.newaxis, :]
+            else:
+                # find matter-galaxy and galaxy-galaxy power spectra without galaxy-bias
+                pgg, pgg_extr = pgm, pgm_extr = self.BaccoEmulator.get_heft(params_dic, k, self.Survey.lbin, self.Survey.zz_integr) 
+            pgm, pgm_extr = pgm*np.sqrt(bar_boost), pgm_extr*np.sqrt(bar_boost) 
+            
+        else: 
+            # compute matter-matter power spectrum with baryonic feedback
+            pmm = self.get_pmm(params_dic, k, self.Survey.lbin, self.Survey.zz_integr, model_dic['nl_model'], model_dic['baryon_model'])
+            # find matter-galaxy and galaxy-galaxy power spectra without galaxy-bias
+            pgg, pgg_extr = pmm, None
+            pgm, pgm_extr = pmm, None    
         # compute weak lensing angular power spectra cl_ll(l, bin_i, bin_j)
         # window function w_l(l,z,bin) in units of h/Mpc
         cl_ll, w_l = self.get_cell_shear(params_dic, ez, rz, dz, pmm, model_dic['ia_model'], model_dic['photoz_err_model'])
