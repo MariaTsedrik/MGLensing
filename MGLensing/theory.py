@@ -2,9 +2,17 @@ import numpy as np
 import MGrowth as mg
 from scipy.integrate import trapezoid, quad
 from scipy import interpolate as itp
-from .powerspectra import HMcode2020, BCemulator, BaccoEmu, DGPReACT, GammaReACT, MuSigmaReACT, DarkScatteringReACT
+from MGLensing.structure.hmcode2020_interface import HMcode2020
+from MGLensing.structure.bacco_interface import BaccoEmu
+from MGLensing.structure.bcemu_interface import BCemulator
+from MGLensing.structure.react_ndgp_interface import DGPReACT
+from MGLensing.structure.react_gamma_interface import GammaReACT
+from MGLensing.structure.react_musigma_interface import MuSigmaReACT
+from MGLensing.structure.react_ide_interface import DarkScatteringReACT
 from math import sqrt, log, exp, pow, log10
 import os
+import fastpt as fpt
+from scipy.interpolate import interp1d
 
 os.environ['TF_CPP_MIN_LOG_LEVEL'] = '3'  
 # Suppress TensorFlow warnings
@@ -14,7 +22,7 @@ H0_h_c = 1./2997.92458
 # =100/c in Mpc/h Hubble constant conversion factor
 C_IA = 0.0134 
 # =dimensionsless, C x rho_crit 
-a_arr_for_mu = np.logspace(-5., 1., 512)
+PIVOT_REDSHIFT = 0.
 
 NL_MODEL_HMCODE = 0
 NL_MODEL_BACCO = 1
@@ -36,145 +44,273 @@ BIAS_LIN = 0
 BIAS_B1B2 = 1
 BIAS_HEFT = 2
 
+
 PHOTOZ_NONE = 0
 PHOTOZ_ADD = 1
 PHOTOZ_MULT = 2
 
-
-EmulatorRanges = {
-    'HMcode':
-        {
-        'Omega_c':      {'p1': 0.1,         'p2': 0.8},    
-        'Omega_b':      {'p1':0.01,         'p2': 0.1},  
-        'h':            {'p1': 0.4,         'p2': 1.},      
-        'As':           {'p1': 0.495e-9,    'p2': 5.459e-9},
-        'ns':           {'p1': 0.6,         'p2': 1.2}, 
-        'Mnu':          {'p1': 0.0,         'p2': 0.5},
-        'w0':           {'p1': -3.,         'p2': -0.3},    
-        'wa':           {'p1': -3.,         'p2': 3.},  
-        },
-    'bacco':
-        {
-        'Omega_cb':     {'p1': 0.23,         'p2': 0.4},    
-        'Omega_b':      {'p1':0.04,          'p2': 0.06},  
-        'h':            {'p1': 0.6,          'p2': 0.8},      
-        'sigma8_cb':    {'p1': 0.73,         'p2': 0.9},
-        'ns':           {'p1': 0.92,         'p2': 1.01}, 
-        'Mnu':          {'p1': 0.0,          'p2': 0.4},
-        'w0':           {'p1': -1.15,        'p2': -0.85},    
-        'wa':           {'p1': -0.3,         'p2': 0.3}, 
-        },    
-    'bacco_lin':
-        {
-        'Omega_cb':     {'p1': 0.06,         'p2': 0.7},    
-        'Omega_b':      {'p1':0.03,          'p2': 0.07},  
-        'h':            {'p1': 0.5,          'p2': 0.9},      
-        'ns':           {'p1': 0.6,         'p2': 1.2}, 
-        'Mnu':          {'p1': 0.0,          'p2': 1.},
-        'w0':           {'p1': -2.,        'p2': -0.5},    
-        'wa':           {'p1': -0.5,         'p2': 0.5}, 
-        },        
-    'bcemu':
-        {
-        'log10Mc_bcemu':    {'p1': 11.4,         'p2': 14.6}, 
-        'thej_bcemu':       {'p1': 2.6,          'p2': 7.4},
-        'mu_bcemu':         {'p1': 0.2,          'p2': 1.8},
-        'gamma_bcemu':      {'p1': 1.3,          'p2': 3.7},
-        'delta_bcemu':      {'p1': 3.8,          'p2': 10.2},
-        'eta_bcemu':        {'p1': 0.085,        'p2': 0.365},
-        'deta_bcemu':       {'p1': 0.085,        'p2': 0.365},
-        },
-    'hm_bar':
-        {    
-        'log10Tagn':    {'p1': 7.6,         'p2': 8.3}
-        },
-    'bacco_bfc':
-        {    
-        'log10Mc_bc':   {'p1': 9.,           'p2': 15.}, 
-        'eta_bc':       {'p1': -0.69,        'p2': 0.69},
-        'beta_bc':      {'p1': -1.,          'p2': 0.69},
-        'log10Mz0_bc':  {'p1': 9.,           'p2': 13.},
-        'thetaout_bc':  {'p1': 0.,           'p2': 0.47},
-        'thetainn_bc':  {'p1': -2.,          'p2': -0.523},
-        'log10Minn_bc': {'p1': 9.,           'p2': 13.5}
-        },
-    'ndgp_react':
-        {
-        'Omega_m':      {'p1':0.27,           'p2':0.34}, 
-        'Omega_b':      {'p1':0.04044,        'p2':0.05686}, 
-        'h':            {'p1':0.62,           'p2':0.74},
-        'ns':           {'p1':0.92,           'p2':1.0},
-        'As':           {'p1':1.5e-09,        'p2':2.7e-09},
-        'Mnu':          {'p1':0.,             'p2':0.5},
-        'log10Omega_rc':{'p1':-3.,            'p2':2.},
-        },       
-    'gammaz_react':
-        {
-        'Omega_m':      {'p1':0.29,            'p2':0.34}, 
-        'Omega_b':      {'p1':0.04044,         'p2':0.05686}, 
-        'h':            {'p1':0.629,           'p2':0.731},
-        'ns':           {'p1':0.9432,          'p2':0.9862},
-        'As':           {'p1':1.5e-09,         'p2':2.7e-09},
-        'Omega_nu':     {'p1':0.,              'p2':0.00317},
-        'gamma0':       {'p1':0.,              'p2':1.},
-        'gamma1':       {'p1':-0.7,            'p2':0.7},
-        'q1':           {'p1':-2.,             'p2':2.}
-        },     
-    'musigma_react':
-        {
-        'Omega_m':      {'p1':0.2,            'p2':0.6}, 
-        'Omega_b':      {'p1':0.03,           'p2':0.07}, 
-        'h':            {'p1':0.58,           'p2':0.8},
-        'ns':           {'p1':0.93,           'p2':1.0},
-        'As':           {'p1':0.5e-09,        'p2':5.e-09},
-        'Mnu':          {'p1':0.,             'p2':0.6},
-        'mu0':          {'p1':-0.9999,        'p2':2.9999},
-        'sigma0':       {'p1':-1.,            'p2':3.},
-        'q1':           {'p1':-2.,            'p2':2.}
-        },    
-    'ds_react':
-        {
-        'Ombh2':        {'p1':0.01875,            'p2':0.02625}, 
-        'Omch2':        {'p1':0.05,           'p2':0.255}, 
-        'h':            {'p1':0.64,           'p2':0.82},
-        'ns':           {'p1':0.84,           'p2':1.1},
-        'S8':           {'p1':0.6,        'p2':0.9},
-        'Mnu':          {'p1':0.,             'p2':0.2},
-        'w0':           {'p1':-1.3,            'p2':-0.7},
-        'Ads':           {'p1':-30.,            'p2':30.}
-        },    
-
-}            
-
-
-cosmo_names = ["Omega_m", "Omega_b", "Omega_c", "Omega_cb", "Omega_nu", "Ombh2", "Omnuh2", "fb", "h", "Mnu", "ns", "w0", "wa"]
 def check_zmax(zmax, emu_obj):
     emu_z_max = emu_obj.zz_max
     if zmax > emu_z_max:
         raise ValueError(f'Survey z_max must not exceed zz_max in the power spectrum computation for {emu_obj.emu_name}!')
-        
+
+def compute_spline(c_ell, binned_ell, nbin):
+    spline_c_ell = np.empty((nbin, nbin), dtype=(list, 3))
+    # create an interpolator at the binned ells
+    for bin1 in range(nbin):
+        for bin2 in range(nbin):
+            spline_c_ell[bin1, bin2] = list(itp.splrep(
+                binned_ell[:], c_ell[:, bin1, bin2]))    
+    return spline_c_ell        
+
+def build_data_matrix(c_ell, binned_ell, all_int_ell, nbin):
+    # create an interpolator at the binned ells
+    spline_c_ell = compute_spline(c_ell, binned_ell, nbin)
+    cov_theory = np.zeros((len(all_int_ell), nbin, nbin), 'float64')
+    # interpolate at all integer values of ell
+    for bin1 in range(nbin):
+        for bin2 in range(nbin):
+            cov_theory[:, bin1, bin2] = itp.splev(all_int_ell[:], spline_c_ell[bin1, bin2])
+    return cov_theory  
+
+def build_data_matrix_3x2pt(cl_ll, cl_gg, cl_lg, cl_gl,  binned_ell_wl, binned_ell_gc, binned_ell_xc, 
+                            all_int_ell_wl, all_int_ell_gc, ell_jump, nbin):
+    # create an interpolator at the binned ells
+    spline_ll = compute_spline(cl_ll, binned_ell_wl, nbin)
+    spline_gg = compute_spline(cl_gg, binned_ell_gc, nbin)
+    spline_lg = compute_spline(cl_lg, binned_ell_xc, nbin)
+    spline_gl = compute_spline(cl_gl, binned_ell_xc, nbin)
+    cov_theory = np.zeros((len(all_int_ell_wl), 2 * nbin, 2 * nbin), 'float64')
+    cov_theory_high = np.zeros(((len(all_int_ell_wl) - ell_jump), nbin, nbin), 'float64')    
+    for bin1 in range(nbin):
+        for bin2 in range(nbin):
+            cov_theory[:, bin1, bin2] = itp.splev(
+                all_int_ell_gc[:], spline_ll[bin1, bin2])
+            cov_theory[:, nbin + bin1, bin2] = itp.splev(
+                all_int_ell_gc[:], spline_gl[bin1, bin2])
+            cov_theory[:, bin1, nbin + bin2] = itp.splev(
+                all_int_ell_gc[:], spline_lg[bin1, bin2])
+            cov_theory[:, nbin + bin1, nbin + bin2] = itp.splev(
+                all_int_ell_gc[:], spline_gg[bin1, bin2])
+            cov_theory_high[:, bin1, bin2] = itp.splev(
+                all_int_ell_wl[ell_jump:], spline_ll[bin1, bin2])      
+    return cov_theory, cov_theory_high
+
 
 class Theory:
-    def __init__(self, SurveyClass):
+    def __init__(self, SurveyClass, model: dict):
+        """
+        Initialize the theory class with the given survey and model parameters.
+
+        Parameters:
+        ----------
+        SurveyClass : object
+            An instance of the survey class containing survey-specific information.
+        model : dict
+            A dictionary containing model parameters with the following keys:
+
+            - 'nl_model': Nonlinear model option. Valid options are:
+                - NL_MODEL_HMCODE
+                - NL_MODEL_BACCO
+                - NL_MODEL_NDGP
+                - NL_MODEL_GAMMAZ
+                - NL_MODEL_MUSIGMA
+                - NL_MODEL_DS
+            - 'baryon_model': Baryonic model option. Valid options are:
+                - NO_BARYONS
+                - BARYONS_HMCODE
+                - BARYONS_BCEMU
+                - BARYONS_BACCO
+            - 'ia_model': Intrinsic alignment model option. Valid options are:
+                - IA_NLA
+                - IA_TATT
+            - 'bias_model': Galaxy bias model option. Valid options are:
+                - BIAS_LIN
+                - BIAS_B1B2
+                - BIAS_HEFT
+            - 'photoz_err_model': Redshift uncertainty model option. Valid options are:
+                - PHOTOZ_NONE 
+                - PHOTOZ_ADD 
+                - PHOTOZ_MULT
+
+        Raises:
+        ------
+        ValueError:
+            If an invalid option is provided for 'nl_model', 'baryon_model', 'ia_model', or 'bias_model'.
+            If 'ia_model' is set to IA_TATT and 'bias_model' is not BIAS_LIN.
+        """
         self.Survey = SurveyClass
-        # load classes with emulators
-        # to-do: load only the ones actually used in the code
-        self.HMcode2020Emulator = HMcode2020()
-        check_zmax(self.Survey.zmax, self.HMcode2020Emulator)
-        self.BCemulator = BCemulator()
-        check_zmax(self.Survey.zmax, self.BCemulator)
-        self.BaccoEmulator = BaccoEmu()
-        check_zmax(self.Survey.zmax, self.BaccoEmulator)
-        self.DGPEmulator = DGPReACT()
-        check_zmax(self.Survey.zmax, self.DGPEmulator)
-        self.GammazEmulator = GammaReACT()
-        check_zmax(self.Survey.zmax, self.GammazEmulator)
-        self.MuSigmaEmulator = MuSigmaReACT()
-        check_zmax(self.Survey.zmax, self.MuSigmaEmulator)
-        self.DSEmulator = DarkScatteringReACT()
-        check_zmax(self.Survey.zmax, self.DSEmulator)
+        # load emulators
+        # assign nonlinear prescription
+        nl_models = {
+            NL_MODEL_HMCODE: HMcode2020,
+            NL_MODEL_BACCO: BaccoEmu,
+            NL_MODEL_NDGP: DGPReACT,
+            NL_MODEL_GAMMAZ: GammaReACT,
+            NL_MODEL_MUSIGMA: MuSigmaReACT,
+            NL_MODEL_DS: DarkScatteringReACT
+        }
+        try:
+            if model['nl_model'] == NL_MODEL_BACCO:
+                option = model['bacco_option'] if 'bacco_option' in model else 'z_extrap_linear'
+                self.StructureEmu = nl_models[model['nl_model']](option)
+            else:
+                self.StructureEmu = nl_models[model['nl_model']]()
+        except KeyError:
+            raise ValueError("Invalid nl_model option.")
+        check_zmax(self.Survey.zmax, self.StructureEmu)
+
+        # assign baryonic prescription
+        baryon_models = {
+            BARYONS_HMCODE: HMcode2020,
+            BARYONS_BCEMU: BCemulator,
+            BARYONS_BACCO: BaccoEmu
+        }
+        self.BaryonsEmu = baryon_models.get(model['baryon_model'], None)
+        if self.BaryonsEmu:
+            self.BaryonsEmu = self.BaryonsEmu()
+            check_zmax(self.Survey.zmax, self.BaryonsEmu)
+    
+        # assign intrinsic alignment     
+        ia_models = {
+            IA_NLA: (self.get_pk_nla, self.get_pk_cross_nla),
+            IA_TATT: (self.get_pk_tatt, self.get_pk_cross_tatt)
+        }
+        try:
+            self.get_pk_ia, self.get_pk_cross_ia = ia_models[model['ia_model']]
+            if model['ia_model'] == IA_TATT:
+                pad_factor = 1
+                self.klin = self.StructureEmu.kh_lin
+                n_pad = int(pad_factor * len(self.klin))
+                self.fpt_obj = fpt.FASTPT(self.klin, to_do=['IA'],
+                            low_extrap=-5,
+                            high_extrap=3,
+                            n_pad=n_pad)
+        except KeyError:
+            raise ValueError("Invalid ia_model option.")
+            
+        # assign galaxy bias
+        self.flag_heft = (model['bias_model'] == BIAS_HEFT)
+        bias_models = {
+            BIAS_LIN: (self.get_pgm_lin_bias, self.get_pgg_lin_bias),
+            BIAS_B1B2: (self.get_pgm_quadr_bias, self.get_pgg_quadr_bias),
+            BIAS_HEFT: (self.get_pgm_heft_bias, self.get_pgg_heft_bias)
+        }
+        try:
+            self.get_pgm, self.get_pgg = bias_models[model['bias_model']]
+            if self.flag_heft:
+                self.BaccoEmuClass = BaccoEmu()
+        except KeyError:
+            raise ValueError("Invalid bias_model option.")
+        if model['bias_model'] != BIAS_LIN and model['ia_model'] == IA_TATT:
+            raise ValueError("TATT is only available with linear bias!")
+
+        # assign photo-z model
+        photoz_err_models = {
+            PHOTOZ_NONE: lambda nz, deltas: nz,
+            PHOTOZ_ADD: self.get_add_photoz_error,
+            PHOTOZ_MULT: self.get_mult_photoz_error
+        }
+        self.get_n_of_z = photoz_err_models.get(model['photoz_err_model'])
+        if self.get_n_of_z is None:
+            raise ValueError("Invalid photoz_err_model option.")
+
+    def get_fpt_terms(self, plin_z0,  C_window=.75):
+        """
+        Computes the terms of the Intrinsic Alignment (IA) TATT model at 1-loop order.
+        For reference on the equations, see https://arxiv.org/pdf/1708.09247.
+
+        Parameters:
+        ----------
+        plin_z0 : numpy.ndarray
+            Linear power spectrum at redshift z = 0.
+        C_window : float, optional
+            Window function parameter to remove high frequency modes and avoid ringing effects.
+            Default value is 0.75.
+
+        Returns:
+        -------
+        dict
+            Dictionary containing the 1-loop order terms of the intrinsic alignment model:
+            - 'a00e': scipy.interpolate.interp1d
+            - 'c00e': scipy.interpolate.interp1d
+            - 'a0e0e': scipy.interpolate.interp1d
+            - 'a0b0b': scipy.interpolate.interp1d
+            - 'ae2e2': scipy.interpolate.interp1d
+            - 'ab2b2': scipy.interpolate.interp1d
+            - 'a0e2': scipy.interpolate.interp1d
+            - 'b0e2': scipy.interpolate.interp1d
+            - 'd0ee2': scipy.interpolate.interp1d
+            - 'd0bb2': scipy.interpolate.interp1d
+            Each entry in the dictionary is an interpolation function of the corresponding term as a function of the wavenumber.
+        """
+
+        P_window = None
+
+        a00e, c00e, a0e0e, a0b0b = self.fpt_obj.IA_ta(plin_z0,
+                                                   P_window=P_window,
+                                                   C_window=C_window)
+        ae2e2, ab2b2 = self.fpt_obj.IA_tt(plin_z0, P_window=P_window, C_window=C_window)
+
+        a0e2, b0e2, d0ee2, d0bb2 = self.fpt_obj.IA_mix(plin_z0,
+                                                    P_window=P_window,
+                                                    C_window=C_window)
+
+        a00e_int = itp.interp1d(self.klin, a00e, kind='linear',
+                                    fill_value='extrapolate')
+
+        c00e_int = itp.interp1d(self.klin, c00e, kind='linear',
+                                    fill_value='extrapolate')
+
+        a0e0e_int = itp.interp1d(self.klin, a0e0e, kind='linear',
+                                     fill_value='extrapolate')
+
+        a0b0b_int = itp.interp1d(self.klin, a0b0b, kind='linear',
+                                     fill_value='extrapolate')
+
+        ae2e2_int = itp.interp1d(self.klin, ae2e2, kind='linear',
+                                     fill_value='extrapolate')
+
+        ab2b2_int = itp.interp1d(self.klin, ab2b2, kind='linear',
+                                     fill_value='extrapolate')
+
+        a0e2_int = itp.interp1d(self.klin, a0e2, kind='linear',
+                                    fill_value='extrapolate')
+
+        b0e2_int = itp.interp1d(self.klin, b0e2, kind='linear',
+                                    fill_value='extrapolate')
+
+        d0ee2_int = itp.interp1d(self.klin, d0ee2, kind='linear',
+                                     fill_value='extrapolate')
+
+        d0bb2_int = itp.interp1d(self.klin, d0bb2, kind='linear',
+                                     fill_value='extrapolate')
+
+        return {'a00e': a00e_int, 'c00e': c00e_int, 'a0e0e': a0e0e_int, 'a0b0b': a0b0b_int, 
+                'ae2e2': ae2e2_int, 'ab2b2': ab2b2_int, 'a0e2': a0e2_int, 'b0e2': b0e2_int, 'd0ee2': d0ee2_int, 'd0bb2': d0bb2_int}
+
+
 
     def check_consistency(self, params): 
+        """
+        Check the consistency of the provided cosmological parameters.
+
+        Parameters:
+        ----------
+        params (dict): Dictionary containing cosmological parameters.
+
+        Raises:
+        ------
+        KeyError: If 'h' is not found in the dictionary.
+
+        ValueError: If too many density parameters are present, 
+                    if multiple amplitude parameters are present, 
+                    or if no amplitude parameters are present.
+
+        Returns:
+        -------
+        dict: Updated parameters after applying relations.
+        """
         if 'h' not in params.keys():
             raise KeyError("h not found in dictionary")
         conditions = [
@@ -189,6 +325,7 @@ class Theory:
         'log10As',
         'As',
         'sigma8',
+        'sigma8_cb',
         'S8']
         amplitude_params = [param for param in conditions_amp if param in params]
         if len(amplitude_params) > 1:
@@ -196,13 +333,19 @@ class Theory:
         elif len(amplitude_params) == 0:  
             raise ValueError(f"Invalid parameter set: no amplitude parameters present")
         params_new = self.apply_relations(params)
-        still_unspecified = [param for param in cosmo_names if param not in params_new]
-        if len(still_unspecified) > 1:
-            raise ValueError(f"Invalid parameter set: missing parameters: {still_unspecified}")
         return params_new
         
-    
     def apply_relations(self, params): 
+        """Apply cosmological parameter relations and compute derived parameters.
+
+        Parameters:
+        ----------
+        params (dict): Dictionary containing cosmological parameters.
+
+        Returns:
+        -------
+        dict: Updated dictionary with derived cosmological parameters.
+        """
         params['TCMB'] = params.get('TCMB', 2.7255)
         params['nnu'] = params.get( 'nnu', 3.044)
         if 'Omega_b' in params.keys():
@@ -230,243 +373,111 @@ class Theory:
         if 'As' in params.keys():
             params['log10As'] = log(1e10*params['As'])
         elif 'log10As' in params.keys():
-            params['As'] = exp(params['log10As'])*1e-10
-        if 'S8' in params.keys():
-            params['sigma8'] = params['S8']/sqrt(params['Omega_m']/0.3)   
-        return params
-
-    def get_emu_status(self, params, which_emu, flag_once=False):
+            params['As'] = exp(params['log10As'])*1e-10 
+        return params        
+    
+    def check_ranges(self, params):
         """
-        Checks the relevant boundaries of emulators.
+        Check if the parameters are within the valid ranges for the emulators
+        at each step of MCMC.
 
         Parameters:
         ----------
-        params (dict): a set of coordinates in parameter space
-        which_emu (str) : kind of emulator: options are 'HMcode', 'bacco', 'bacco_lin',
-                                            'baryons'
-        flag_once (boolean): set to false within a chain, set to true for a single data computation
+        params (dict): Dictionary containing the parameters to be checked.
 
         Returns:
         -------
-        boolean: status of the ranges check
-
-        Raises:
-        ------
-        KeyError: If the parameter is outside its allowed ranges: what is this parameter and which are the correct ranges.
+        boolean: True if all parameters are within the valid ranges, False otherwise.
         """
-        # parameters strictly needed to evaluate the emulator
-        eva_pars = EmulatorRanges[which_emu].keys()
-        pp = [params[p] for p in eva_pars]
-        if flag_once:
-            for i, par in enumerate(eva_pars):
-                val = pp[i]
-                message = 'Parameter {}={} out of bounds [{}, {}]'.format(
-                par, val, EmulatorRanges[which_emu][par]['p1'],
-                EmulatorRanges[which_emu][par]['p2'])
-                assert (np.all(val >= EmulatorRanges[which_emu][par]['p1'])
-                    & np.all(val <= EmulatorRanges[which_emu][par]['p2'])
-                    ), message
-        else:    
-            if not all(EmulatorRanges[which_emu][par_i]['p1'] <= params[par_i] <= EmulatorRanges[which_emu][par_i]['p2'] for par_i in eva_pars):
-                return False
-        return True
-        
-        
-    def get_a_s(self, params, flag_once=False):
-        if 'As' in params:
-            return True, params['As']
+        status_nl = self.StructureEmu.check_pars(params) #including mg-conditions
+        if self.BaryonsEmu!=None:
+            status_b  = self.BaryonsEmu.check_pars(params) 
         else:
-            # to-do: add from_sigma8_to_sigma8_cb
-            # make distinction between sigma8_cold and sigma8
-            params['sigma8_cb'] = params['sigma8'] 
-            status = self.get_emu_status(params, 'bacco_lin', flag_once)
-            if not status:
-                return False, np.nan
-            else:
-                params_bacco = {
-                'ns'            :  params['ns'],
-                'sigma8_cold'   :  params['sigma8_cb'], 
-                'hubble'        :  params['h'],
-                'omega_baryon'  :  params['Omega_b'],
-                'omega_cold'    :  params['Omega_cb'], 
-                'neutrino_mass' :  params['Mnu'],
-                'w0'            :  params['w0'],
-                'wa'            :  params['wa'],
-                'expfactor'     :  1    
-                }
-                a_s = self.BaccoEmulator.baccoemulator.get_A_s(**params_bacco)
-                return True, a_s
+            status_b = True    
+        status = status_nl and status_b
+        return  status 
     
-    def get_sigma8_cb(self, params, flag_once=False):
-        if 'sigma8' in params:
-            # to-do: add from_sigma8_to_sigma8_cb
-            # make distinction between sigma8_cold and sigma8
-            params['sigma8_cb'] = params['sigma8']     
-            return True, params['sigma8_cb'] 
-        else: 
-            status = self.get_emu_status(params, 'bacco_lin', flag_once)
-            if not status:
-                return False, np.nan
-            else:
-                params_bacco = {
-                'ns'            :  params['ns'],
-                'A_s'           :  params['As'], 
-                'hubble'        :  params['h'],
-                'omega_baryon'  :  params['Omega_b'],
-                'omega_cold'    :  params['Omega_cb'], 
-                'neutrino_mass' :  params['Mnu'],
-                'w0'            :  params['w0'],
-                'wa'            :  params['wa'],
-                'expfactor'     :  1    
-                }
-                sigma8_cb = self.BaccoEmulator.baccoemulator.get_sigma8(cold=True, **params_bacco)
-                return True, sigma8_cb
-    
-    
-    def check_ranges(self, params, model, flag_once=False):
+    def check_ranges_ini(self, params):
         """
-        Check the parameter ranges in emulators for the model.
+        Check if the parameters are within the valid ranges for the emulators
+        once at initialization of data and model with explicit error messages.
 
         Parameters:
-        -----------
-        params (dict): Dictionary containing the parameters to be checked.                  
-        model (dict): Dictionary containing the model-specific parameters.
-        flag_once (boolean): set to false within a chain, set to true for a single data computation 
+        ----------
+        params (dict): Dictionary containing the parameters to be checked.
 
         Returns:
         -------
-        boolean: status of the parameter range check.
+        boolean: True if all parameters are within the valid ranges, False otherwise.
         """
-        if  model['nl_model']==NL_MODEL_HMCODE:
-            status_, params['As'] = self.get_a_s(params, flag_once)
-            if not status_:
-                return status_
-            status_nl = self.get_emu_status(params, 'HMcode', flag_once)
-        elif  model['nl_model']==NL_MODEL_BACCO:       
-            status_, params['sigma8_cb'] = self.get_sigma8_cb(params)
-            if not status_:
-                return status_
-            status_nl = self.get_emu_status(params, 'bacco', flag_once)
-        elif  model['nl_model']==NL_MODEL_NDGP:       
-            status_nl = self.get_emu_status(params, 'ndgp_react', flag_once)
-        elif  model['nl_model']==NL_MODEL_GAMMAZ:       
-            status_nl = self.get_emu_status(params, 'gammaz_react', flag_once)
-        elif  model['nl_model']==NL_MODEL_MUSIGMA:       
-            status_nl = self.get_emu_status(params, 'musigma_react', flag_once)
-        elif  model['nl_model']==NL_MODEL_DS:       
-            status_nl = self.get_emu_status(params, 'ds_react', flag_once)    
-        if model['baryon_model']!=NO_BARYONS:
-            if  model['baryon_model']==BARYONS_BCEMU:
-                status_b = self.get_emu_status(params, 'bcemu', flag_once)
-            elif  model['baryon_model']==BARYONS_HMCODE:
-                status_b = self.get_emu_status(params, 'hm_bar', flag_once)
-            elif  model['baryon_model']==BARYONS_BACCO:
-                status_b = self.get_emu_status(params, 'bacco_bfc', flag_once)
-            status = status_nl and status_b
+        status_nl = self.StructureEmu.check_pars_ini(params) #including mg-conditions
+        if self.BaryonsEmu!=None:
+            status_b  = self.BaryonsEmu.check_pars_ini(params) 
         else:
-            status = status_nl
-        # check the w0-wa condition
-        if params['w0'] + params['wa'] >= 0:
-            status = False
-        # check the mu-Sigma condition
-        if params['mu0'] > (2.*params['sigma0']+1.):
-            status = False    
-        # check the DS condition
-        if params['w0']!=-1.:
-            if params['Ads']/(1. + params['w0']) < 0:
-                status = False       
+            status_b = True    
+        status = status_nl and status_b
         return  status 
 
-
-    def check_pars_ini(self, param_dic, model_dic, flag_once=True):
-        """
-        Initial check and validate the parameters for the model and data.
+    def check_pars_ini(self, param_dic):
+        """Initial check and validate the parameters for the model and data.
 
         Parameters:
         ----------
         param_dic (dict): Dictionary containing the parameters to be checked.
-        model_dic (dict): Dictionary containing the model-specific parameters.
 
         Returns:
-        --------
+        -------
         tuple: A tuple containing the updated parameter dictionary and the status
                of the parameter range check.
 
         Raises:
-        -------        
+        ------       
         KeyError: If the required parameter 'h' is not found in the parameter dictionary.
+        
         KeyError: If some cosmological parameters are missing from the parameter dictionary.
         """
         param_dic_all = self.check_consistency(param_dic)
-        status = self.check_ranges(param_dic_all, model_dic, flag_once)
+        status = self.check_ranges_ini(param_dic_all)
         return param_dic_all, status
     
-    def check_pars(self, param_dic, model_dic):
+    def check_pars(self, param_dic):
         """
         Check and validate the parameters for the model within a chain.
 
         Parameters:
         ----------
         param_dic (dict): Dictionary containing the parameters to be checked.
-        model_dic (dict): Dictionary containing the model-specific parameters.
 
         Returns:
-        --------
+        -------
         tuple: A tuple containing the updated parameter dictionary and the status
                of the parameter range check.
         """
         param_dic_all = self.apply_relations(param_dic)
-        status = self.check_ranges(param_dic_all, model_dic, False)
+        status = self.check_ranges(param_dic_all)
         return param_dic_all, status
-    
-    def add_photoz_error(self, params_dic, nz, photoz_err_model=0):
-        '''
-        Add photo-z error to the redshift distribution of galaxies.
-        Parameters:
-        -----------
-        params_dic : dict
-            Dictionary containing photo-z error parameters.
-        nz : numpy.ndarray
-            Array of redshift distribution of galaxies.
-        photoz_err_model : int, optional
-            Integer specifying the photo-z error model to use. Default is 0.
-            '''
-        deltaz = np.array([params_dic['deltaz_'+str(i+1)] for i in range(self.Survey.nbin)])
-        nz_biased = np.zeros((len(self.Survey.zz_integr), self.Survey.nbin))
-        for i in range(self.Survey.nbin):
-            f = itp.interp1d(self.Survey.zz_integr, nz[:,i], fill_value=0.0, bounds_error=False)
-            # additive mode
-            if photoz_err_model == PHOTOZ_ADD:
-                nz_biased[:,i] = f(self.Survey.zz_integr - deltaz[i])
-            # multiplicative mode
-            if photoz_err_model == PHOTOZ_MULT:  
-                nz_biased[:,i] = f(self.Survey.zz_integr * (1 - deltaz[i]))
-            # normalize
-            nz_biased[:,i] /= np.trapz(nz_biased[:,i], self.Survey.zz_integr)
-        return nz_biased
 
-    def get_ez_rz_k(self, params_dic, zz):
-        """
-        Calculate the E(z), r_com(z), and k(z)=(ell+1/2)/r_com(z) grids based on cosmological parameters.
+    def get_ez_rz_k(self, params_dic):
+        r"""
+        Calculate the :math:`E(z)`, :math:`r_{\rm com}(z)`, and :math:`k(z)=(\ell+1/2)/r_{\rm com}(z)` grids based on cosmological parameters.
 
         Parameters:
-        -----------
+        ----------
         params_dic : dict
             Dictionary containing cosmological parameters:
+
             - 'Omega_m': Matter density parameter.
             - 'w0': Equation of state parameter w0.
             - 'wa': Equation of state parameter wa.
-        zz : array-like
-            Array of redshift values.
 
         Returns:
-        --------
+        -------
         e_z_grid : numpy.ndarray
-            Array of E(z) values corresponding to the input redshift values.
+            Array of E(z) values corresponding to the survey's redshift integration grid.
         r_z_grid : numpy.ndarray
-            Array of r_com(z) values corresponding to the input redshift values, in units of Mpc/h.
+            Array of r_com(z) values corresponding to the survey's redshift integration grid, in units of Mpc/h.
         k_grid : numpy.ndarray
-            Array of k(z) values corresponding to the input redshift values, in units of h/Mpc.
+            Array of k(z) values corresponding to the survey's redshift integration grid, in units of h/Mpc.
         """
         omega_m = params_dic['Omega_m']
         w0 = params_dic['w0']
@@ -475,737 +486,1163 @@ class Theory:
         e_z_func = lambda z: np.sqrt(omega_m*pow(1.+z, 3) + omega_lambda_func(z))
         r_z_int = lambda z: 1./e_z_func(z)
         r_z_func = lambda z_in: quad(r_z_int, 0, z_in)[0]
-        r_z_grid = np.array([r_z_func(zz_i) for zz_i in zz])/H0_h_c 
-        e_z_grid = np.array([e_z_func(zz_i) for zz_i in zz])
+        r_z_grid = np.array([r_z_func(zz_i) for zz_i in self.Survey.zz_integr])/H0_h_c 
+        e_z_grid = np.array([e_z_func(zz_i) for zz_i in self.Survey.zz_integr])
         k_grid =(self.Survey.ell[:,None]+0.5)/r_z_grid
         return e_z_grid, r_z_grid, k_grid
     
-
-    
-    def get_growth(self, params_dic, zz_integr,  nl_model=0):
+    def get_add_photoz_error(self, nz, deltaz):
         """
-        Calculate the growth factor for different cosmological models.
+        Additative photo-z error to the redshift distribution of galaxies:
+        :math:`n(z')=n(z+\delta_z)`.
 
         Parameters:
-        -----------
-        params_dic : dict
-            Dictionary containing cosmological parameters. Expected keys are:
-            'Omega_m', 'h', 'w0', 'wa', and depending on the model, 'log10Omega_rc', 'gamma0', 'gamma1'.
-        zz_integr : array-like
-            Array of redshift values for integration.
-        nl_model : int, optional
-            Integer specifying the modified gravity model to use. Default is 0.
-            - 0 or 1: w0waCDM model
-            - 2: nDGP model
-            - 3: Linder_gamma_a model
+        ----------
+        deltaz : numpy.ndarray
+            Array containing photo-z error parameters for sources or lenses.
+        nz : numpy.ndarray
+            Array of redshift distribution of galaxies, sources or lenses.
 
         Returns:
-        --------
-        dz : numpy.ndarray
-            Normalized growth factor array corresponding to the input redshift values.
-        dz0 : float
-            Growth factor at redshift zero.
-            
-        Raises:
         -------
-        ValueError
-            If an invalid mg_model option is provided.
+        nz_biased : numpy.ndarray
+            The biased redshift distribution of galaxies after applying the additive photo-z error.
         """
-        aa_integr =  np.array(1./(1.+zz_integr[::-1]))
-        background ={
-            'Omega_m': params_dic['Omega_m'],
-            'h' : params_dic['h'],
-            'w0': params_dic['w0'],
-            'wa': params_dic['wa'],
-            'a_arr': np.hstack((aa_integr, 1.))
-            }
-        if nl_model==NL_MODEL_HMCODE or nl_model==NL_MODEL_BACCO:
-            cosmo = mg.w0waCDM(background)   
-            da, _ = cosmo.growth_parameters() 
-        elif nl_model==NL_MODEL_NDGP:
-            cosmo = mg.nDGP(background)
-            log10omega_rc = params_dic['log10Omega_rc'] 
-            da, _ = cosmo.growth_parameters(10**log10omega_rc)  
-        elif nl_model==NL_MODEL_GAMMAZ:
-            cosmo = mg.Linder_gamma_a(background)
-            gamma0 = params_dic['gamma0'] 
-            gamma1 = params_dic['gamma1'] 
-            da, _ = cosmo.growth_parameters(gamma=gamma0, gamma1=gamma1)
-        elif nl_model==NL_MODEL_MUSIGMA:
-            omega_m = params_dic['Omega_m']
-            w0 = params_dic['w0']
-            wa = params_dic['wa']
-            omega_lambda = (1.-omega_m)* pow(a_arr_for_mu, -3.*(1.+w0+wa)) * np.exp(-3.*wa*(1.-a_arr_for_mu))
-            e2 = omega_m/a_arr_for_mu**3+omega_lambda
-            cosmo = mg.mu_a(background)
-            mu0 = params_dic['mu0'] 
-            mu0_arr = 1.+mu0/e2
-            mu_interpolator = itp.interp1d(a_arr_for_mu, mu0_arr, bounds_error=False,
-                kind='cubic') 
-            da, _ = cosmo.growth_parameters(mu_interp=mu_interpolator) 
-        elif nl_model==NL_MODEL_DS:
-            cosmo = mg.IDE(background)
-            xi = params_dic['Ads']/(1.+params_dic['w0'])
-            da, _ = cosmo.growth_parameters(xi=xi)             
-        else:
-            raise ValueError("Invalid mg_model option.")    
-        dz = da[::-1] 
-        # growth factor should be normalised to z=0
-        dz0 = dz[0]
-        dz = dz[1:]/dz0
-        return dz, dz0
+        nz_biased = np.zeros((len(self.Survey.zz_integr), self.Survey.nbin))
+        for i in range(self.Survey.nbin):
+            f = itp.interp1d(self.Survey.zz_integr, nz[:,i], fill_value=0.0, bounds_error=False)
+            # additive mode
+            nz_biased[:,i] = f(self.Survey.zz_integr - deltaz[i])
+            # normalize
+            nz_biased[:,i] /= np.trapz(nz_biased[:,i], self.Survey.zz_integr)
+        return nz_biased
     
-    def get_ia_kernel(self, omega_m, params_dic, ez, dz, eta_z_s, zz_integr, ia_model=0, photoz_err_model=0):
+    def get_mult_photoz_error(self, nz, deltaz):
         """
-        Calculate the intrinsic alignment (IA) kernel in units of h/Mpc. The amplitude is given by 
-
-        .. math::
-            A(z) = - a_{\rm IA} C_{\rm IA} \frac{\Omega_{\rm m}}{D(z)} (1+z)^{\eta_{\rm IA}} L(z)^{\beta_{\rm IA}}
-        with :math:`C_{\rm IA} = \bar{C}_{\rm IA} \rho_{\rm crit}` and 
-        :math:`\bar{C}_{\rm IA}=5 \times 10^{-14} M^{-1}_\odot h^{-2} \rm{Mpc}^3`, and luminosity funsiton L.
-        The kernel is given by
-
-        .. math::
-            W_i^{\rm IA}(z) = A(z) \frac{n_i(z)}{c/H(z)}
-        with :math:`n_i(z)` being the source distribution in bin-i.
+        Multiplicative photo-z error to the redshift distribution of galaxies:
+        :math:`n(z')=n(z(1+\delta_z))`.
 
         Parameters:
-        -----------
-        omega_m : float
-            Matter density parameter.
-        params_dic : dict
-            Dictionary containing IA model parameters:
-            - 'aIA': Amplitude of the intrinsic alignment.
-            - 'etaIA': Redshift evolution parameter for IA.
-            - 'betaIA': Luminosity-function dependence parameter for IA.
-        ez : array_like
-            Redshift-dependent Hubble parameter values.
-        dz : array_like
-            Growth factor values.
-        eta_z_s : array_like
-            Redshift-dependent source galaxy distribution.
-        zz_integr : array_like
-            Redshift integration grid.
-        ia_model : int, optional
-            Intrinsic alignment model to use (default is 0).
-            - 0: Standard IA model.
-            - 1: TATT.
+        ----------
+        deltaz : numpy.ndarray
+            Array containing photo-z error parameters for sources or lenses.
+        nz : numpy.ndarray
+            Array of redshift distribution of galaxies, sources or lenses.
 
         Returns:
-        --------
-        w_ia : array_like
-            Intrinsic alignment kernel.
+        -------
+        nz_biased : numpy.ndarray
+            The biased redshift distribution of galaxies after applying the multiplicative photo-z error.
         """
-        if photoz_err_model!=PHOTOZ_NONE:
-            eta_z_s = self.add_photoz_error(params_dic, eta_z_s, photoz_err_model)
-            
-        if ia_model==IA_NLA:
-            w_ia_p = eta_z_s * ez[:,None] * H0_h_c
-            a_ia = params_dic['aIA'] 
-            eta_ia = params_dic['etaIA'] 
-            beta_ia = params_dic['betaIA']
-            f_ia = (1.+zz_integr)**eta_ia * (self.Survey.lum_func(zz_integr))**beta_ia
-            dz = dz[None,:] 
-            # growth factor can be scale-dependent for f(R)
-            w_ia = - a_ia*C_IA*omega_m*f_ia[None,:,None]/dz[:,:,None] * w_ia_p[None,:,:]
-        else:
-            raise NotImplementedError('TATT not implememnted yet')
-        return w_ia
+        nz_biased = np.zeros((len(self.Survey.zz_integr), self.Survey.nbin))
+        for i in range(self.Survey.nbin):
+            f = itp.interp1d(self.Survey.zz_integr, nz[:,i], fill_value=0.0, bounds_error=False)
+            # multiplicative mode
+            nz_biased[:,i] = f(self.Survey.zz_integr * (1 - deltaz[i]))
+            # normalize
+            nz_biased[:,i] /= np.trapz(nz_biased[:,i], self.Survey.zz_integr)
+        return nz_biased
+
     
-    def get_wl_kernel(self, omega_m, params_dic, ez, rz, dz, ia_model=0, photoz_err_model=0):
+    def get_tatt_parameters(self, params):
+        """Calculate the normalised tidal alignment and tidal torque (TATT) model parameters.
+        See definitions of C1, C1d and C2 in https://arxiv.org/pdf/1708.09247.
+
+
+        Parameters:
+        ----------
+        params : dict
+            Dictionary containing the following keys:
+
+            - 'Omega_m': float, matter density parameter.
+            - 'a1_IA': float, amplitude of the tidal alignment model.
+            - 'a2_IA': float, amplitude of the torque alignment model.
+            - 'b1_IA': float, amplitude of the density-weighted linear alignment model.
+            - 'eta1_IA': float, redshift evolution parameter for the tidal alignment model.
+            - 'eta2_IA': float, redshift evolution parameter for the torque alignment model.
+
+        Returns:
+        -------
+        tuple
+            A tuple containing three numpy arrays:
+            
+            - c1
+            - c1d
+            - c2
         """
-        Calculate the weak lensing kernel, in units of units of h/Mpc: 
+        omega_m = params['Omega_m']
+        # dz is normalise at z=0
+        dz = self.dz[None, :]
+        a1_ia = params['a1_IA']
+        a2_ia = params['a2_IA']
+        b1_ia = params['b1_IA']
+        eta1_ia = params['eta1_IA']
+        eta2_ia = params['eta2_IA']
+        c1 = -a1_ia * C_IA * omega_m * \
+            ((1 + self.Survey.zz_integr) / (1 + PIVOT_REDSHIFT)) ** eta1_ia / dz
+        # factor 5 comes from setting similar signal in II smoothed withing filter for a1=a2
+        c2 = a2_ia * 5 * C_IA * omega_m * \
+            ((1 + self.Survey.zz_integr) / (1 + PIVOT_REDSHIFT)) ** eta2_ia / (dz**2)
+        c1d = b1_ia * c1
+        # dimensions (lbin, z_integr)
+        return c1, c1d, c2
+
+
+    def get_pk_tatt(self, params_dic):
+        """Calculate the power spectra for tidal alignment and tidal torquing (TATT) model.
+
+        Parameters:
+        ----------
+        params_dic : dict
+            Dictionary containing the parameters needed to compute the TATT power spectra.
+
+        Returns:
+        -------
+        pk_delta_ia : numpy.ndarray
+            Power spectrum for the intrinsic alignment density.
+        pk_iaia : numpy.ndarray
+            Power spectrum for the intrinsic alignment-intrinsic alignment.
+        """
+        c1, c1d, c2 = self.get_tatt_parameters(params_dic)
+        dz = self.dz[None, :]
+        # growth factor can be scale-dependent for f(R) in the future potentially
+        # fpt terms are computed at redshift 0
+        fpt_terms = self.get_fpt_terms(self.StructureEmu.pklin_z0)
+
+        pk_delta_ia =   c1 * self.pmm + \
+                        c1d * dz**4 * (fpt_terms['a00e'](self.k) + fpt_terms['c00e'](self.k)) + \
+                        c2 * dz**4 *  (fpt_terms['a0e2'](self.k) + fpt_terms['b0e2'](self.k))
+
+
+        pk_iaia =   c1**2.0 * self.pmm+ \
+                    2.0 * c1 * c1d * dz**4 * (fpt_terms['a00e'](self.k) + fpt_terms['c00e'](self.k)) +\
+                    c1d**2.0 * dz**4 * fpt_terms['a0e0e'](self.k) + \
+                    c2**2.0 * dz**4 * fpt_terms['ae2e2'](self.k) +  \
+                    2.0 * c1 * c2 * dz**4 * (fpt_terms['a0e2'](self.k)+ fpt_terms['b0e2'](self.k)) +\
+                    2.0 * c1d * c2 * dz**4 * fpt_terms['d0ee2'](self.k)
+        # dimensions of is power spectra: (ell, zz_integr)
+        return pk_delta_ia, pk_iaia
+    
+    def get_pk_nla(self, params_dic):
+        r"""Calculate the extended non-linear alignment (e-zNLA) power spectra:
+
         .. math::
-            W_i^{L} = W_i^{\gamma} + W_i^{\rm IA}
-        where
+            P_{\delta \mathrm{IA}}(z, k) = f_{\rm IA}(z) P_{\rm mm}(z, k) \\
+            P_{\rm IAIA}(z, k) = [f_{\rm IA}(z)]^2 P_{\rm mm}(z, k) 
+
+        with the factor
+
         .. math::
-            W_i^{\gamma} = \frac{3}{2} \left( \frac{H_0}{c} \right)^2 \Omega_{\rm m} (1+z) r_{\rm com}(z) \bar{W}_i(z)
+            f_{\rm IA} = - A_1 C_\rm {IA} \frac{\Omega_{\rm m}}{D(z)} \left(\frac{1+z}{1+z_{\rm piv}}\right)^{\eta_1} [L(z)]^\beta
+
+        where:
+
+        - :math:`P_{\rm mm}` is the matter-matter power spectrum.
+        - :math:`D(z)` is the normalised at z=0 growth factor.
+        - :math:`L(z)` is the luminosity function.
+        - :math:`C_{\rm IA} = \bar{C}_{\rm IA} \rho_{\rm crit}` and  :math:`\bar{C}_{\rm IA}=5 \times 10^{-14} M^{-1}_\odot h^{-2} \rm{Mpc}^3`.
+        - :math:`z_{\rm piv}` is the pivot redshift that we set to 0, often in the literature it equals 0.62.
+
+        Parameters:
+        ----------
+        params_dic : dict
+            Dictionary containing the following keys:
+
+            - 'Omega_m': float, matter density parameter.
+            - 'a1_IA': float, intrinsic alignment amplitude.
+            - 'eta1_IA': float, redshift evolution parameter for intrinsic alignment.
+            - 'beta_IA': float, luminosity evolution parameter for intrinsic alignment.
+
+        Returns:
+        -------
+        tuple
+            A tuple containing:
+
+            - pk_delta_ia : ndarray
+                The cross power spectrum between the density field and the intrinsic alignment field.
+            - pk_iaia : ndarray
+                The auto power spectrum of the intrinsic alignment field.
+        """
+        omega_m = params_dic['Omega_m']
+        a_ia = params_dic['a1_IA'] 
+        eta_ia = params_dic['eta1_IA'] 
+        beta_ia = params_dic['beta_IA']
+        f_ia = ((1. + self.Survey.zz_integr) / (1. + PIVOT_REDSHIFT))**eta_ia * (self.Survey.lum_func(self.Survey.zz_integr))**beta_ia
+        # dz (ell, zz_inegr) must be normalise to unity at z=0 to cancel the linear growth of the density field 
+        # and yield a constant amplitude in the primordial alignment scenario
+        dz = self.dz[None,:] 
+        # growth factor can be scale-dependent for f(R) in the future potentially
+        # dimensions of is power spectra: (ell, zz_integr)
+        self.factor_nla = - a_ia*C_IA*omega_m*f_ia[None,:]/dz
+        pk_delta_ia = self.factor_nla * self.pmm
+        pk_iaia = (self.factor_nla)**2 * self.pmm
+        return pk_delta_ia, pk_iaia
+    
+    def get_wl_kernel(self, params_dic):
+        r"""Calculate the weak lensing kernel:
+
+        .. math::
+            W^{\gamma}_{i} = \frac{3}{2} \left( \frac{H_0}{c} \right)^2 \Omega_{\rm m} (1+z) r_{\rm com}(z) \bar{W}_i(z)
         with
+
         .. math:: 
             \bar{W}_i(z) = \int \mathrm{d}z' n_i(z')\left[ 1-\frac{r_{\rm com}(z)}{r_{\rm com}(z')} \right]   
 
+        where:
+
+        - :math:`n_i(z)` is the redshift distribution of the sourses.
+        - :math:`E(z)` is the expansion function.
+        - :math:`r_{\rm com}(z)` is the comoving distance.
+
         Parameters:
-        -----------
-        omega_m : float
-            Matter density parameter.
+        ----------
         params_dic : dict
-            Dictionary of parameters.
-        ez : array-like
-            E(z) function values.
-        rz : array-like
-            Comoving distance values.
-        dz : array-like
-            Growth factor values.
-        ia_model : int, optional
-            Intrinsic alignment model (default is 0).
+            Dictionary containing cosmological parameters. Must include:
+
+            - 'Omega_m': float, the matter density parameter.
 
         Returns:
-        --------
-        w_l : array-like
-            Weak lensing kernel.
+        -------
+        w_gamma : numpy.ndarray
+            The weak lensing kernel. The shape of the array is (1, num_bins, num_bins),
+            where num_bins is the number of redshift bins.
         """
-        eta_z_s =  self.Survey.eta_z_s 
-        if photoz_err_model!=PHOTOZ_NONE:
-            eta_z_s = self.add_photoz_error(params_dic, eta_z_s, photoz_err_model)
+        omega_m = params_dic['Omega_m']
+        # can be later changed 
+        #deltas = np.array([params_dic['deltaz_'+str(i+1)] for i in range(self.Survey.nbin)])
+        eta_z_s =  self.get_n_of_z(self.Survey.eta_z_s, self.deltaz_s)
+
         # in the integrand dimensions are (bin_i, zz_integr, zz_integr)
-        integrand = 3./2.*H0_h_c**2. * omega_m * rz[None,:,None]*(1.+self.Survey.zz_integr[None,:,None])*eta_z_s.T[:,None,:]*(1.-rz[None,:,None]/rz[None,None,:])
+        integrand = 3./2.*H0_h_c**2. * omega_m * self.rz[None,:,None]*(1.+self.Survey.zz_integr[None,:,None])*eta_z_s.T[:,None,:]*(1.-self.rz[None,:,None]/self.rz[None,None,:])
         # integrate along the third dimension in zz_integr
         w_gamma  = trapezoid(np.triu(integrand), self.Survey.zz_integr,axis=-1).T
         # add an extra dimension to w_gamma as we might have ell-dependence in the IA-kernel due to the scale-dependent linear growth
-        # sum the lensing and intrinsic alignment kernels together
-        w_l = w_gamma[None,:,:] + self.get_ia_kernel(omega_m, params_dic, ez, dz, eta_z_s, self.Survey.zz_integr, ia_model, photoz_err_model)
-        return w_l
+        w_gamma = w_gamma[None,:,:]
+        return w_gamma
     
-    def get_cell_shear(self, params_dic, ez, rz, dz, pk, ia_model=0, photoz_err_model=0):
-        """
-        Calculate the weak lensing power spectrum (C_ell):
+    def get_ia_kernel(self, params_dic):
+        r"""This function computes the intrinsic alignment (IA) kernel, which is a function of redshift and 
+        cosmological parameters:
+
         .. math::
-            C^{\rm LL}_{ij}(\ell) = \frac{c}{H_0} \int \mathrm{d}z \frac{W^{\rm L}_i(z)W^{\rm L}_j(z)}{E(z) r^2_{\rm com}(z)} P_{\rm mm}(k(\ell, z), z)
-        and weak lensing kernel.
-            
+            W^{\rm IA}_{i}(z) = n_i(z) H(z)
+        
+        where:
+
+        - :math:`n_i(z)` is the redshift distribution of the sourses.
+        - :math:`H(z)` is the expansion function.
+
         Parameters:
-        -----------
+        ----------
         params_dic : dict
-            Dictionary containing cosmological parameters, including 'Omega_m'.
-        ez : array_like
-            Array of E(z) values, where E(z) is the dimensionless Hubble parameter.
-        rz : array_like
-            Array of comoving radial distances.
-        dz : array_like
-            Array of growth factors.
-        pk : array_like
-            Array of matter power spectrum values.
-        ia_model : int, optional
-            Intrinsic alignment model (default is 0).
-        photoz_err_model : int, optional
-            Photo-z error model (default is 0).
+            Dictionary containing the necessary parameters for the calculation. 
+
 
         Returns:
-        --------
-        cl_ll : array_like
-            Weak lensing power spectrum (C_ell) for different redshift bins.
-        w_l : array_like
-            Weak lensing kernel.
+        -------
+        w_ia : numpy.ndarray
+            A 3D array with dimensions (ell, zz_integr, bin_i) representing the 
+            intrinsic alignment kernel.
         """
-        omega_m = params_dic['Omega_m']
-        # compute weak lensing kernel
-        w_l = self.get_wl_kernel(omega_m, params_dic, ez, rz, dz, ia_model, photoz_err_model)
+        # dimension (ell, zz_integr, bin_i)
+        eta_z_s =  self.get_n_of_z(self.Survey.eta_z_s, self.deltaz_s)
+        w_ia = eta_z_s[None, :, :] * self.ez[None, :,None] * H0_h_c 
+        return w_ia
+    
+    def get_cell_shear(self):
+        r"""Calculate the weak lensing power spectrum (C_ell):
+
+        .. math::
+            C^{\rm LL}_{ij}(\ell) = \frac{c}{H_0} \int \mathrm{d}z \frac{\left[ W^{\gamma}_i(z)W^{\gamma}_j(z)P_{\rm mm}(k(\ell, z), z) + 
+            (W^{\gamma}_i(z)W^{\rm IA}_j(z)+W^{\rm IA}_i(z)W^{\gamma}_j(z))P_{\rm IA m}(k(\ell, z), z)) + 
+            W^{\rm IA}_i(z)W^{\rm IA}_j(z)P_{\rm IA IA}(k(\ell, z), z)\right]}{E(z) r^2_{\rm com}(z)}\, ,
+
+        where:
+
+        - :math:`W^{\gamma}`, :math:`W^{\rm IA}`  are the lensing and intrinsic alignment kernels.
+        - :math:`E(z)` is the expansion function.
+        - :math:`r_{\rm com}(z)` is the comoving distance.
+        - :math:`P_{\rm mm}(z, k)`, :math:`P_{\rm m IA}(z, k)`, :math:`P_{\rm IA IA}(z, k)` are the matter-matter, matter-IA and IA-IA power spectra.     
+            
+        Returns:
+        -------
+        cl_ll : numpy.ndarray
+            Weak lensing power spectrum (C_ell) for different redshift bins.
+        """
+        kernel_delta_ia = (self.w_gamma[:, :, :, None]*self.w_ia[:, :, None, :] + self.w_gamma[:, :, None, :]*self.w_ia[:, :, :, None]) * self.pk_delta_ia[:, :, None, None]
+        kernel_iaia = self.w_ia[:, :, :, None]*self.w_ia[:, :, None, :]  * self.pk_iaia[:, :, None, None]
+        kernel_wl = self.w_gamma[:, :, :, None]*self.w_gamma[:, :, None, :]  * self.pmm[:, :, None, None]
         # compute the integrand with dimensions (ell, z_integr, bin_i, bin_j)
-        cl_ll_int = w_l[:,:,:,None] * w_l[:,:,None,:] * pk[:,:,None,None] / ez[None,:,None,None] / rz[None,:,None,None] / rz[None,:,None,None] / H0_h_c
+        cl_ll_int = (kernel_wl + kernel_delta_ia + kernel_iaia) / self.ez[None,:,None,None] / self.rz[None,:,None,None] / self.rz[None,:,None,None] / H0_h_c
         # integrate along the z_integr-direction
         cl_ll = trapezoid(cl_ll_int, self.Survey.zz_integr, axis=1)[:self.Survey.nell_wl, :, :]
         # add noise to the auto-correlated bins
         for i in range(self.Survey.nbin):
             cl_ll[:, i, i] += self.Survey.noise['LL']
-        return cl_ll, w_l
+        return cl_ll
     
-    def get_bpgg(self, params_dic, k, pgg, pgg_extr, nbin, bias_model):
+     
+    def get_pmm(self, params_dic):
+        """Calculate the matter-matter power spectrum (P_mm) with optional baryonic corrections.
+
+        Parameters:
+        ----------
+        params_dic : dict
+            Dictionary containing the cosmological parameters.
+
+        Returns:
+        -------
+        pk : numpy.ndarray
+            The matter power spectrum with the specified baryonic corrections applied.
+        boost_bar : numpy.ndarray
+            The baryonic boost factor applied to the matter power spectrum.
         """
-        Calculate the galaxy-galaxy power spectrum given the parameters and bias model,
+        # return matter-matter power spectrum of dimension (lbin, z_integr)
+        pk = self.StructureEmu.get_pk_nl(params_dic, self.k, self.Survey.lbin, self.Survey.zz_integr)
+        if self.BaryonsEmu!=None:
+            # add baryonic boost
+            boost_bar = self.BaryonsEmu.get_barboost(params_dic, self.k, self.Survey.lbin, self.Survey.zz_integr)
+            pk *= boost_bar
+            return pk, boost_bar
+        return pk, np.ones((self.Survey.lbin, len(self.Survey.zz_integr)), 'float64')
+    
+    def get_pgg_lin_bias(self, params_dic):
+        """Calculate the galaxy-galaxy power spectrum with linear bias (constant in a given redshift bin),
         in units of (Mpc/h)^3.
 
         Parameters:
-        -----------
+        ----------
         params_dic : dict
             Dictionary containing the bias parameters.
-        k : numpy.ndarray
-            Array of wavenumbers.
-        pgm : numpy.ndarray
-            Array of power spectrum values.
-        pgm_extr : numpy.ndarray
-            Array of extrapolated power spectrum values.
-        nbin : int
-            Number of bins.
-        bias_model : str
-            The bias model to use. Options are 'BIAS_LIN', 'BIAS_B1B2', 'BIAS_HEFT'.
-
+  
         Returns:
-        --------
-        bpgm : numpy.ndarray
-            The matter-galaxy power spectrum.
-        
-        Raises:
         -------
-        ValueError
-            If an invalid bias_model option is provided.
+        pgg : numpy.ndarray
+            The galaxy-galaxy power spectrum.
         """
-        if bias_model == BIAS_LIN:
-            bias1 = np.array([params_dic['b1_'+str(i+1)] for i in range(nbin)])
-            bpgg = bias1[None, None, :, None] * bias1[None, None, None, :] * pgg[:,:,None, None]
-        elif bias_model == BIAS_B1B2:  
-            bias1 = np.array([params_dic['b1_'+str(i+1)] for i in range(nbin)])
-            bias2 = np.array([params_dic['b2_'+str(i+1)] for i in range(nbin)])  
-            bpgg = ( bias1[None, None,:, None] + bias2[None, None, :, None] * k[:, :, None, None]**2 )*( bias1[None, None, None, :] + bias2[None, None, None, :] * k[:, :, None, None]**2 )* pgg[:,:,None,None]
-        elif bias_model == BIAS_HEFT:
-            bL1 = np.array([params_dic['b1L_'+str(i+1)] for i in range(nbin)])
-            bL2 = np.array([params_dic['b2L_'+str(i+1)] for i in range(nbin)])
-            bs2 = np.array([params_dic['bs2L_'+str(i+1)] for i in range(nbin)])
-            blapl = np.array([params_dic['blaplL_'+str(i+1)] for i in range(nbin)])
-            p_dmdm = pgg[0, :, :]        
-            p_dmd1 = pgg[1, :, :]    
-            p_dmd2 = pgg[2, :, :]        
-            p_dms2 = pgg[3, :, :]        
-            p_dmk2 = pgg[4, :, :]      
-            p_d1d1 = pgg[5, :, :]     
-            p_d1d2 = pgg[6, :, :]        
-            p_d1s2 = pgg[7, :, :]         
-            p_d1k2 = pgg[8, :, :]         
-            p_d2d2 = pgg[9, :, :]        
-            p_d2s2 = pgg[10, :, :]         
-            p_d2k2 = pgg[11, :, :]
-            p_s2s2 = pgg[12, :, :] 
-            p_s2k2 = pgg[13, :, :] 
-            p_k2k2 = pgg[14, :, :] 
-            bpgg = (p_dmdm[:,:,None,None]  +
-               (bL1[None,None,:,None]+bL1[None,None, None, :]) * p_dmd1[:,:,None,None] +
-               (bL1[None,None, :,None]*bL1[None,None, None, :]) * p_d1d1[:,:,None,None] +
-               (bL2[None,None, :,None] + bL2[None,None, None, :]) * p_dmd2[:,:,None,None] +
-               (bs2[None,None, :,None] + bs2[None,None, None, :]) * p_dms2[:,:,None,None] +
-               (bL1[None,None, :,None]*bL2[None,None, None, :] + bL1[None,None, None, :]*bL2[None,None, :,None]) * p_d1d2[:,:,None,None] +
-               (bL1[None,None, :,None]*bs2[None,None, None, :] + bL1[None,None, None, :]*bs2[None,None, :,None]) * p_d1s2[:,:,None,None] +
-               (bL2[None,None, :,None]*bL2[None,None, None, :]) * p_d2d2[:,:,None,None] +
-               (bL2[None,None, :,None]*bs2[None,None, None, :] + bL2[None,None, None, :]*bs2[None,None, :,None]) * p_d2s2[:,:,None,None] +
-               (bs2[None,None, :,None]*bs2[None,None, None, :])* p_s2s2[:,:,None,None] +
-               (blapl[None,None, :,None] + blapl[None,None, None, :]) * p_dmk2[:,:,None,None] +
-               (bL1[None,None, None, :] * blapl[None,None, :,None] + bL1[None,None, :,None] * blapl[None,None, None, :]) * p_d1k2[:,:,None,None] +
-               (bL2[None,None, None, :] * blapl[None,None, :,None] + bL2[None,None, :,None] * blapl[None,None, None, :]) * p_d2k2[:,:,None,None] +
-               (bs2[None,None, None, :] * blapl[None,None, :,None] + bs2[None,None, :,None] * blapl[None,None, None, :]) * p_s2k2[:,:,None,None] +
-               (blapl[None,None, :,None] * blapl[None,None, None, :]) * p_k2k2[:,:,None,None])
-            bpgg_extr = (1.+bL1[None,None, :,None])*(1.+bL1[None,None, None, :]) * pgg_extr[:,:,None,None]
-            bpgg += bpgg_extr 
-        else:
-            raise ValueError("Invalid bias_model option.")
-        return bpgg
-
-    def get_gg_kernel(self, ez, params_dic, photoz_err_model=0):
-        """
-        Calculate the galaxy-galaxy lensing kernel, , in units of units of h/Mpc: 
-        .. math::
-            W_i^{G} = n_i(z)\frac{H(z)}{c}\, ,
-        where n_i(z) is the lense distribution.    
-        
+        bias1 = np.array([params_dic['b1_'+str(i+1)] for i in range(self.Survey.nbin)])
+        # return dimension (lbin, z_integr, bin_i, bin_j)
+        pgg = bias1[None, None, :, None] * bias1[None, None, None, :] * self.pmm[:,:,None, None]
+        return pgg
+    
+    def get_pgg_quadr_bias(self, params_dic):
+        """Calculate the galaxy-galaxy power spectrum with quadratic bias model,
+        in units of (Mpc/h)^3.
 
         Parameters:
-        ez : numpy.ndarray
-            Array of E(z) values, where E(z) is the dimensionless Hubble parameter.
+        ----------
+        params_dic : dict
+            Dictionary containing the bias parameters.
+  
+        Returns:
+        -------
+        pgm : numpy.ndarray
+            The galaxy-galaxy power spectrum.
+        """
+        bias1 = np.array([params_dic['b1_'+str(i+1)] for i in range(self.Survey.nbin)])
+        bias2 = np.array([params_dic['b2_'+str(i+1)] for i in range(self.Survey.nbin)])  
+        # return dimension (lbin, z_integr, bin_i, bin_j)
+        pgg = ( bias1[None, None,:, None] + bias2[None, None, :, None] * self.k[:, :, None, None]**2 ) * \
+              ( bias1[None, None, None, :] + bias2[None, None, None, :] * self.k[:, :, None, None]**2 ) * self.pmm[:,:,None,None]
+        return pgg
+    
+    def get_pgm_lin_bias(self, params_dic):
+        """Calculate the galaxy-matter power spectrum with linear bias (constant in a given redshift bin),
+        in units of (Mpc/h)^3.
+
+        Parameters:
+        ----------
+        params_dic : dict
+            Dictionary containing the bias parameters.
+  
+        Returns:
+        -------
+        pgm : numpy.ndarray
+            The matter-galaxy power spectrum.
+        """
+        bias1 = np.array([params_dic['b1_'+str(i+1)] for i in range(self.Survey.nbin)])
+        # return dimension (lbin, z_integr, bin_i)
+        pgm = bias1[None, None, :] * self.pmm[:,:,None]
+        return pgm
+    
+    def get_pgm_quadr_bias(self, params_dic):
+        """Calculate the galaxy-matter power spectrum with quadratic bias,
+        in units of (Mpc/h)^3.
+
+        Parameters:
+        ----------
+        params_dic : dict
+            Dictionary containing the bias parameters.
+  
+        Returns:
+        -------
+        pgm : numpy.ndarray
+            The matter-galaxy power spectrum.
+        """
+        bias1 = np.array([params_dic['b1_'+str(i+1)] for i in range(self.Survey.nbin)])
+        bias2 = np.array([params_dic['b2_'+str(i+1)] for i in range(self.Survey.nbin)])  
+        # return dimension (lbin, z_integr, bin_i)
+        pgm = ( bias1[None, None,:] + bias2[None, None, :] * self.k[:, :, None]**2 ) * self.pmm[:,:,None]
+        return pgm
+    
+    def get_heft_pk_exp(self, params_dic):
+        """Calculate the HEFT power spectrum with possible rescaling for modified gravity.
+
+        Parameters:
+        ----------
+        params_dic : dict
+            Dictionary containing the parameters for the calculation.
 
         Returns:
+        -------
+        pk_exp : ndarray
+            The power spectrum perturbative expansion terms.
+        pk_exp_extr : ndarray
+            The extrapolated power spectrum.
+
+        Notes:
+        -----
+        If the emulator name in `StructureEmu` is not 'BACCO', the power spectrum
+        is rescaled for modified gravity using the growth factors from `StructureEmu` and `BaccoEmuClass`.
+        """
+        if self.StructureEmu.emu_name!='BACCO':
+            # re-scale for modified gravity
+            # heft pk dimensions are (15, ell, z_integr)
+            dz, _ = self.StructureEmu(params_dic, self.Survey.zz_integr)
+            params_dic['sigma8_cb'] = self.BaccoEmuClass.get_sigma8_cb(params_dic)
+            dz_norm, _ = self.BaccoEmuClass.get_growth(params_dic, self.Survey.zz_integr)
+            dz_rescale = dz/dz_norm
+            pk_exp, pk_exp_extr = self.BaccoEmuClass.get_heft(params_dic, self.k, self.Survey.lbin, self.Survey.zz_integr)*dz_rescale[np.newaxis, np.newaxis, :]*dz_rescale[np.newaxis, np.newaxis, :]
+        else:    
+            pk_exp, pk_exp_extr = self.BaccoEmuClass.get_heft(params_dic, self.k, self.Survey.lbin, self.Survey.zz_integr)  
+        return pk_exp, pk_exp_extr
+    
+    def get_pgg_heft_bias(self, params_dic):
+        """Calculate the galaxy-galaxy power spectrum with HEFT Lagrangian bias expansion,
+        in units of (Mpc/h)^3.
+
+        Parameters:
+        ----------
+        params_dic : dict
+            Dictionary containing the bias parameters.
+  
+        Returns:
+        -------
+        pgm : numpy.ndarray
+            The galaxy-galaxy power spectrum.
+        """
+        pk_exp, pk_exp_extr = self.pk_exp, self.pk_exp_extr
+        bL1 = np.array([params_dic['b1L_'+str(i+1)] for i in range(self.Survey.nbin)])
+        bL2 = np.array([params_dic['b2L_'+str(i+1)] for i in range(self.Survey.nbin)])
+        bs2 = np.array([params_dic['bs2L_'+str(i+1)] for i in range(self.Survey.nbin)])
+        blapl = np.array([params_dic['blaplL_'+str(i+1)] for i in range(self.Survey.nbin)])    
+        p_dmdm = pk_exp[0, :, :]        
+        p_dmd1 = pk_exp[1, :, :]    
+        p_dmd2 = pk_exp[2, :, :]        
+        p_dms2 = pk_exp[3, :, :]        
+        p_dmk2 = pk_exp[4, :, :]      
+        p_d1d1 = pk_exp[5, :, :]     
+        p_d1d2 = pk_exp[6, :, :]        
+        p_d1s2 = pk_exp[7, :, :]         
+        p_d1k2 = pk_exp[8, :, :]         
+        p_d2d2 = pk_exp[9, :, :]        
+        p_d2s2 = pk_exp[10, :, :]         
+        p_d2k2 = pk_exp[11, :, :]
+        p_s2s2 = pk_exp[12, :, :] 
+        p_s2k2 = pk_exp[13, :, :] 
+        p_k2k2 = pk_exp[14, :, :] 
+        pgg = (p_dmdm[:,:,None,None]  +
+            (bL1[None,None,:,None]+bL1[None,None, None, :]) * p_dmd1[:,:,None,None] +
+            (bL1[None,None, :,None]*bL1[None,None, None, :]) * p_d1d1[:,:,None,None] +
+            (bL2[None,None, :,None] + bL2[None,None, None, :]) * p_dmd2[:,:,None,None] +
+            (bs2[None,None, :,None] + bs2[None,None, None, :]) * p_dms2[:,:,None,None] +
+            (bL1[None,None, :,None]*bL2[None,None, None, :] + bL1[None,None, None, :]*bL2[None,None, :,None]) * p_d1d2[:,:,None,None] +
+            (bL1[None,None, :,None]*bs2[None,None, None, :] + bL1[None,None, None, :]*bs2[None,None, :,None]) * p_d1s2[:,:,None,None] +
+            (bL2[None,None, :,None]*bL2[None,None, None, :]) * p_d2d2[:,:,None,None] +
+            (bL2[None,None, :,None]*bs2[None,None, None, :] + bL2[None,None, None, :]*bs2[None,None, :,None]) * p_d2s2[:,:,None,None] +
+            (bs2[None,None, :,None]*bs2[None,None, None, :])* p_s2s2[:,:,None,None] +
+            (blapl[None,None, :,None] + blapl[None,None, None, :]) * p_dmk2[:,:,None,None] +
+            (bL1[None,None, None, :] * blapl[None,None, :,None] + bL1[None,None, :,None] * blapl[None,None, None, :]) * p_d1k2[:,:,None,None] +
+            (bL2[None,None, None, :] * blapl[None,None, :,None] + bL2[None,None, :,None] * blapl[None,None, None, :]) * p_d2k2[:,:,None,None] +
+            (bs2[None,None, None, :] * blapl[None,None, :,None] + bs2[None,None, :,None] * blapl[None,None, None, :]) * p_s2k2[:,:,None,None] +
+            (blapl[None,None, :,None] * blapl[None,None, None, :]) * p_k2k2[:,:,None,None])
+        pgg_extr = (1.+bL1[None,None, :,None])*(1.+bL1[None,None, None, :]) * pk_exp_extr[:,:,None,None]
+        pgg += pgg_extr 
+        # return dimension (lbin, z_integr, bin_i, bin_j)
+        return pgg
+    
+    def get_pgm_heft_bias(self, params_dic):
+        """Calculate the galaxy-matter power spectrum with HEFT Lagrangian bias expansion,
+        in units of (Mpc/h)^3.
+
+        Parameters:
+        ----------
+        params_dic : dict
+            Dictionary containing the bias parameters.
+  
+        Returns:
+        -------
+        pgm : numpy.ndarray
+            The matter-galaxy power spectrum.
+        """
+        pk_exp, pk_exp_extr = self.pk_exp, self.pk_exp_extr
+        bL1 = np.array([params_dic['b1L_'+str(i+1)] for i in range(self.Survey.nbin)])
+        bL2 = np.array([params_dic['b2L_'+str(i+1)] for i in range(self.Survey.nbin)])
+        bs2 = np.array([params_dic['bs2L_'+str(i+1)] for i in range(self.Survey.nbin)])
+        blapl = np.array([params_dic['blaplL_'+str(i+1)] for i in range(self.Survey.nbin)])    
+        p_dmdm = pk_exp[0, :, :]        
+        p_dmd1 = pk_exp[1, :, :]    
+        p_dmd2 = pk_exp[2, :, :]        
+        p_dms2 = pk_exp[3, :, :]        
+        p_dmk2 = pk_exp[4, :, :]      
+        pgm = (p_dmdm[:,:,None]  +
+                bL1[None,None,:] * p_dmd1[:,:,None] +
+                bL2[None,None,:] * p_dmd2[:,:,None] +
+                bs2[None,None,:] * p_dms2[:,:,None] +
+                blapl[None,None,:] * p_dmk2[:,:,None])   
+        pgm_extr = (1.+bL1[None,None,:]) * pk_exp_extr[:,:,None]
+        pgm += pgm_extr
+        # return dimension (lbin, z_integr, bin_i)
+        return pgm
+        
+
+    def get_gg_kernel(self, params_dic):
+        r"""Calculate the galaxy-galaxy lensing kernel in units of h/Mpc.
+
+        .. math::
+            W_i^{G} = n_i(z)\frac{H(z)}{c}\, ,
+
+        where n_i(z) is the lens distribution.
+
+        Parameters:
+        ----------
+        params_dic : dict
+            Dictionary containing the cosmological parameters.
+
+        Returns:
+        -------
         numpy.ndarray
             The galaxy-galaxy lensing kernel with shape (1, zbin_integr, nbin).
         """
-        eta_z_l = self.Survey.eta_z_l  
-        if photoz_err_model!=PHOTOZ_NONE:
-            eta_z_l = self.add_photoz_error(params_dic, eta_z_l, photoz_err_model)
-
+        eta_z_l = self.get_n_of_z(self.Survey.eta_z_l, self.deltaz_l) 
         w_g = np.zeros((self.Survey.zbin_integr, self.Survey.nbin), 'float64')
-        w_g = ez[:, None] * H0_h_c * eta_z_l
+        w_g = self.ez[:, None] * H0_h_c * eta_z_l
         # add an extra dimension, now (ell, z_integr, bin_i)
         w_g = w_g[None, :, :]
         return w_g
-    
-    def get_cell_galclust(self, params_dic, ez, rz, k, pgg, pgg_extr, bias_model=0, photoz_err_model=0):
-        """
-        Compute the galaxy clustering angular power spectrum:
+
+    def get_cell_galclust(self):
+        r"""Compute the galaxy clustering angular power spectrum:
+
         .. math::
             C^{\rm GG}_{ij}(\ell) = c \int \mathrm{d}z \frac{W^{\rm G}_i(z) W^{\rm G}_j(z)}{H(z) r^2_{\rm com}(z)} P_{\rm gg}(k(\ell, z), z)
 
+        This function calculates the galaxy clustering angular power spectrum given the 
+        cosmological parameters and the precomputed power spectra.
+
         Parameters:
-        -----------
+        ----------
         params_dic : dict
             Dictionary containing the parameters for the computation.
-        ez : array_like
-            Array of E(z) values.
-        rz : array_like
-            Array of comoving radial distances.
-        k : array_like
-            Array of wavenumbers.
-        pgg : array_like
-            Galaxy-galaxy power spectrum.
-        pgg_extr : array_like
-            Extrapolated galaxy-galaxy power spectrum.
-        bias_model : int, optional
-            Bias model to use (default is 0).
-        photoz_err_model : int, optional
-            Photo-z error model (default is 0).
 
         Returns:
-        --------
-        cl_gg : array_like
-            Galaxy clustering angular power spectrum.
-        w_g : array_like
-            Photo galaxy clustering kernel.
+        -------
+        cl_gg : numpy.ndarray
+            Galaxy clustering angular power spectrum with dimensions (ell, bin_i, bin_j).
         """
-        # compute photo galaxy clustering kernel
-        w_g = self.get_gg_kernel(ez, params_dic, photoz_err_model)
-        # compute galaxy-galaxy power spectrum
-        bpgg = self.get_bpgg(params_dic, k, pgg, pgg_extr, self.Survey.nbin, bias_model)
         # compute integrand with the dimensions of (ell, z_integr, bin_i, bin_j)
-        cl_gg_int = w_g[:,:,:,None] * w_g[:,: , None, :] * bpgg / ez[None,:,None,None] / rz[None,:,None,None] / rz[None,:,None,None] / H0_h_c    
+        cl_gg_int = self.w_g[:,:,:,None] *self. w_g[:,: , None, :] * self.pgg / self.ez[None,:,None,None] / self.rz[None,:,None,None] / self.rz[None,:,None,None] / H0_h_c    
         # integrate along the z_integr direction
         cl_gg = trapezoid(cl_gg_int, self.Survey.zz_integr, axis=1)[:self.Survey.nell_gc, :, :]
         # add noise
         for i in range(self.Survey.nbin):
             cl_gg[:, i, i] += self.Survey.noise['GG']
-        return cl_gg, w_g    
+        return cl_gg 
     
-    def get_bpgm(self,params_dic, k, pgm, pgm_extr, nbin, bias_model):
-        """
-        Calculate the matter-galaxy power spectrum given the parameters and bias model,
-        in units of (Mpc/h)^3.
+    def get_pk_cross_nla(self, params_dic):
+        r"""Computes the galaxy-intrinsic alignment power spectrum for the e-zNLA model.
 
-        Parameters:
-        -----------
-        params_dic : dict
-            Dictionary containing the bias parameters.
-        k : numpy.ndarray
-            Array of wavenumbers.
-        pgm : numpy.ndarray
-            Array of power spectrum values.
-        pgm_extr : numpy.ndarray
-            Array of extrapolated power spectrum values.
-        nbin : int
-            Number of bins.
-        bias_model : str
-            The bias model to use. Options are 'BIAS_LIN', 'BIAS_B1B2', 'BIAS_HEFT'.
+        .. math::
+            P_{\rm g IA}(z, k) = f_{\rm IA}(z) b_g(z, k) P_{\rm mm}(z, k) 
+
+        where:
+
+        - :math:`b_g(z)` is the galaxy bias.
+        - :math:`f_{\rm IA}(z)` is the intrinsic alignment parameters (see get_pk_nla).
+        - :math:`P_{\rm mm}(z, k)` is the matter power spectrum with baryons.
 
         Returns:
         --------
-        bpgm : numpy.ndarray
-            The matter-galaxy power spectrum.
-        
-        Raises:
-        -------
-        ValueError
-            If an invalid bias_model option is provided.
-        """
-        if bias_model == BIAS_LIN:
-            bias1 = np.array([params_dic['b1_'+str(i+1)] for i in range(nbin)])
-            bpgm = bias1[None,None, :] * pgm[:,:,None]
-        elif bias_model == BIAS_B1B2:
-            bias1 = np.array([params_dic['b1_'+str(i+1)] for i in range(nbin)])
-            bias2 = np.array([params_dic['b2_'+str(i+1)] for i in range(nbin)])  
-            bpgm = ( bias1[None, None,:] + bias2[None, None, :] * k[:, :, None]**2 )*pgm[:,:,None]
-        elif bias_model == BIAS_HEFT:
-            p_dmdm = pgm[0, :, :]        
-            p_dmd1 = pgm[1, :, :]    
-            p_dmd2 = pgm[2, :, :]        
-            p_dms2 = pgm[3, :, :]        
-            p_dmk2 = pgm[4, :, :]      
-            bL1 = np.array([params_dic['b1L_'+str(i+1)] for i in range(nbin)])
-            bL2 = np.array([params_dic['b2L_'+str(i+1)] for i in range(nbin)])
-            bs2 = np.array([params_dic['bs2L_'+str(i+1)] for i in range(nbin)])
-            blapl = np.array([params_dic['blaplL_'+str(i+1)] for i in range(nbin)])
-            bpgm = (p_dmdm[:,:,None]  +
-                bL1[None,None,:] * p_dmd1[:,:,None] +
-                bL2[None,None,:] * p_dmd2[:,:,None] +
-                bs2[None,None,:] * p_dms2[:,:,None] +
-                blapl[None,None,:] * p_dmk2[:,:,None])   
-            bpgm_extr = (1.+bL1[None,None,:]) * pgm_extr[:,:,None]
-            bpgm += bpgm_extr
-        else:
-            raise ValueError("Invalid bias_model option.")         
-        return bpgm
+        numpy.ndarray
+            The galaxy-intrinsic alignment power spectrum for the TATT model.
 
-    def get_cell_cross(self, params_dic, ez, rz, k, pgm, pgm_extr, w_l, w_g, bias_model=0):
         """
-        Compute the galaxy-galaxy lensing or cross-correlation angular power spectrum:
+        # if ia dependens on the photo-z bin
+        # then change to factor_nla[:, :, :, None]*pgm[:, :, None, :]
+        return self.factor_nla[:, :, None, None] * self.pgm[:, :, None, :]
+
+    
+    def get_pk_cross_tatt(self, params_dic):
+        r"""Computes the galaxy-intrinsic alignment power spectrum for the TATT model.
+
         .. math::
-            C^{\rm LG}_{ij}(\ell) = c \int \mathrm{d}z \frac{W^{\rm L}_i(z) W^{\rm G}_j(z)}{H(z) r^2_{\rm com}(z)} P_{\rm gm}(k(\ell, z), z)
+            P_{\rm g IA}(z, k) = b_g(z) \left[ C_{1}P_{\rm mm}(z, k) + C_{1\delta}D(z)^{4}[ A_{0|0E}(k) +  C_{0|0E}(k)] + C_{2}D(z)^{4}[ A_{0|E2}(k) + B_{0|E2}(k)] \right]
+
+        where:
+
+        - :math:`D(z)` is the growth factor normalized at :math:`z=0`.
+        - :math:`b_g(z)` is the galaxy bias.
+        - :math:`C_{1}`, :math:`C_{1\delta}`, and :math:`C_{2}` are the intrinsic alignment parameters.
+        - :math:`P_{\rm mm}(z, k)` is the matter power spectrum.
+        - :math:`A_{0|0E}(k)`, :math:`C_{0|0E}(k)`, :math:`A_{0|E2}(k)`, and :math:`B_{0|E2}(k)` are the FAST-PT terms.
+
+        Returns:
+        --------
+        numpy.ndarray
+            The galaxy-intrinsic alignment power spectrum for the TATT model.
+        """
+        bias1 = np.array([params_dic['b1_'+str(i+1)] for i in range(self.Survey.nbin)])
+        # return dimension (lbin, z_integr, bin_i)
+        # if ia dependens on the photo-z bin
+        # then change to bias1[None, None, None, :]*pk_delta_ia[:, :, :, None]
+        pk_gal_ia =   bias1[None, None, None, :] * self.pk_delta_ia[:, :, None, None]
+        return pk_gal_ia
+    
+    def get_cell_cross(self):
+        r"""Compute the galaxy-galaxy lensing or cross-correlation angular power spectrum given by:
+
+        .. math::
+            C^{\rm LG}_{ij}(\ell) = c \int \mathrm{d}z \frac{\left( W^{\gamma}_i(z)P_{\rm gm}(k(\ell, z), z)+ W^{\rm IA}_i(z)P_{\rm IAg}(k(\ell, z), z) \right) W^{\rm G}_j(z)}{H(z) r^2_{\rm com}(z)} 
         and 
+
         .. math::
-            C^{\rm GL}_{ij}(\ell) = c \int \mathrm{d}z \frac{W^{\rm G}_i(z) W^{\rm L}_j(z)}{H(z) r^2_{\rm com}(z)} P_{\rm gm}(k(\ell, z), z)
+            C^{\rm GL}_{ij}(\ell) = c \int \mathrm{d}z \frac{W^{\rm G}_i(z) \left( W^{\gamma}_j(z) P_{\rm gm} (k(\ell, z), z)+ W^{\rm IA}_j(z) P_{\rm gIA}(k(\ell, z), z)\right)}{H(z) r^2_{\rm com}(z)}
         
+        where:
 
-        Parameters:
-        -----------
-        params_dic : dict
-            Dictionary containing the parameters for the computation.
-        ez : array-like
-            Array of E(z) values.
-        rz : array-like
-            Array of comoving distance values.
-        k : array-like
-            Array of wavenumber values.
-        pgm : array-like
-            Array of power spectrum values.
-        pgm_extr : array-like
-            Array of extrapolated power spectrum values.
-        w_l : array-like
-            Array of lensing window functions.
-        w_g : array-like
-            Array of galaxy clustering window functions.
-        bias_model : int, optional
-            Bias model to be used (default is 0).
-
+        - :math:`W^{\gamma}`, :math:`W^{\rm IA}`, :math:`W^{\rm G}`  are the lensing, intrinsic alignment and clustering kernels.
+        - :math:`H(z)` is the expansion function.
+        - :math:`r_{\rm com}(z)` is the comoving distance.
+        - :math:`P_{\rm gm}(z, k)`, :math:`P_{\rm g IA}(z, k)` are the galaxy-matter, and galaxy-IA power spectra.
+            
         Returns:
-        --------
-        cl_lg : array-like
-            Computed lensing-clustering cross power spectrum.
-        cl_gl : array-like
-            Transposed clustering-lensing cross power spectrum.
+        -------
+        cl_lg : numpy.ndarray
+            The galaxy-galaxy lensing angular power spectrum with dimensions (ell, bin_i, bin_j).
+        cl_gl : numpy.ndarray
+            The galaxy-lensing angular power spectrum with dimensions (ell, bin_i, bin_j).
         """
-        # compute power galaxy-galaxy spectrum 
-        bpgm = self.get_bpgm(params_dic, k, pgm, pgm_extr, self.Survey.nbin, bias_model)
+        # compute components of the integrand
+        kernel_ia_gal = self.w_ia[:, :, :, None] * self.pk_gal_ia
+        kernel_wl_gal = self.w_gamma[:, :, :, None] * self.pgm[:,:,None,:]
         # compute integrand with dimensions (ell, z_integr, bin_i, bin_j)
-        cl_lg_int = w_l[:,:,:,None] * w_g[:, :, None, :] * bpgm[:,:,None,:] / ez[None,:,None,None] / rz[None,:,None,None] / rz[None,:,None,None] / H0_h_c
+        cl_lg_int = (kernel_wl_gal + kernel_ia_gal) * self.w_g[:, :, None, :] / self.ez[None,:,None,None] / self.rz[None,:,None,None] / self.rz[None,:,None,None] / H0_h_c
         # integrate along the z-integr direction
         cl_lg = trapezoid(cl_lg_int, self.Survey.zz_integr, axis=1)[:self.Survey.nell_xc,:,:]
         # transpose LG to get GL
         cl_gl = np.transpose(cl_lg, (0, 2, 1))  
         return cl_lg, cl_gl
     
-    def get_pmm(self, params_dic, k, lbin, zz_integr, nl_model=0, baryon_model=0):
-        """
-        Calculate the matter-matter power spectrum (P_mm) with optional non-linear and baryonic corrections.
+    def compute_shear(self, params_dic):
+        """Compute the shear power spectrum given a set of cosmological parameters.
+        Use this when in likelihood computations.
 
         Parameters:
-        -----------
+        ----------
         params_dic : dict
             Dictionary containing the cosmological parameters.
-        k : array-like
-            Wavenumber array.
-        lbin : array-like
-            Bin edges for the lensing kernel.
-        zz_integr : array-like
-            Redshift integration array.
-        nl_model : int, optional
-            Non-linear model to use. Options are:
-            - NL_MODEL_HMCODE: Use HMcode2020 Emulator.
-            - NL_MODEL_BACCO: Use Bacco Emulator.
-            Default is 0 (no non-linear model).
-        baryon_model : int, optional
-            Baryonic model to use. Options are:
-            - NO_BARYONS: No baryonic corrections.
-            - BARYONS_HMCODE: Use HMcode2020 Emulator for baryonic corrections.
-            - BARYONS_BCEMU: Use BCemulator for baryonic corrections.
-            - BARYONS_BACCO: Use Bacco Emulator for baryonic corrections.
-            Default is 0 (no baryonic model).
 
         Returns:
-        --------
-        pk : array-like
-            The matter power spectrum with the specified non-linear and baryonic corrections applied.
-
-        Raises:
         -------
-        ValueError
-            If an invalid nl_model or baryon_model option is provided.
-        """
-
-        if nl_model == NL_MODEL_HMCODE:
-            pk = self.HMcode2020Emulator.get_pk(params_dic, k, lbin, zz_integr)
-        elif nl_model == NL_MODEL_BACCO:
-            pk = self.BaccoEmulator.get_pk(params_dic, k, lbin, zz_integr)
-        elif nl_model == NL_MODEL_NDGP:
-            pk = self.DGPEmulator.get_pk(params_dic, k, lbin, zz_integr)
-        elif nl_model == NL_MODEL_GAMMAZ:
-            pk = self.GammazEmulator.get_pk(params_dic, k, lbin, zz_integr)
-        elif nl_model == NL_MODEL_MUSIGMA:
-            pk = self.MuSigmaEmulator.get_pk(params_dic, k, lbin, zz_integr)
-        elif nl_model == NL_MODEL_DS:
-            pk = self.DSEmulator.get_pk(params_dic, k, lbin, zz_integr)      
-        else:
-            raise ValueError("Invalid nl_model option.")
-        # add baryonic boost
-        if baryon_model != NO_BARYONS:
-            if baryon_model == BARYONS_HMCODE:
-                boost_bar = self.HMcode2020Emulator.get_barboost(params_dic, k, lbin, zz_integr)
-            elif baryon_model == BARYONS_BCEMU:
-                boost_bar = self.BCemulator.get_barboost(params_dic, k, lbin, zz_integr)
-            elif baryon_model == BARYONS_BACCO:
-                boost_bar = self.BaccoEmulator.get_barboost(params_dic, k, lbin, zz_integr)
-            else:
-                raise ValueError("Invalid baryon_model option.")
-            pk *= boost_bar
-        return pk
-    
-    def get_pk_nl(self, params_dic, k, lbin, zz_integr, nl_model=0):
-        if nl_model == NL_MODEL_HMCODE:
-            pk = self.HMcode2020Emulator.get_pk(params_dic, k, lbin, zz_integr)
-        elif nl_model == NL_MODEL_BACCO:
-            pk = self.BaccoEmulator.get_pk(params_dic, k, lbin, zz_integr)
-        else:
-            raise ValueError("Invalid nl_model option.")
-        return pk
-
-    def get_bar_boost(self, params_dic, k, lbin, zz_integr, baryon_model=0):
-        if baryon_model == NO_BARYONS:
-            boost_bar = np.ones((lbin, len(zz_integr)), 'float64')
-        elif baryon_model == BARYONS_HMCODE:
-            boost_bar = self.HMcode2020Emulator.get_barboost(params_dic, k, lbin, zz_integr)
-        elif baryon_model == BARYONS_BCEMU:
-            boost_bar = self.BCemulator.get_barboost(params_dic, k, lbin, zz_integr)
-        elif baryon_model == BARYONS_BACCO:
-            boost_bar = self.BaccoEmulator.get_barboost(params_dic, k, lbin, zz_integr)
-        else:
-            raise ValueError("Invalid baryon_model option.")
-        return boost_bar
-
-    def compute_covariance_wl(self, params_dic, model_dic):
-        """
-        This function computes the (covariance) matrix for weak lensing angular power spectra by first calculating 
-        the necessary cosmological functions (e.g., growth factor, power spectrum) and then 
-        interpolating the shear power spectrum to the desired multipole values from ell_min to ell_max_wl.
-
-        Parameters:
-        -----------
-        params_dic : dict
-            Dictionary containing cosmological parameters.
-        model_dic : dict
-            Dictionary containing model parameters such as 'nl_model', 'baryon_model', and 'ia_model'.
-
-        Returns:
-        --------
-        cov_theory : numpy.ndarray
-            Theoretical covariance matrix for weak lensing, with shape 
-            (len(self.Survey.ells_wl), self.Survey.nbin, self.Survey.nbin).
-
+        numpy.ndarray
+            The shear angular power spectrum.
         """
         # compute background
-        ez, rz, k = self.get_ez_rz_k(params_dic, self.Survey.zz_integr)
-        # compute growth factor
-        dz, _ = self.get_growth(params_dic, self.Survey.zz_integr, model_dic['nl_model'])
+        self.ez, self.rz, self.k = self.get_ez_rz_k(params_dic)
+        # compute normalized growth factor, of size (z_integr)
+        self.dz, _ = self.StructureEmu.get_growth(params_dic, self.Survey.zz_integr)
+        # get redshift uncertainties
+        self.deltaz_s, self.deltaz_l = self.get_deltaz(params_dic)
         # compute matter-matter power spectrum
-        pmm = self.get_pmm(params_dic, k, self.Survey.lbin, self.Survey.zz_integr, model_dic['nl_model'], model_dic['baryon_model'])
-        # compute weak lensing angular power spectra
-        cl_wl, _ = self.get_cell_shear(params_dic, ez, rz, dz, pmm, model_dic['ia_model'])
-        # create an interpolator at the binned ells
-        spline_ll = np.empty((self.Survey.nbin, self.Survey.nbin), dtype=(list, 3))
-        for bin1 in range(self.Survey.nbin):
-            for bin2 in range(self.Survey.nbin):
-                spline_ll[bin1, bin2] = list(itp.splrep(self.Survey.l_wl[:], cl_wl[:, bin1, bin2]))
-        cov_theory = np.zeros((len(self.Survey.ells_wl), self.Survey.nbin, self.Survey.nbin), 'float64')
-        # interpolate at all integer values of ell
-        for bin1 in range(self.Survey.nbin):
-            for bin2 in range(self.Survey.nbin):
-                cov_theory[:, bin1, bin2] = itp.splev(self.Survey.ells_wl[:], spline_ll[bin1, bin2])
-        return cov_theory
+        self.pmm, _ = self.get_pmm(params_dic)
+        # compute weak lensing kernels 
+        self.w_gamma = self.get_wl_kernel(params_dic)
+        # compute ia kernels 
+        self.w_ia = self.get_ia_kernel(params_dic) 
+        # compute intrinsinc alignment components of the integrand
+        self.pk_delta_ia, self.pk_iaia = self.get_pk_ia(params_dic)
+        return self.get_cell_shear()
+    
 
-    def compute_covariance_gc(self, params_dic, model_dic):
+    def compute_galclust(self, params_dic):
         """
-        This function computes the (covariance) matrix for galaxy clustering angular power spectra by first calculating 
-        the necessary cosmological functions (e.g., growth factor, power spectrum) and then 
-        interpolating the photo-GC power spectrum to the desired multipole values from ell_min to ell_max_gc.
+        Compute the photo-GC correlation functions. Use this for likelihood computations.
 
         Parameters:
-        -----------
+        ----------
         params_dic : dict
-            Dictionary containing cosmological parameters.
-        model_dic : dict
-            Dictionary containing model parameters such as 'nl_model', 'baryon_model', and 'bias_model'.
+            Dictionary containing cosmological and survey parameters.
 
         Returns:
-        --------
-        cov_theory : numpy.ndarray
-            Theoretical covariance matrix for photo-GC, with shape 
-            (len(self.Survey.ells_gc), self.Survey.nbin, self.Survey.nbin).
-
+        -------
+        cl_gg : ndarray
+            Photometric galaxy clustering angular power spectra of length Survey.nell_gc.
         """
         # compute background
-        ez, rz, k = self.get_ez_rz_k(params_dic, self.Survey.zz_integr)
+        self.ez, self.rz, self.k = self.get_ez_rz_k(params_dic)
         # compute growth factor
-        pk = self.get_pmm(params_dic, k, self.Survey.lbin, self.Survey.zz_integr, model_dic['nl_model'], model_dic['baryon_model'])
-        pgg = pk
-        pgg_extr = None
-        if model_dic['bias_model'] == BIAS_HEFT:
-            if model_dic['nl_model']!=0 or model_dic['nl_model']!=1:
-                # re-scale for modified gravity
-                # pgm dimensions are (15, ell, z_integr)
-                dz, _ = self.get_growth(params_dic, self.Survey.zz_integr, model_dic['nl_model'])
-                dz_norm, _ = self.get_growth(params_dic, self.Survey.zz_integr,  nl_model=0)
-                dz_rescale = dz/dz_norm
-                pgg, pgg_extr = self.BaccoEmulator.get_heft(params_dic, k, self.Survey.lbin, self.Survey.zz_integr)*dz_rescale[np.newaxis, np.newaxis, :]*dz_rescale[np.newaxis, np.newaxis, :]
-            else:    
-                pgg, pgg_extr = self.BaccoEmulator.get_heft(params_dic, k, self.Survey.lbin, self.Survey.zz_integr)               
-        cl_gg, _ = self.get_cell_galclust(params_dic, ez, rz, k, pgg, pgg_extr, model_dic['bias_model'], model_dic['photoz_err_model'])
-        # create an interpolator at the binned ells
-        spline_gg = np.empty((self.Survey.nbin, self.Survey.nbin), dtype=(list, 3))
-        for bin1 in range(self.Survey.nbin):
-            for bin2 in range(self.Survey.nbin):
-                spline_gg[bin1, bin2] = list(itp.splrep(self.Survey.l_gc[:], cl_gg[:, bin1, bin2]))
-        # interpolate at all integer values of ell
-        cov_theory = np.zeros((len(self.Survey.ells_gc), self.Survey.nbin, self.Survey.nbin), 'float64')
-        for bin1 in range(self.Survey.nbin):
-            for bin2 in range(self.Survey.nbin):
-                cov_theory[:, bin1, bin2] = itp.splev(self.Survey.ells_gc[:], spline_gg[bin1, bin2])
-        return cov_theory
-
-    def compute_covariance_3x2pt(self, params_dic, model_dic):
-        # compute background
-        ez, rz, k = self.get_ez_rz_k(params_dic, self.Survey.zz_integr)
-        # compute growth factor
-        dz, _ = self.get_growth(params_dic, self.Survey.zz_integr, model_dic['nl_model'])
-        if model_dic['bias_model'] == BIAS_HEFT:
-            # compute matter-matter power spectrum with gravity only
-            pk = self.get_pk_nl(params_dic, k, self.Survey.lbin, self.Survey.zz_integr, model_dic['nl_model'])
-            bar_boost = self.get_bar_boost(params_dic, k, self.Survey.lbin, self.Survey.zz_integr, model_dic['baryon_model'])
-            pmm = pk*bar_boost
-            if model_dic['nl_model']!=0 or model_dic['nl_model']!=1:
-                # re-scale for modified gravity
-                # pgm dimensions are (15, ell, z_integr)
-                dz, _ = self.get_growth(params_dic, self.Survey.zz_integr, model_dic['nl_model'])
-                dz_norm, _ = self.get_growth(params_dic, self.Survey.zz_integr,  nl_model=0)
-                dz_rescale = dz/dz_norm
-                pgg, pgg_extr = pgm, pgm_extr = self.BaccoEmulator.get_heft(params_dic, k, self.Survey.lbin, self.Survey.zz_integr) * dz_rescale[np.newaxis, np.newaxis, :]*dz_rescale[np.newaxis, np.newaxis, :]
-            else:
-                # find matter-galaxy and galaxy-galaxy power spectra without galaxy-bias
-                pgg, pgg_extr = pgm, pgm_extr = self.BaccoEmulator.get_heft(params_dic, k, self.Survey.lbin, self.Survey.zz_integr) 
-            pgm, pgm_extr = pgm*np.sqrt(bar_boost), pgm_extr*np.sqrt(bar_boost) 
-            
-        else: 
-            # compute matter-matter power spectrum with baryonic feedback
-            pmm = self.get_pmm(params_dic, k, self.Survey.lbin, self.Survey.zz_integr, model_dic['nl_model'], model_dic['baryon_model'])
-            # find matter-galaxy and galaxy-galaxy power spectra without galaxy-bias
-            pgg, pgg_extr = pmm, None
-            pgm, pgm_extr = pmm, None    
-        # compute weak lensing angular power spectra cl_ll(l, bin_i, bin_j)
-        # window function w_l(l,z,bin) in units of h/Mpc
-        cl_ll, w_l = self.get_cell_shear(params_dic, ez, rz, dz, pmm, model_dic['ia_model'], model_dic['photoz_err_model'])
-        spline_ll = np.empty((self.Survey.nbin, self.Survey.nbin), dtype=(list, 3))
-        # create an interpolator at the binned ells
-        for bin1 in range(self.Survey.nbin):
-            for bin2 in range(self.Survey.nbin):
-                spline_ll[bin1, bin2] = list(itp.splrep(
-                    self.Survey.l_wl[:], cl_ll[:, bin1, bin2]))    
+        self.dz, _ = self.StructureEmu.get_growth(params_dic, self.Survey.zz_integr)
+        # get redshift uncertainties
+        self.deltaz_s, self.deltaz_l = self.get_deltaz(params_dic)
+        if self.flag_heft:
+            self.pk_exp, self.pk_exp_extr = self.get_heft_pk_exp(params_dic)
+        else:
+            self.pmm, _ = self.get_pmm(params_dic)  
+        self.pgg = self.get_pgg(params_dic)
+        self.w_g = self.get_gg_kernel(params_dic)
         # compute photometric galaxy clustring angular power spectra cl_gg(l, bin_i, bin_j)
         # window function w_g(l,z,bin) in units of h/Mpc
-        cl_gg, w_g = self.get_cell_galclust(params_dic, ez, rz, k, pgg, pgg_extr, model_dic['bias_model'], model_dic['photoz_err_model'])    
-        spline_gg = np.empty((self.Survey.nbin, self.Survey.nbin), dtype=(list, 3))
-        # create an interpolator at the binned ells
-        for bin1 in range(self.Survey.nbin):
-            for bin2 in range(self.Survey.nbin):
-                spline_gg[bin1, bin2] = list(itp.splrep(
-                    self.Survey.l_gc[:], cl_gg[:, bin1, bin2]))
+        cl_gg = self.get_cell_galclust()    
+        return cl_gg
+
+    def compute_3x2pt(self, params_dic):
+        """
+        Compute the 3x2pt correlation functions. Use this when all 3 correlation funcions are required,
+        as it is designed to compute properties needed in different computations just once.
+        Attention: order of IA-components is importnant!
+
+        Parameters:
+        ----------
+        params_dic : dict
+            Dictionary containing cosmological and survey parameters.
+
+        Returns:
+        -------
+        cl_ll : ndarray
+            Weak lensing angular power spectra of length Survey.nell_wl.
+        cl_gg : ndarray
+            Photometric galaxy clustering angular power spectra of length Survey.nell_gc.
+        cl_lg : ndarray
+            Cross-correlated galaxy-galaxy lensing angular power spectra of length Survey.nell_xc.
+        cl_gl : ndarray
+            Cross-correlated galaxy-galaxy lensing angular power spectra of length Survey.nell_xc.
+        """
+        # compute background
+        self.ez, self.rz, self.k = self.get_ez_rz_k(params_dic)
+        # compute growth factor
+        self.dz, _ = self.StructureEmu.get_growth(params_dic, self.Survey.zz_integr)
+        # get redshift uncertainties
+        self.deltaz_s, self.deltaz_l = self.get_deltaz(params_dic)
+        # compute matter-matter power spectrum
+        self.pmm, bar_boost = self.get_pmm(params_dic)
+        # compute galaxy-matter power spectrum
+        if self.flag_heft:
+            self.pk_exp, self.pk_exp_extr = self.get_heft_pk_exp(params_dic)
+            self.pgm = self.get_pgm(params_dic)*np.sqrt(bar_boost[:, :, None]) 
+        else:
+            self.pgm = self.get_pgm(params_dic)  
+        # compute galaxy-galaxy power spectrum     
+        self.pgg = self.get_pgg(params_dic)
+        # compute properties used in various calculations just once:
+        self.w_gamma = self.get_wl_kernel(params_dic)
+        self.w_ia = self.get_ia_kernel(params_dic)
+        self.pk_delta_ia, self.pk_iaia = self.get_pk_ia(params_dic)
+        self.w_g = self.get_gg_kernel(params_dic)
+        # order is important: call this only after get_pk_ia
+        self.pk_gal_ia = self.get_pk_cross_ia(params_dic)
+        # compute weak lensing angular power spectra cl_ll(l, bin_i, bin_j)
+        # window function w_l(l,z,bin) in units of h/Mpc
+        cl_ll = self.get_cell_shear()
+        # compute photometric galaxy clustring angular power spectra cl_gg(l, bin_i, bin_j)
+        # window function w_g(l,z,bin) in units of h/Mpc
+        cl_gg = self.get_cell_galclust()    
         # compute cross-correlated or galaxy-galaxy lensing angular power spectra cl_lg(l, bin_i, bin_j) and cl_gl(l, bin_i, bin_j)
-        cl_lg, cl_gl = self.get_cell_cross(params_dic, ez, rz, k, pgm, pgm_extr, w_l, w_g, model_dic['bias_model'])   
-        spline_lg = np.empty((self.Survey.nbin, self.Survey.nbin), dtype=(list, 3))
-        spline_gl = np.empty((self.Survey.nbin, self.Survey.nbin), dtype=(list, 3))
-        # create an interpolator at the binned ells
+        cl_lg, cl_gl = self.get_cell_cross() 
+        return cl_ll, cl_gg, cl_lg, cl_gl  
+    
+    def get_deltaz(self, params):
+        deltaz_s = deltaz_l = None
+        if 'deltaz_1' in params:     
+            deltaz_s = np.array([params[f'deltaz_{i+1}'] for i in range(self.Survey.nbin)])
+            deltaz_l = deltaz_s.copy()
+        if 'deltaz_1_s' in params:  
+            deltaz_s = np.array([params[f'deltaz_{i+1}_s'] for i in range(self.Survey.nbin)])  
+        if 'deltaz_1_l' in params:    
+            deltaz_l = np.array([params[f'deltaz_{i+1}_l'] for i in range(self.Survey.nbin)])  
+        return deltaz_s, deltaz_l
+
+    def compute_data_matrix_3x2pt(self, params_dic):
+        r"""This function computes the 3x2pt angular power spectra and composes a matrix 
+        for computing the likelihood with determinants. The resulting matrix is structured as:
+        
+        .. math::
+
+            \begin{pmatrix}
+            C_{LL} & C_{LG} \\
+            C_{GL} & C_{GG}
+            \end{pmatrix}
+
+        for the same scale-cuts per-redshift bin, i.e. ell_max_gc. We also compute a
+        "high"-matrix for ell>ell_max_gc with weak lensing angular power spectra, 
+        as we assume that ell_max_wl>ell_max_gc.  
+        These matrices are later used in the likelihood computation via determinants.         
+
+        Parameters:
+        ----------
+        params_dic : dict
+            Dictionary containing the parameters required for computing the 3x2pt angular power spectra.
+
+        Returns:
+        -------
+        cov_theory : numpy.ndarray
+            The data matrix for the 3x2pt angular power spectra.
+        cov_theory_high : numpy.ndarray
+            The data matrix for ell > ell_max_gc with weak lensing angular power spectra.
+        """
+        # compute 3x2pt angular power spectra
+        cl_ll, cl_gg, cl_lg, cl_gl = self.compute_3x2pt(params_dic)
+        # compose a matrix for computing likelihood with determinants
+        # and a "high"-matrix where
+        # ell_jump is ell_max_gc
+        cov_theory, cov_theory_high = build_data_matrix_3x2pt(cl_ll, cl_gg, cl_lg, cl_gl, 
+                                                              self.Survey.l_wl, self.Survey.l_gc, self.Survey.l_xc,
+                                                              self.Survey.ells_wl, self.Survey.ells_gc, self.Survey.ell_jump, 
+                                                              self.Survey.nbin)
+        # dimensions: 
+        # cov_theory (len(all_int_ell_wl), 2 * nbin, 2 * nbin)
+        # cov_theory_high (len(all_int_ell_wl) - ell_jump), nbin, nbin)
+        return cov_theory, cov_theory_high    
+
+    def compute_data_vector_3x2pt(self, params_dic):
+        """This function calculates the 3x2pt angular power spectra and constructs a data vector
+        by combining the power spectra for different bins. It then applies a mask to the data
+        vector based on the survey's scale-cuts per photo-z bin.
+
+        Parameters:
+        ----------
+        params_dic : dict
+            Dictionary containing the parameters required for computing the 3x2pt angular power spectra.
+
+        Returns:
+        -------
+        data_vector_masked : numpy.ndarray
+            The masked data vector containing the 3x2pt angular power spectra for the given parameters.
+        """
+        # compute 3x2pt angular power spectra
+        cl_ll, cl_gg, cl_lg, cl_gl = self.compute_3x2pt(params_dic)
+        data_vector = np.zeros(((self.Survey.nell_wl+2*self.Survey.nell_xc+self.Survey.nell_gc)*self.Survey.nbin_flat), 'float64')
+        # construct a vector
+        idx_start = 0
+        start_lg = self.Survey.nell_wl*self.Survey.nbin_flat
+        start_gl = (self.Survey.nell_wl+self.Survey.nell_xc)*self.Survey.nbin_flat
+        start_gc = (self.Survey.nell_wl+self.Survey.nell_xc+self.Survey.nell_xc)*self.Survey.nbin_flat
         for bin1 in range(self.Survey.nbin):
-            for bin2 in range(self.Survey.nbin):
-                spline_lg[bin1, bin2] = list(itp.splrep(
-                    self.Survey.l_xc[:], cl_lg[:, bin1, bin2]))
-                spline_gl[bin1, bin2] = list(itp.splrep(
-                    self.Survey.l_xc[:], cl_gl[:, bin1, bin2]))
-        # compose a matrix
-        # C_LL | C_LG
-        # C_GL | C_GG   
-        # and a "high"-matrix for ell>ell_max_gc with weak lensing anggular power spectra, as we assume that ell_max_wl>ell_max_gc
-        cov_theory = np.zeros((len(self.Survey.ells_gc), 2 * self.Survey.nbin, 2 * self.Survey.nbin), 'float64')
-        cov_theory_high = np.zeros(((len(self.Survey.ells_wl) - self.Survey.ell_jump), self.Survey.nbin, self.Survey.nbin), 'float64')    
+            for bin2 in range(bin1, self.Survey.nbin):
+                data_vector[idx_start*self.Survey.nell_wl:(idx_start+1)*self.Survey.nell_wl] = cl_ll[:, bin1, bin2]
+                data_vector[idx_start*self.Survey.nell_gx+start_lg:(idx_start+1)*self.Survey.nell_gx+start_lg] = cl_lg[:, bin1, bin2]
+                data_vector[idx_start*self.Survey.nell_gx+start_gl:(idx_start+1)*self.Survey.nell_gx+start_gl] = cl_gl[:, bin1, bin2]
+                data_vector[idx_start*self.Survey.nell_gc+start_gc:(idx_start+1)*self.Survey.nell_gc+start_gc] = cl_gg[:, bin1, bin2]
+                idx_start += 1
+        # apply mask for different scale-cuts per photo-z bin        
+        data_vector_masked = data_vector[self.Survey.mask_data_vector_3x2pt]
+        return data_vector_masked
+    
+    def compute_covariance_3x2pt(self, params_dic):
+        r"""Compute the gaussian (only diagonal components with :math:`\ell=\ell'`) covariance matrix for the 3x2pt analysis.
+        This function calculates the covariance matrix for the 3x2pt analysis, which includes 
+        weak lensing (LL), galaxy clustering (GG), and their cross-correlation (LG and GL). 
+        The covariance matrix is computed for different bins and multipoles as follows
+
+        .. math::
+            \mathrm{Cov}[C_{ij}^{AB}(\ell)C_{kl}^{CD}(\ell)]=\frac{1}{2f_{\rm sky}(2 \ell+1) \Delta \ell} 
+            \left( C^{AC}_{ik}C^{BD}_{jl}+C^{AD}_{il}C^{BC}_{jk}\right)\, ,
+
+        where :math:`A,B,C,D = \{L, G\}` and :math:`i,j` correspond to redshift-bins.
+        
+        Parameters:
+        ----------
+        params_dic : dict
+            Dictionary containing the parameters required for the computation of the 3x2pt 
+            angular power spectra.
+        Returns:
+        -------
+        cov_flat_masked : numpy.ndarray
+            The masked covariance matrix for the 3x2pt analysis.
+        """
+
+        # compute all angular power spectra
+        cl_ll, cl_gg, cl_lg, cl_gl = self.compute_3x2pt(params_dic)
+        # l_wl, l_xc, l_gc are centers of the lbins
+        # in general we assume max(l_wl)>=max(l_xc)>=max(l_gc)
+        # now we compute at the same number of ell-bins for all probes
+        # and then apply a mask, alterntively, the probes can be computed with different
+        # lmax from the start
+        denom_wl = ((2*self.Survey.l_wl+1)*self.Survey.fsky*self.Survey.d_ell_bin_cut_wl)
+        denom_xc = ((2*self.Survey.l_xc+1)*self.Survey.fsky*self.Survey.d_ell_bin_cut_xc)
+        denom_gc = ((2*self.Survey.l_gc+1)*self.Survey.fsky*self.Survey.d_ell_bin_cut_gc)
+        cov_flat = np.zeros(((self.Survey.nell_wl+self.Survey.nell_gc+2*self.Survey.nell_xc)*self.Survey.nbin_flat, (self.Survey.nell_wl+self.Survey.nell_gc+2*self.Survey.nell_xc)*self.Survey.nbin_flat), 'float64')
+        counter_x = 0
+        counter_y = 0
+        start_lg = self.Survey.nell_wl*self.Survey.nbin_flat
+        start_gl = (self.Survey.nell_wl+self.Survey.nell_xc)*self.Survey.nbin_flat
+        start_gc = (self.Survey.nell_wl+self.Survey.nell_xc+self.Survey.nell_xc)*self.Survey.nbin_flat
         for bin1 in range(self.Survey.nbin):
-            for bin2 in range(self.Survey.nbin):
-                cov_theory[:, bin1, bin2] = itp.splev(
-                    self.Survey.ells_gc[:], spline_ll[bin1, bin2])
-                cov_theory[:, self.Survey.nbin + bin1, bin2] = itp.splev(
-                    self.Survey.ells_gc[:], spline_gl[bin1, bin2])
-                cov_theory[:, bin1, self.Survey.nbin + bin2] = itp.splev(
-                    self.Survey.ells_gc[:], spline_lg[bin1, bin2])
-                cov_theory[:, self.Survey.nbin + bin1, self.Survey.nbin + bin2] = itp.splev(
-                    self.Survey.ells_gc[:], spline_gg[bin1, bin2])
-                cov_theory_high[:, bin1, bin2] = itp.splev(
-                    self.Survey.ells_wl[self.Survey.ell_jump:], spline_ll[bin1, bin2])
-        return cov_theory, cov_theory_high
+            for bin2 in range(bin1, self.Survey.nbin):
+                for bin3 in range(self.Survey.nbin):
+                    for bin4 in range(bin3, self.Survey.nbin):
+                        for i_wl in range(self.Survey.nell_wl):
+                            #ABCD=LLLL
+                            cov_flat[self.Survey.nell_wl*counter_y+i_wl, self.Survey.nell_wl*counter_x+i_wl] = (cl_ll[i_wl, bin1, bin3] * cl_ll[i_wl, bin2, bin4] +
+                            cl_ll[i_wl, bin1, bin4] * cl_ll[i_wl, bin2, bin3])/denom_wl[i_wl] 
+
+                        for i_xc in range(self.Survey.nell_xc):    
+                            #ABCD=LLLG
+                            cov_flat[self.Survey.nell_xc*counter_y+i_xc, start_lg+self.Survey.nell_xc*counter_x+i_xc] = (cl_ll[i_xc, bin1, bin3] * cl_lg[i_xc, bin2, bin4] +
+                            cl_lg[i_xc, bin1, bin4] * cl_ll[i_xc, bin2, bin3])/denom_xc[i_xc] 
+                            #ABCD=LLGL
+                            cov_flat[self.Survey.nell_xc*counter_y+i_xc, start_gl+self.Survey.nell_xc*counter_x+i_xc] = (cl_lg[i_xc, bin1, bin3] * cl_ll[i_xc, bin2, bin4] +
+                            cl_ll[i_xc, bin1, bin4] * cl_lg[i_xc, bin2, bin3])/denom_xc[i_xc]
+                            #ABCD=LLGG
+                            cov_flat[self.Survey.nell_xc*counter_y+i_xc, start_gc+self.Survey.nell_xc*counter_x+i_xc] = (cl_lg[i_xc, bin1, bin3] * cl_lg[i_xc, bin2, bin4] +
+                            cl_lg[i_xc, bin1, bin4] * cl_lg[i_xc, bin2, bin3])/denom_gc[i_xc]  
+
+                            #ABCD=LGLL
+                            cov_flat[start_lg+self.Survey.nell_wl*counter_y+i_xc, self.Survey.nell_wl*counter_x+i_xc] = (cl_ll[i_xc, bin1, bin3] * cl_gl[i_xc, bin2, bin4] +
+                            cl_ll[i_xc, bin1, bin4] * cl_gl[i_xc, bin2, bin3])/denom_xc[i_xc] 
+
+                            #ABCD=GLLL
+                            cov_flat[start_gl+self.Survey.nell_wl*counter_y+i_xc, self.Survey.nell_wl*counter_x+i_xc] = (cl_gl[i_xc, bin1, bin3] * cl_ll[i_xc, bin2, bin4] +
+                            cl_gl[i_xc, bin1, bin4] * cl_ll[i_xc, bin2, bin3])/denom_xc[i_xc] 
+
+                            #ABCD=GGLL
+                            cov_flat[start_gc+self.Survey.nell_wl*counter_y+i_xc, self.Survey.nell_wl*counter_x+i_xc] = (cl_gl[i_xc, bin1, bin3] * cl_gl[i_xc, bin2, bin4] +
+                            cl_gl[i_xc, bin1, bin4] * cl_gl[i_xc, bin2, bin3])/denom_xc[i_xc] 
+
+                        for i_gc in range(self.Survey.nell_gc):  
+                            #ABCD=LGLG
+                            cov_flat[start_lg+self.Survey.nell_xc*counter_y+i_gc, start_lg+self.Survey.nell_xc*counter_x+i_gc] = (cl_ll[i_gc, bin1, bin3] * cl_gg[i_gc, bin2, bin4] +
+                            cl_lg[i_gc, bin1, bin4] * cl_gl[i_gc, bin2, bin3])/denom_gc[i_gc] 
+                            #ABCD=LGGL
+                            cov_flat[start_lg+self.Survey.nell_xc*counter_y+i_gc, start_gl+self.Survey.nell_xc*counter_x+i_gc] = (cl_lg[i_gc, bin1, bin3] * cl_gl[i_gc, bin2, bin4] +
+                            cl_ll[i_gc, bin1, bin4] * cl_gg[i_gc, bin2, bin3])/denom_gc[i_gc] 
+                            #ABCD=LGGG
+                            cov_flat[start_lg+self.Survey.nell_xc*counter_y+i_gc, start_gc+self.Survey.nell_xc*counter_x+i_gc] = (cl_lg[i_gc, bin1, bin3] * cl_gg[i_gc, bin2, bin4] +
+                            cl_lg[i_gc, bin1, bin4] * cl_gg[i_gc, bin2, bin3])/denom_gc[i_gc] 
+
+
+                            #ABCD=GLLG
+                            cov_flat[start_gl+self.Survey.nell_xc*counter_y+i_gc, start_lg+self.Survey.nell_xc*counter_x+i_gc] = (cl_gl[i_gc, bin1, bin3] * cl_lg[i_gc, bin2, bin4] +
+                            cl_gg[i_gc, bin1, bin4] * cl_ll[i_gc, bin2, bin3])/denom_gc[i_gc] 
+                            #ABCD=GLGL
+                            cov_flat[start_gl+self.Survey.nell_xc*counter_y+i_gc, start_gl+self.Survey.nell_xc*counter_x+i_gc] = (cl_gg[i_gc, bin1, bin3] * cl_ll[i_gc, bin2, bin4] +
+                            cl_gl[i_gc, bin1, bin4] * cl_lg[i_gc, bin2, bin3])/denom_gc[i_gc] 
+                            #ABCD=GLGG
+                            cov_flat[start_gl+self.Survey.nell_xc*counter_y+i_gc, start_gc+self.Survey.nell_xc*counter_x+i_gc] = (cl_gg[i_gc, bin1, bin3] * cl_lg[i_gc, bin2, bin4] +
+                            cl_gg[i_gc, bin1, bin4] * cl_lg[i_gc, bin2, bin3])/denom_gc[i_gc] 
+                            
+                            #ABCD=GGLG
+                            cov_flat[start_gc+self.Survey.nell_xc*counter_y+i_gc, start_lg+self.Survey.nell_xc*counter_x+i_gc] = (cl_gl[i_gc, bin1, bin3] * cl_gg[i_gc, bin2, bin4] +
+                            cl_gg[i_gc, bin1, bin4] * cl_gl[i_gc, bin2, bin3])/denom_gc[i_gc] 
+                            #ABCD=GGGL
+                            cov_flat[start_gc+self.Survey.nell_xc*counter_y+i_gc, start_gl+self.Survey.nell_xc*counter_x+i_gc] = (cl_gg[i_gc, bin1, bin3] * cl_gl[i_gc, bin2, bin4] +
+                            cl_gl[i_gc, bin1, bin4] * cl_gg[i_gc, bin2, bin3])/denom_gc[i_gc] 
+                            #ABCD=GGGG
+                            cov_flat[start_gc+self.Survey.nell_gc*counter_y+i_gc, start_gc+self.Survey.nell_gc*counter_x+i_gc] = (cl_gg[i_gc, bin1, bin3] * cl_gg[i_gc, bin2, bin4] +
+                            cl_gg[i_gc, bin1, bin4] * cl_gg[i_gc, bin2, bin3])/denom_gc[i_gc]    
+                            
+                        if counter_x<self.Survey.nbin_flat-1:
+                            counter_x+=1
+                        else:
+                            counter_x = 0
+                            counter_y+=1    
+        print('cov_flat: ', cov_flat.shape)                                      
+        cov_flat_masked = cov_flat[self.Survey.mask_cov_3x2pt]
+        print('cov_flat_masked: ', cov_flat_masked.shape)  
+        return cov_flat_masked 
+    
+    def compute_data_matrix_wl(self, params_dic):
+        """This function calculates the weak lensing angular power spectra using the provided parameters
+        and constructs the corresponding covariance matrix. This is later used in lieklihood with determinants.
+
+        Parameters:
+        ----------
+        params_dic : dict
+            Dictionary containing the parameters required for computing the shear power spectra.
+
+        Returns:
+        -------
+        cov_theory : numpy.ndarray
+            The computed data matrix for the weak lensing data.
+        """
+        # compute weak lensing angular power spectra
+        cl_wl = self.compute_shear(params_dic)
+        # construct matrix
+        cov_theory = build_data_matrix(cl_wl, self.Survey.l_wl, self.Survey.ells_wl, self.Survey.nbin)
+        return cov_theory
+    
+    def compute_data_vector_wl(self, params_dic):
+        """This function calculates the weak lensing angular power spectra and constructs
+        the data vector for weak lensing, applying a mask to the resulting data vector.
+
+        Parameters:
+        ----------
+        params_dic : dict
+            Dictionary containing the parameters required for the computation of the shear.
+
+        Returns:
+        -------
+        data_vector_masked : numpy.ndarray
+            The masked data vector for weak lensing, containing the angular power spectra
+            for the specified survey configuration.
+        """
+        # compute weak lensing angular power spectra
+        cl_wl = self.compute_shear(params_dic)
+        data_vector = np.zeros((self.Survey.nell_wl*self.Survey.nbin_flat), 'float64')
+        idx_start = 0
+        for bin1 in range(self.Survey.nbin):
+            for bin2 in range(bin1, self.Survey.nbin):
+                data_vector[idx_start*self.Survey.nell_wl:(idx_start+1)*self.Survey.nell_wl] = cl_wl[:, bin1, bin2]
+                idx_start += 1
+        data_vector_masked = data_vector[self.Survey.mask_data_vector_wl]
+        return data_vector_masked
+    
+    def compute_covariance_wl(self, params_dic):
+        r"""Compute the Gaussian (only diagonal components with :math:`\ell=\ell'`) covariance matrix for the weak lensing (WL) analysis.
+        This function calculates the covariance matrix for the weak lensing analysis, which includes 
+        the auto-correlation of shear (LL). The covariance matrix is computed for different bins and multipoles as follows:
+
+        .. math::
+            \mathrm{Cov}[C_{ij}^{LL}(\ell)C_{kl}^{LL}(\ell)]=\frac{1}{2f_{\rm sky}(2 \ell+1) \Delta \ell} 
+            \left( C^{LL}_{ik}C^{LL}_{jl}+C^{LL}_{il}C^{LL}_{jk}\right)\, ,
+
+        where :math:`L` corresponds to weak lensing and :math:`i,j` correspond to redshift bins.
+        
+        Parameters:
+        ----------
+        params_dic : dict
+            Dictionary containing the parameters required for the computation of the weak lensing 
+            angular power spectra.
+        Returns:
+        -------
+        cov_flat_masked : numpy.ndarray
+            The masked covariance matrix for the weak lensing analysis.
+        """
+        # compute weak lensing angular power spectra
+        cl_wl = self.compute_shear(params_dic)
+        # l_wl are centers of the lbins
+        denom = ((2*self.Survey.l_wl+1)*self.Survey.fsky*self.Survey.d_ell_bin_cut_wl)
+        cov_flat = np.zeros((self.Survey.nell_wl*self.Survey.nbin_flat, self.Survey.nell_wl*self.Survey.nbin_flat), 'float64')
+        counter_x = 0
+        counter_y = 0
+        for bin1 in range(self.Survey.nbin):
+            for bin2 in range(bin1, self.Survey.nbin):
+                for bin3 in range(self.Survey.nbin):
+                    for bin4 in range(bin3, self.Survey.nbin):
+                        for i in range(self.Survey.nell_wl):
+                            cov_flat[self.Survey.nell_wl*counter_y+i, self.Survey.nell_wl*counter_x+i] = (cl_wl[i, bin1, bin3] * cl_wl[i, bin2, bin4] +
+                            cl_wl[i, bin1, bin4]* cl_wl[i, bin2, bin3])/denom[i] 
+                        if counter_x<self.Survey.nbin_flat-1:
+                            counter_x+=1
+                        else:
+                            counter_x = 0
+                            counter_y+=1                       
+        print('cov_flat: ', cov_flat.shape)                                      
+        cov_flat_masked = cov_flat[self.Survey.mask_cov_wl]
+        print('cov_flat_masked: ', cov_flat_masked.shape)  
+        return cov_flat_masked 
     
 
- 
+    def compute_data_matrix_gc(self, params_dic):
+        """This function computes the angular power spectra for galaxy clustering
+        using the provided parameters dictionary, and then constructs the 
+        data matrix based on the computed power spectra and survey 
+        parameters. This is later used in likelihood with determinants.
+
+        Parameters:
+        ----------
+        params_dic : dict
+            Dictionary containing the parameters required for computing the galaxy clustering spectra.
+
+        Returns:
+        -------
+        cov_theory : numpy.ndarray
+            The computed data matrix for the photo-GC data.
+        """
+        # compute angular power spectra
+        cl_gc = self.compute_galclust(params_dic)
+        # construct matrix
+        cov_theory = build_data_matrix(cl_gc, self.Survey.l_gc, self.Survey.ells_gc, self.Survey.nbin)
+        return cov_theory
+    
+    def compute_data_vector_gc(self, params_dic):
+        """This method computes the angular power spectra for galaxy clustering
+        using the provided parameters dictionary, constructs the data vector,
+        and applies a mask to the data vector.
+
+        Parameters:
+        ----------
+        params_dic : dict
+            Dictionary containing the parameters required for computing the
+            angular power spectra.
+
+        Returns:
+        -------
+        data_vector_masked : numpy.ndarray
+            The masked data vector for galaxy clustering.
+        """
+        # compute angular power spectra
+        cl_gc = self.compute_galclust(params_dic)
+        # construct vector
+        data_vector = np.zeros((self.Survey.nell_gc*self.Survey.nbin_flat), 'float64')
+        idx_start = 0
+        for bin1 in range(self.Survey.nbin):
+            for bin2 in range(bin1, self.Survey.nbin):
+                data_vector[idx_start*self.Survey.nell_gc:(idx_start+1)*self.Survey.nell_gc] = cl_gc[:, bin1, bin2]
+                idx_start += 1
+        data_vector_masked = data_vector[self.Survey.mask_data_vector_gc]
+        return data_vector_masked
+    
+    def compute_covariance_gc(self, params_dic):
+        r"""Compute the Gaussian (only diagonal components with :math:`\ell=\ell'`) covariance matrix for the galaxy clustering (GC) analysis.
+        This function calculates the covariance matrix for the auto-correlation of galaxy clustering. 
+        The covariance matrix is computed for different bins and multipoles as follows:
+
+        .. math::
+            \mathrm{Cov}[C_{ij}^{GG}(\ell)C_{kl}^{GG}(\ell)]=\frac{1}{2f_{\rm sky}(2 \ell+1) \Delta \ell} 
+            \left( C^{GG}_{ik}C^{GG}_{jl}+C^{GG}_{il}C^{GG}_{jk}\right)\, ,
+
+        where :math:`G` corresponds to galaxy clustering and :math:`i,j` correspond to redshift bins.
+        
+        Parameters:
+        ----------
+        params_dic : dict
+            Dictionary containing the parameters required for the computation of the galaxy clustering 
+            angular power spectra.
+        Returns:
+        -------
+        cov_flat_masked : numpy.ndarray
+            The masked covariance matrix for the galaxy clustering analysis.
+        """
+        # compute angular power spectra
+        cl_gc = self.compute_galclust(params_dic)
+        # l_gc are centers of the lbins
+        denom = ((2*self.Survey.l_gc+1)*self.Survey.fsky*self.Survey.d_ell_bin_cut_gc)
+        cov_flat = np.zeros((self.Survey.nell_gc*self.Survey.nbin_flat, self.Survey.nell_gc*self.Survey.nbin_flat), 'float64')
+        counter_x = 0
+        counter_y = 0
+        for bin1 in range(self.Survey.nbin):
+            for bin2 in range(bin1, self.Survey.nbin):
+                for bin3 in range(self.Survey.nbin):
+                    for bin4 in range(bin3, self.Survey.nbin):
+                        for i in range(self.Survey.nell_gc):
+                            cov_flat[self.Survey.nell_gc*counter_y+i, self.Survey.nell_gc*counter_x+i] = (cl_gc[i, bin1, bin3] * cl_gc[i, bin2, bin4] +
+                            cl_gc[i, bin1, bin4]* cl_gc[i, bin2, bin3])/denom[i] 
+                        if counter_x<self.Survey.nbin_flat-1:
+                            counter_x+=1
+                        else:
+                            counter_x = 0
+                            counter_y+=1                       
+        print('cov_flat: ', cov_flat.shape)                                      
+        cov_flat_masked = cov_flat[self.Survey.mask_cov_gc]
+        print('cov_flat_masked: ', cov_flat_masked.shape)  
+        return cov_flat_masked 

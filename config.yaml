@@ -3,9 +3,14 @@ observable: 'WL'
 #     'WL' -> shear-shear
 #     'GC' -> photo-clustering
 #     '3x2pt' -> 3x2pt: shear-shear, photo-clustering, galaxy-galaxy lensing
-#----- not implemented yet:
-#     'XC' -> cross-correlation, galaxy-galaxy lensing
-#     '2x2pt' -> 2x2pt: photo-clustering, galaxy-galaxy lensing
+
+
+likelihood: 'binned'
+#Likelihood
+#      'determinants' -> using determinants and summing over all integer ell-values
+#      'binned' -> using covariance and differences between data vectors
+
+
 specs:
   #Scale cuts
   #'const_lmax' -> same lmax in all z-bins
@@ -13,36 +18,43 @@ specs:
   #'kmax' -> vary kmax in each z-bin, which technically equals to the 'lmax'-option via lmax=kmax rcom(z_mod)/(1+z_mod)
   #           with z_mod corresponding to a peak of the shear and photo-GC kernels 
   scale_cuts:
-    type: 'const_lmax'
-    max_WL: [2000]
-            #[1., 1., 1., 1., 1.]
-            #[1000, 
-            #1000, 2000, 
-            #1000, 2000, 2000,
-            #1000, 2000, 2000, 3000,
-            #2000, 2000, 2000, 3000, 3000] #always a list, same length as nbin*(nbin+1)/2 or just 1 for const_lmax
-    max_GC: [900]
-            #[0.4, 0.4, 0.4, 0.4, 0.4]
-            #[500, 
-            #400, 500, 
-            #400, 600, 600,
-            #400, 800, 800, 800,
-            #400, 900, 900, 900, 900]
-    cosmo: #or transformation from k_eff to ell
+    type: 'lmax'
+    max_WL: [2000, 2000, 2000, 2000, 2000, 
+                   2000, 2000, 2000, 2000, 
+                         2000, 2000, 2000, 
+                               2000, 2000,
+                                     1000] #always a list, same length as nbin*(nbin+1)/2 or just 1 for const_lmax
+            #[5., 5., 5., 1., 1.]
+    max_GC: [600, 600, 600, 600, 600, 
+                  600, 600, 600, 600, 
+                       600, 600, 600, 
+                            900, 900,
+                                 900] #always a list, same length as nbin*(nbin+1)/2 or just 1 for const_lmax
+            #[0.7, 0.7, 0.7, 0.7, 0.7]
+    cosmo: # for transformation from k_eff to ell
       'Omega_m': 0.31
       'w0': -1.
       'wa': 0.
 
   #Survey info
-  #     Euclid: Euclid_5bins or Euclid_10bins
+  #     Euclid: Euclid_Y1, Euclid_5bins or Euclid_10bins
   #     LSST: LSST_Y1 or LSST_Y10 
+  #----- not implemented yet:  
   #     Custom: analytical n(z) or from file
-  survey_info: 'LSST_Y1' #'Euclid_5bins'
-  custom_survey_path: './custom_survey.yaml'
+  survey_info: 'LSST_Y1' #'Euclid_Y1' #'Euclid_5bins'
+  custom_survey_path: 
 
 
 data:
-  nl_model: 1
+  type: 0
+  #Types:
+  #     0 -> compute for a given model and likelihood
+  #----- not implemented yet:  
+  #     1 -> read from a file
+  data_file: 
+
+  nl_model: 0
+  #bacco_option: 'linear'
   #Nonlinear power spectrum
   #     0 -> HMcode
   #     1 -> bacco
@@ -58,15 +70,14 @@ data:
   ia_model: 0
   # Intrinsic alignment model
   #     0 -> zNLA
-  #----- not implemented yet:
   #     1 -> TATT
-  baryon_model: 3
+  baryon_model: 0
   # Baryonic flag
   #     0 -> no baryons
   #     1 -> Tagn HMcode
   #     2 -> bcemu
   #     3 -> bacco
-  photoz_err_model: 2
+  photoz_err_model: 0
   # Photo-z error on n(z) model
   #     0 -> no photo-z error
   #     1 -> additive mode, n(z') = n(z + dz)
@@ -74,7 +85,8 @@ data:
   params: ./params_data.yaml
 
 theory:
-  nl_model: 1
+  nl_model: 0
+  #bacco_option: 'linear'
   #Nonlinear power spectrum
   #     0 -> HMcode
   #     1 -> bacco
@@ -90,9 +102,8 @@ theory:
   ia_model: 0
   # Intrinsic alignment model
   #     0 -> zNLA
-  #----- not implemented yet:
   #     1 -> TATT
-  baryon_model: 3
+  baryon_model: 0
   # Baryonic flag
   #     0 -> no baryons
   #     1 -> Tagn HMcode
@@ -103,10 +114,10 @@ theory:
   #     0 -> no photo-z error
   #     1 -> additive mode, n(z') = n(z + dz)
   #     2 -> multiplicative mode, n(z') = n(z(1 + dz))
-  params: ./params_photoz_test.yaml
+  params: ./params_model_hmcode.yaml
 
 output: 
-  chain_name: params_debug
+  chain_name: params_debug_mult
 sampler: 
   mcmc:
     verbose: True
@@ -114,9 +125,6 @@ sampler:
     n_live: 1000
     pool: 20
     resume: False
-    hdf5_name: 'params_debug'
-  #----- not implemented yet:  
-  minimiser:
-    verbose: True
-    tolerance: 0.1
+    hdf5_name: 'params_debug_mult'
+
     
