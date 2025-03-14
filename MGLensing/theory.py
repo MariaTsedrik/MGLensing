@@ -2,13 +2,13 @@ import numpy as np
 import MGrowth as mg
 from scipy.integrate import trapezoid, quad
 from scipy import interpolate as itp
-from MGLensing.structure.hmcode2020_interface import HMcode2020
-from MGLensing.structure.bacco_interface import BaccoEmu
-from MGLensing.structure.bcemu_interface import BCemulator
-from MGLensing.structure.react_ndgp_interface import DGPReACT
-from MGLensing.structure.react_gamma_interface import GammaReACT
-from MGLensing.structure.react_musigma_interface import MuSigmaReACT
-from MGLensing.structure.react_ide_interface import DarkScatteringReACT
+from .structure.hmcode2020_interface import HMcode2020
+from .structure.bacco_interface import BaccoEmu
+from .structure.bcemu_interface import BCemulator
+from .structure.react_ndgp_interface import DGPReACT
+from .structure.react_gamma_interface import GammaReACT
+from .structure.react_musigma_interface import MuSigmaReACT
+from .structure.react_ide_interface import DarkScatteringReACT
 from math import sqrt, log, exp, pow, log10
 import os
 import fastpt as fpt
