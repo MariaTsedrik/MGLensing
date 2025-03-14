@@ -12,7 +12,8 @@ classifiers = ["License :: OSI Approved :: MIT License"]
 dynamic = ["version", "description"]
 requires-python = "==3.11"
 dependencies = ["numpy>=1.18.0", "scipy>=1.4.0", 
-                "pyyaml", "datetime", "MGrowth", "cosmopower", "sacc", "baccoemu", "BCemu"]
+                "pyyaml", "datetime", "MGrowth", "cosmopower", "sacc", "baccoemu", "BCemu",
+                "fast-pt"]
 
 [project.urls]
 Home = "https://mglensing.readthedocs.io"
