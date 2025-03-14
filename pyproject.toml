@@ -5,7 +5,7 @@ build-backend = "flit_core.buildapi"
 [project]
 name = "MGL"
 authors = [{name = "Maria Tsedrik", email = "mtsedrik@ed.ac.uk"},
-{name = "ttavia Truttero"}]
+{name = "Ottavia Truttero"}]
 readme = "README.md"
 license = {file = "LICENSE"}
 classifiers = ["License :: OSI Approved :: MIT License"]
@@ -21,4 +21,4 @@ Home = "https://mglensing.readthedocs.io"
 exclude = ["docs", ".gitignore", ".github", ".readthedocs.yaml"]
 
 [tool.flit.module]
-name = "MGL"
+name = "MGLensing"
