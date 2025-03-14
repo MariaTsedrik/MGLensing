@@ -1,0 +1,24 @@
+[build-system]
+requires = ["flit_core >=3.2,<4"]
+build-backend = "flit_core.buildapi"
+
+[project]
+name = "MGL"
+authors = [{name = "Maria Tsedrik", email = "mtsedrik@ed.ac.uk"},
+{name = "ttavia Truttero"}]
+readme = "README.md"
+license = {file = "LICENSE"}
+classifiers = ["License :: OSI Approved :: MIT License"]
+dynamic = ["version", "description"]
+requires-python = "==3.11"
+dependencies = ["numpy>=1.18.0", "scipy>=1.4.0", "scikit-learn>=0.22.0",
+                "threadpoolctl>=3.0.0"]
+
+[project.urls]
+Home = "https://mglensing.readthedocs.io"
+
+[tool.flit.sdist]
+exclude = ["docs", ".gitignore", ".github", ".readthedocs.yaml"]
+
+[tool.flit.module]
+name = "MGL"
