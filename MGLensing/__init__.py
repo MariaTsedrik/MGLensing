@@ -1,3 +1,6 @@
+"""Modified Gravity Lensing: Forecasting Pipeline."""
+
+
 __author__ = ["M. Tsedrik", "O. Truttero"]
 __version__ = "0.0"
 __description__ = "MGL = Modified Gravity Lensing: Forecasting Pipeline"
