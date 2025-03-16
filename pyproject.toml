@@ -11,8 +11,8 @@ license = {file = "LICENSE"}
 classifiers = ["License :: OSI Approved :: MIT License"]
 dynamic = ["version", "description"]
 requires-python = ">=3.11.0"
-dependencies = ["numpy==1.23.5", "scipy==1.10.1", "tensorboard==2.13.0",
-                "tensorflow == 2.12.0", "tensorflow-probability<0.21.0",  
+dependencies = ["numpy==1.23.5", "scipy==1.10.1", 
+                "tensorflow == 2.12.0", "tensorflow-probability==0.20.1",  
                 "pyyaml", "datetime", "MGrowth", "cosmopower==0.1.3", "sacc", 
                 "baccoemu>=2.1.1", "BCemu==1.1.1",
                 "fast-pt==3.2"]
