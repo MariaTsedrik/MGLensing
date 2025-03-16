@@ -61,7 +61,8 @@ Following files provide examples of using MGL:
 * plotting_scripts/postprocess_compute_S8.py: compute $\sigma_8$ and $S_8$ from a chain.
 
 ## Documentation
-...tbd...
+
+The documentation can be found at [mglensing.readthedocs.io](https://mglensing.readthedocs.io/en/latest/index.html).
 
 
 ## To-do list for Maria

@@ -15,8 +15,9 @@
 
 |
 
-
+.. image:: https://img.shields.io/readthedocs/mglensing
 .. image:: https://img.shields.io/github/languages/top/MariaTsedrik/MGlensing
+.. image:: https://img.shields.io/github/license/MariaTsedrik/MGlensing
 
 |
 
