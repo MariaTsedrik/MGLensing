@@ -329,7 +329,9 @@ def validate_and_setup_lmax(obj, scale_cuts_info, likelihood, lmin, lmax, zz_mod
         obj.lmax_wl_vals = scale_cuts_info['max_WL']
         obj.lmax_gc_vals= scale_cuts_info['max_GC']
         setup_lmax(obj)
-    elif scale_cuts_info['type'] == 'kmax':    
+    elif scale_cuts_info['type'] == 'kmax':   
+        if likelihood!='binned':
+            raise ValueError('Varied lmax is applicable only for the binned approach!') 
         check_length(scale_cuts_info, obj.nbin)
         params_dic = scale_cuts_info['cosmo']
         lmax_wl = from_keff_to_lmax(obj.nbin, scale_cuts_info['max_WL'], zz_mod_wl, params_dic)
@@ -340,6 +342,7 @@ def validate_and_setup_lmax(obj, scale_cuts_info, likelihood, lmin, lmax, zz_mod
         obj.lmax_gc_vals = lmax_gc 
         print('lmax_wl: ', lmax_wl)
         print('lmax_gc: ', lmax_gc)
+        setup_lmax(obj)
     else:
         raise ValueError('Invalid scale-cut type') 
 

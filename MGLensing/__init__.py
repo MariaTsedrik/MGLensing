@@ -103,12 +103,14 @@ class DataClass():
             'GC': Survey.ells_gc,
             '3x2pt': Survey.ells_wl
             }
-            self.cov_obs = compute_matrix[Survey.observable](self.params_data_dic)
-            self.det_obs = np.linalg.det(self.cov_obs) 
             self.ells = assign_ell[Survey.observable]
             if Survey.observable == '3x2pt':
-                self.det_obs_high = np.linalg.det(self.cov_obs[1])
-                self.cov_obs = self.cov_obs[0]
+                self.cov_obs, self.cov_obs_high = compute_matrix[Survey.observable](self.params_data_dic)
+                self.det_obs = np.linalg.det(self.cov_obs) 
+                self.det_obs_high = np.linalg.det(self.cov_obs_high)
+            else:
+                self.cov_obs = compute_matrix[Survey.observable](self.params_data_dic)
+                self.det_obs = np.linalg.det(self.cov_obs)     
         else:
             compute_vector = {
             'WL': self.DataModel.compute_data_vector_wl,

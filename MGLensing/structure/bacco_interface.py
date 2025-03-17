@@ -134,7 +134,7 @@ class BaccoEmu:
     get_sigma8_cb(params):
         Computes the sigma8 for cold dark matter for given parameters.
     """
-    def __init__(self, option):
+    def __init__(self, option=None):
         print('initialising baccoemu')
         self.baccoemulator = baccoemu.Matter_powerspectrum()
         self.heftemulator = baccoemu.Lbias_expansion()
@@ -186,7 +186,7 @@ class BaccoEmu:
 
         if option=='linear':
             self.get_pk_nl =  self.get_pk_lin 
-        elif option=='z_extrap_linear':
+        elif option=='z_extrap_linear' or option==None:
             self.get_pk_nl = self.get_pk_nl_zextr_lin
         elif option=='z_extrap_hmcode':
             self.HMcodeEmu = HMcode2020()

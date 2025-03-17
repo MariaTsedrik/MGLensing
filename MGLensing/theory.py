@@ -80,8 +80,12 @@ def build_data_matrix_3x2pt(cl_ll, cl_gg, cl_lg, cl_gl,  binned_ell_wl, binned_e
     spline_gg = compute_spline(cl_gg, binned_ell_gc, nbin)
     spline_lg = compute_spline(cl_lg, binned_ell_xc, nbin)
     spline_gl = compute_spline(cl_gl, binned_ell_xc, nbin)
-    cov_theory = np.zeros((len(all_int_ell_wl), 2 * nbin, 2 * nbin), 'float64')
-    cov_theory_high = np.zeros(((len(all_int_ell_wl) - ell_jump), nbin, nbin), 'float64')    
+    cov_theory = np.zeros((len(all_int_ell_gc), 2 * nbin, 2 * nbin), 'float64')
+    cov_theory_high = np.zeros(((len(all_int_ell_wl) - ell_jump), nbin, nbin), 'float64')  
+    #print('len(all_int_ell_gc)', len(all_int_ell_gc))  
+    #print('len(all_int_ell_wl)', len(all_int_ell_wl))  
+    #print('ell_jump', ell_jump)  
+    #print('cov_theory_high', cov_theory_high.shape)
     for bin1 in range(nbin):
         for bin2 in range(nbin):
             cov_theory[:, bin1, bin2] = itp.splev(
@@ -94,6 +98,7 @@ def build_data_matrix_3x2pt(cl_ll, cl_gg, cl_lg, cl_gl,  binned_ell_wl, binned_e
                 all_int_ell_gc[:], spline_gg[bin1, bin2])
             cov_theory_high[:, bin1, bin2] = itp.splev(
                 all_int_ell_wl[ell_jump:], spline_ll[bin1, bin2])      
+    #print(cov_theory_high.shape)        
     return cov_theory, cov_theory_high
 
 
@@ -1339,8 +1344,8 @@ class Theory:
         for bin1 in range(self.Survey.nbin):
             for bin2 in range(bin1, self.Survey.nbin):
                 data_vector[idx_start*self.Survey.nell_wl:(idx_start+1)*self.Survey.nell_wl] = cl_ll[:, bin1, bin2]
-                data_vector[idx_start*self.Survey.nell_gx+start_lg:(idx_start+1)*self.Survey.nell_gx+start_lg] = cl_lg[:, bin1, bin2]
-                data_vector[idx_start*self.Survey.nell_gx+start_gl:(idx_start+1)*self.Survey.nell_gx+start_gl] = cl_gl[:, bin1, bin2]
+                data_vector[idx_start*self.Survey.nell_xc+start_lg:(idx_start+1)*self.Survey.nell_xc+start_lg] = cl_lg[:, bin1, bin2]
+                data_vector[idx_start*self.Survey.nell_xc+start_gl:(idx_start+1)*self.Survey.nell_xc+start_gl] = cl_gl[:, bin1, bin2]
                 data_vector[idx_start*self.Survey.nell_gc+start_gc:(idx_start+1)*self.Survey.nell_gc+start_gc] = cl_gg[:, bin1, bin2]
                 idx_start += 1
         # apply mask for different scale-cuts per photo-z bin        
