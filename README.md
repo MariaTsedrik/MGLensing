@@ -1,4 +1,4 @@
-# MGlensing
+# MGLensing
 
 Repository containing a likelihood (initially based on [this pipeline](https://github.com/Sefa76/photometric_fofR/tree/main)) for photometric probes with [emulated nonlinear power spectra](https://github.com/nebblu/ReACT-emus?tab=readme-ov-file) and various other emulators.
 
