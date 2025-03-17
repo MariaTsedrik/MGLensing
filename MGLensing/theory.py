@@ -82,10 +82,6 @@ def build_data_matrix_3x2pt(cl_ll, cl_gg, cl_lg, cl_gl,  binned_ell_wl, binned_e
     spline_gl = compute_spline(cl_gl, binned_ell_xc, nbin)
     cov_theory = np.zeros((len(all_int_ell_gc), 2 * nbin, 2 * nbin), 'float64')
     cov_theory_high = np.zeros(((len(all_int_ell_wl) - ell_jump), nbin, nbin), 'float64')  
-    #print('len(all_int_ell_gc)', len(all_int_ell_gc))  
-    #print('len(all_int_ell_wl)', len(all_int_ell_wl))  
-    #print('ell_jump', ell_jump)  
-    #print('cov_theory_high', cov_theory_high.shape)
     for bin1 in range(nbin):
         for bin2 in range(nbin):
             cov_theory[:, bin1, bin2] = itp.splev(

@@ -1,11 +1,11 @@
-observable: '3x2pt'
+observable: 'WL'
 #Observables 
 #     'WL' -> shear-shear
 #     'GC' -> photo-clustering
 #     '3x2pt' -> 3x2pt: shear-shear, photo-clustering, galaxy-galaxy lensing
 
 
-likelihood: 'determinants'
+likelihood: 'binned'
 #Likelihood
 #      'determinants' -> using determinants and summing over all integer ell-values
 #      'binned' -> using covariance and differences between data vectors
@@ -18,19 +18,19 @@ specs:
   #'kmax' -> vary kmax in each z-bin, which technically equals to the 'lmax'-option via lmax=kmax rcom(z_mod)/(1+z_mod)
   #           with z_mod corresponding to a peak of the shear and photo-GC kernels 
   scale_cuts:
-    type: 'const_lmax'
-    max_WL: [2000, 2000, 2000, 2000, 2000, 
-                   2000, 2000, 2000, 2000, 
-                         2000, 2000, 2000, 
-                               2000, 2000,
-                                     1000] #always a list, same length as nbin*(nbin+1)/2 or just 1 for const_lmax
-            #[5., 5., 5., 5., 5.]
-    max_GC: [600, 600, 600, 600, 600, 
-                  600, 600, 600, 600, 
-                       600, 600, 600, 
-                            900, 900,
-                                 900] #always a list, same length as nbin*(nbin+1)/2 or just 1 for const_lmax
-            #[0.7, 0.7, 0.7, 0.7, 0.7]
+    type: 'kmax'
+    max_WL: #[2000, 2000, 2000, 2000, 2000, 
+            #       2000, 2000, 2000, 2000, 
+            #             2000, 2000, 2000, 
+            #                   2000, 2000,
+            #                         1000] #always a list, same length as nbin*(nbin+1)/2 or just 1 for const_lmax
+            [5., 3., 3., 2., 2.]
+    max_GC: #[600, 600, 600, 600, 600, 
+            #      600, 600, 600, 600, 
+            #           600, 600, 600, 
+            #                900, 900,
+            #                     900] #always a list, same length as nbin*(nbin+1)/2 or just 1 for const_lmax
+            [0.7, 0.7, 0.7, 0.7, 0.7]
     cosmo: # for transformation from k_eff to ell
       'Omega_m': 0.31
       'w0': -1.

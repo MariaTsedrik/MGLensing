@@ -2,8 +2,8 @@
 #         ##############################################################
 #         # Cosmology Pipeline Configuration
 #         #------------------------------------------------------------
-#         # Observable: WL+XC+GC
-#         # Likelihood: using determinants and summing over all integer ell-values
+#         # Observable: shear-shear
+#         # Likelihood: using covariance and differences between data vectors in ell-bins
 #         # Sky Fraction (fsky): 0.43
 #         # Redshift Binning: 5 bins (0.01 ≤ z ≤ 3.0)
 #         # for n(z) LSST-like
@@ -11,8 +11,9 @@
 #         #   - l_min: 20
 #         #   - l_max: 5000.0
 #         #   - total l_bins: 50
-#         #   - cut in l_max (WL): 2000
-#         #   - cut in l_max (GC, XC): 600
+#         #   - cut in l_max (WL): [2854 2854 2854 2854 2854 2488 2488 2488 2488 2981 2981 2981 2226 2226
+#  2388]
+#         #   - cut in l_max (GC, XC): [473 473 473 473 473 619 619 619 619 714 714 714 779 779 818]
 #         #
 #             
 #             # Data Model:
@@ -121,5 +122,5 @@
 #         ##############################################################
 #              Omega_m          log10Mc_bc        log_w   log_l
 #         ##############################################################
-#         # loglikelihood = -4691877.774770176 evaluation took  0.22005081176757812 s (--> 0:00:00.220051 hh:mm:ss)
+#         # loglikelihood = -102.80088244419964 evaluation took  0.03609204292297363 s (--> 0:00:00.036092 hh:mm:ss)
 #         

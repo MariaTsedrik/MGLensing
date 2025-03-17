@@ -152,10 +152,12 @@ def from_keff_to_lmax(n, k_eff, z_mod, params_dic):
     lmax = []
     for bin1 in range(n):
         for bin2 in range(bin1, n):
-            print('bin2, bin1: ', bin2, bin1)
-            z = z_mod[bin2]
-            lmax.append( k_eff[bin2] * get_rcom(params_dic, z) / (1. + z))
+            z = z_mod[bin1]
+            lmax_i = k_eff[bin1] * get_rcom(params_dic, z) / (1. + z)
+            lmax.append( lmax_i )
+            print('bin1, bin2: ', bin1, bin2, 'k_eff[bin1]: ', k_eff[bin1], 'lmax: ', lmax_i)
     return lmax
+
 def max_ells_for_plots(n, flat_array):
     matrix_ell_cuts = np.zeros((n, n), dtype=int)
     iu1 = np.triu_indices(n)
@@ -342,6 +344,8 @@ def validate_and_setup_lmax(obj, scale_cuts_info, likelihood, lmin, lmax, zz_mod
         obj.lmax_gc_vals = lmax_gc 
         print('lmax_wl: ', lmax_wl)
         print('lmax_gc: ', lmax_gc)
+        if any(val > lmax for val in lmax_wl) or  any(val > lmax for val in lmax_gc):
+            raise ValueError(f'lmax cannot exceed {lmax}!!!')  
         setup_lmax(obj)
     else:
         raise ValueError('Invalid scale-cut type') 
