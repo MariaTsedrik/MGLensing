@@ -20,7 +20,7 @@ author = 'Maria Tsedrik, Ottavia Truttero'
 # Add any Sphinx extension module names here, as strings. They can be
 # extensions coming with Sphinx (named 'sphinx.ext.*') or your custom
 # ones.
-extensions = ['numpydoc', 'sphinx.ext.autosectionlabel']
+extensions = ['numpydoc', 'sphinx.ext.autosectionlabel', 'sphinx.ext.mathjax']
 numpydoc_show_class_members = False
 autoclass_content = 'init'
 

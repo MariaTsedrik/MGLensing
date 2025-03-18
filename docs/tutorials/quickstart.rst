@@ -8,11 +8,12 @@ Here we show one simple use of MGL explaining the basic usage of ``test_run.py``
 Let us start considering only weak gravitational lensing as dark matter tracer, using `BACCO-emulator <https://baccoemu.readthedocs.io/en/latest/>`_ .
 These settings need to be written in the file ``config.yaml`` as follows:
 
-.. code-block:: python
+.. code-block:: yaml
     observable: 'WL'
+
     data:
-    type: 0
-    data_file: 
+        type: 0
+        data_file: 
 
     nl_model: 1  # Bacco
     bias_model: 0  # constant linear bias
@@ -39,7 +40,7 @@ set the fiducial value as ``Omega_m: 0.31``,
 
 and the prior type and range as 
 
-.. code-block:: python
+.. code-block:: yaml
     Omega_m:
     type: 'U'  # uniform prior
     p0: 0.31   # value if parameter is fixed
@@ -54,13 +55,13 @@ The results, including the log-likelihood value and the time taken, are saved to
 
 In addition, one could also easily calculate and plot the :math:`C_\ell`. For this simple example it would look like:
 
-.. image:: ./figs/modelling/c_ell/example_cl_wl_plot.png
-   :width: 80 %
+.. image:: example_cl_wl_plot.png
+   :width: 80%
    :align: center
 
 
 The test code ``test_mcmc_run.py`` will instead build a mock catalogue and then run a full MCMC chain using 
-`nautilus sampler <https://nautilus-sampler.readthedocs.io/en/latest/index.html>` using 
+`nautilus sampler <https://nautilus-sampler.readthedocs.io/en/latest/index.html>`_ using 
 parameters and priors from the input files. The posterior distribution can be plotted with ``potting_scripts/plot_posterior.py``.
 The result is a corner plot as the following one: **Add plot**
 
