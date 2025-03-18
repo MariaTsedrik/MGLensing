@@ -44,10 +44,10 @@ and the prior type and range as
 .. code-block:: yaml
     
     Omega_m:
-    type: 'U'  # uniform prior
-    p0: 0.31   # value if parameter is fixed
-    p1: 0.2    # prior limit
-    p2: 0.4    # prior limit 
+        type: 'U'  # uniform prior
+        p0: 0.31   # value if parameter is fixed
+        p1: 0.2    # prior limit
+        p2: 0.4    # prior limit 
   
 
 We are now ready to run the two scripts. ``test_run.py`` will use the function ``test()`` which constructs a dictionary of test parameters, 
@@ -62,7 +62,7 @@ In addition, one could also easily calculate and plot the :math:`C_\ell`. For th
    :align: center
 
 
-The test code ``test_mcmc_run.py`` will instead build a mock catalogue and then run a full MCMC chain using 
+The test code ``test_mcmc_run.py`` will instead build a mock catalogue and then run a full MCMC chain analysis using 
 `nautilus sampler <https://nautilus-sampler.readthedocs.io/en/latest/index.html>`_ using 
 parameters and priors from the input files. The posterior distribution can be plotted with ``potting_scripts/plot_posterior.py``.
 The result is a corner plot as the following one: **Add plot**
