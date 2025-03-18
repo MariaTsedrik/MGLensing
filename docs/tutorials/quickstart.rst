@@ -34,7 +34,7 @@ Please refer to the complete file to see all options and sections not listed her
 with fixed intrinsic alignment parameters, no baryonic feedback and no photo-z error on the sources and lenses distribution
 
 The fiducial values to build the mock data have to be written in ``params_data.yaml`` while ``params_bacco_test.yaml`` contains the parameter prior ranges 
-and the shape of the prior. Here is an example fo rthe parameter :math:`\Omega_m`, 
+and the shape of the prior. Here is an example for the parameter :math:`\Omega_m`, 
 
 set the fiducial value as ``Omega_m: 0.31``, 
 
