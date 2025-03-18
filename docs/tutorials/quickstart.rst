@@ -9,6 +9,7 @@ Let us start considering only weak gravitational lensing as dark matter tracer, 
 These settings need to be written in the file ``config.yaml`` as follows:
 
 .. code-block:: yaml
+
     observable: 'WL'
 
     data:
@@ -41,6 +42,7 @@ set the fiducial value as ``Omega_m: 0.31``,
 and the prior type and range as 
 
 .. code-block:: yaml
+    
     Omega_m:
     type: 'U'  # uniform prior
     p0: 0.31   # value if parameter is fixed
