@@ -7,6 +7,7 @@ import sacc
 import yaml
 import warnings
 import os
+DEG2_IN_SPHERE = 4 * np.pi * (180 / np.pi)**2
 
 dirname = os.path.split(__file__)[0]
 print(dirname)
@@ -201,31 +202,10 @@ def setup_const_lmax(obj, likelihood):
         obj.ells_gc = np.array(range(obj.lmin, int(obj.lmax_gc_vals)+1)) # all integer ells
         obj.ell_jump =  int(obj.lmax_gc_vals) - obj.lmin + 1
     else:
-        idx_lmax_wl = (obj.ell_bin_edges<=obj.lmax_wl_vals)
-        idx_lmax_gc = (obj.ell_bin_edges<=obj.lmax_gc_vals)
-        # ell bineed cut at lmax
-        # we set ells for the cross-correlation to be equal to photo-gc
-        # can be changed later
-        obj.l_wl = obj.l_wl_bin_centers[idx_lmax_wl[1:]] 
-        obj.l_xc = obj.l_gc = obj.l_wl_bin_centers[idx_lmax_gc[1:]] 
-        obj.nell_wl = len(obj.l_wl)
-        obj.nell_xc = obj.nell_gc = len(obj.l_gc)
-        # this is not used, computed for completness
-        # all integer ells
-        obj.ells_wl = np.array(range(obj.lmin, int(obj.lmax_wl_vals)+1)) 
-        obj.ells_gc = np.array(range(obj.lmin, int(obj.lmax_gc_vals)+1)) 
-        obj.ell_jump =  int(obj.lmax_gc_vals) - obj.lmin + 1
-        # compute masks (basically does nothing as the model is already computed for l<lmax)
-        obj.mask_data_vector_wl = np.ones((obj.nell_wl*nbin_flat), dtype=bool)
-        obj.mask_cov_wl = np.ix_(obj.mask_data_vector_wl, obj.mask_data_vector_wl)
-        obj.mask_data_vector_gc = np.ones((obj.nell_gc*nbin_flat), dtype=bool)
-        obj.mask_cov_gc = np.ix_(obj.mask_data_vector_gc, obj.mask_data_vector_gc)
-        obj.mask_data_vector_3x2pt = np.ones(int((obj.nell_gc+2*obj.nell_xc+obj.nell_wl)*nbin_flat), dtype=bool)
-        obj.mask_cov_3x2pt = np.ix_(obj.mask_data_vector_3x2pt, obj.mask_data_vector_3x2pt)
-        # delta ells for covariance computation
-        obj.d_ell_bin_cut_wl = obj.d_ell_bin[idx_lmax_wl[1:]] 
-        obj.d_ell_bin_cut_xc = obj.d_ell_bin[idx_lmax_gc[1:]] 
-        obj.d_ell_bin_cut_gc = obj.d_ell_bin[idx_lmax_gc[1:]] 
+        obj.lmax_wl_vals = np.full(obj.nbin_flat, obj.lmax_wl_vals)
+        obj.lmax_gc_vals = np.full(obj.nbin_flat, obj.lmax_gc_vals)
+        setup_lmax(obj)
+
     obj.ells_wl_max = max_ells_for_plots(obj.nbin, np.full(nbin_flat, obj.lmax_wl_vals))
     obj.ells_gc_max = max_ells_for_plots(obj.nbin, np.full(nbin_flat, obj.lmax_gc_vals))    
 
@@ -257,8 +237,6 @@ def setup_lmax(obj):
     # for binned ansatz:
     # we compute model/data/covariance at all available ell-bins
     # and apply mask afterwards;
-    # alternatively, we can compute the model already at different lmax per probe
-    # the current implementation in the Theory class allows it
     obj.l_wl = obj.l_xc = obj.l_gc = obj.l_wl_bin_centers
     obj.nell_wl = obj.nell_xc = obj.nell_gc = len(obj.l_wl)
     # delta ells for covariance computation
@@ -269,9 +247,15 @@ def setup_lmax(obj):
     mask_ells_wl = mask_ells_wl[:, 1:]
     mask_ells_gc = np.array([(obj.ell_bin_edges<= lmax_gc_i) for lmax_gc_i in obj.lmax_gc_vals])
     mask_ells_gc = mask_ells_gc[:, 1:]
+    # later add an option to define xc cuts independently
+    lmax_xc_vals_2d = max_ells_for_plots(obj.nbin, obj.lmax_gc_vals)
+    obj.lmax_xc_vals = np.concatenate(lmax_xc_vals_2d)
+    mask_ells_xc = np.array([(obj.ell_bin_edges<= lmax_xc_i) for lmax_xc_i in obj.lmax_xc_vals])
+    mask_ells_xc = mask_ells_xc[:, 1:]
     obj.mask_data_vector_wl = np.concatenate((mask_ells_wl))
     obj.mask_data_vector_gc = np.concatenate((mask_ells_gc))
-    obj.mask_data_vector_3x2pt = np.concatenate((obj.mask_data_vector_wl, obj.mask_data_vector_gc, obj.mask_data_vector_gc, obj.mask_data_vector_gc))
+    obj.mask_data_vector_xc = np.concatenate((mask_ells_xc))
+    obj.mask_data_vector_3x2pt = np.concatenate((obj.mask_data_vector_wl, obj.mask_data_vector_xc, obj.mask_data_vector_gc))
     obj.mask_cov_wl = np.ix_(obj.mask_data_vector_wl, obj.mask_data_vector_wl)
     obj.mask_cov_gc = np.ix_(obj.mask_data_vector_gc, obj.mask_data_vector_gc)
     obj.mask_cov_3x2pt = np.ix_(obj.mask_data_vector_3x2pt, obj.mask_data_vector_3x2pt)
@@ -651,13 +635,13 @@ class EuclidSetUp:
         self.gal_per_sqarcmn = 30.0
         self.rms_shear = 0.30
         self.fsky = 0.375 #15k deg^2
-        self.lbin = 100
+        self.lbin = 20 #100
         self.lmin = 10
         self.lmax = 5000
         if survey_info == 'Euclid_5bins':
             self.nbin = 5 
             self.z_bin_edge = np.array([self.zmin, 0.560, 0.789, 1.019, 1.324, self.zmax])  
-            self.fsky = 0.375 #15k deg^2
+            self.fsky = 0.375 #15k deg^2 #sky coverage 14_700  in in deg^2, fskay=sky coverage/DEG2_IN_SPHERE
 
         elif survey_info == 'Euclid_Y1':
             self.nbin = 5 
@@ -671,7 +655,7 @@ class EuclidSetUp:
         elif survey_info == 'Euclid_10bins':    
             self.nbin = 10
             self.z_bin_edge = np.array([self.zmin, 0.418, 0.560, 0.678, 0.789, 0.900, 1.019, 1.155, 1.324, 1.576, 2.5])
-            self.fsky = 0.4
+            self.fsky = 14_700/DEG2_IN_SPHERE #0.4 
         self.z_bin_center = np.array([(self.z_bin_edge[i]+self.z_bin_edge[i+1])/2 for i in range(self.nbin)])
         self.z_bin_center_s = self.z_bin_center_l = self.z_bin_center
         # z values for integration (!= from z bins)

@@ -15,6 +15,7 @@ from datetime import timedelta
 import MGrowth as mg
 from scipy import interpolate as itp
 from scipy.linalg import cholesky, solve_triangular
+import matplotlib.pyplot as plt
 
 NL_MODEL_HMCODE = 0
 NL_MODEL_BACCO = 1
@@ -125,7 +126,27 @@ class DataClass():
             }
             self.data_vector = compute_vector[Survey.observable](self.params_data_dic)
             self.data_covariance = compute_covariance[Survey.observable](self.params_data_dic)
-            self.cholesky_transform = cholesky(self.data_covariance, lower=True)
+            plot_cov = False
+            if plot_cov:
+                cmap = 'seismic'
+                cov = self.data_covariance
+                ndata = cov.shape[0]
+                pp_norm = np.zeros((ndata,ndata))
+                for i in range(ndata):
+                    for j in range(ndata):
+                        pp_norm[i][j] = cov[i][j]/np.sqrt(cov[i][i]*cov[j][j])      
+                fig = plt.figure()
+                ax = fig.add_subplot(1, 1, 1)
+                im3 = ax.imshow(pp_norm, cmap=cmap, vmin=-1, vmax=1)
+                fig.colorbar(im3, orientation='vertical')
+                plt.show()
+            try:
+                self.cholesky_transform = cholesky(self.data_covariance, lower=True)
+                print('managed to cholesky')
+                print('######CHOLESKY!!!!########')
+            except:                
+                self.inv_data_covariance = np.linalg.inv(self.data_covariance)   
+                print('######INVERSE COVARIANCE!!!!########') 
 
             
          
@@ -386,7 +407,7 @@ class MGL():
             - err_cl_ll: Error bars for the lensing-lensing component.
             - err_cl_gg: Error bars for the galaxy-galaxy component.
             - err_cl_lg: Error bars for the lensing-galaxy component.
-            - err_cl_gl: Error bars for the galaxy-lensing component.
+
         
         Notes:
         -----
@@ -394,24 +415,26 @@ class MGL():
         by taking the square root of the diagonal elements of the covariance matrix. The error bars are
         then split into different components based on the survey configuration.
         """
-        mask_data_vector_3x2pt = np.ones(int((self.Survey.nell_gc+2*self.Survey.nell_xc+self.Survey.nell_wl)*self.Survey.nbin_flat), dtype=bool)
+        mask_data_vector_3x2pt = np.ones(int(2*self.Survey.lbin*self.Survey.nbin_flat+self.Survey.lbin*self.Survey.nbin**2), dtype=bool)
         self.Data.DataModel.Survey.mask_cov_3x2pt = np.ix_(mask_data_vector_3x2pt, mask_data_vector_3x2pt)
         cov3x2pt = self.Data.DataModel.compute_covariance_3x2pt(params)
         errorbars = np.sqrt(np.diag(cov3x2pt))
-        start_lg = self.Survey.nell_wl*self.Survey.nbin_flat
-        start_gl = (self.Survey.nell_wl+self.Survey.nell_xc)*self.Survey.nbin_flat
-        start_gc = (self.Survey.nell_wl+self.Survey.nell_xc+self.Survey.nell_xc)*self.Survey.nbin_flat
+        start_lg = self.Survey.lbin*self.Survey.nbin_flat 
+        start_gc = start_lg+self.Survey.lbin*self.Survey.nbin**2
         
         errorbars_ll = errorbars[:start_lg]
-        errorbars_lg = errorbars[start_lg:start_gl]
-        errorbars_gl = errorbars[start_gl:start_gc]
+        errorbars_lg = errorbars[start_lg:start_gc]
         errorbars_gg = errorbars[start_gc:]
         #return errorbars_ll, errorbars_gg, errorbars_lg, errorbars_gl
         err_cl_ll = _errorbars_for_plots(self.Survey.nell_wl, self.Survey.nbin, errorbars_ll)
         err_cl_gg = _errorbars_for_plots(self.Survey.nell_gc, self.Survey.nbin, errorbars_gg)
-        err_cl_lg = _errorbars_for_plots(self.Survey.nell_xc, self.Survey.nbin, errorbars_lg)
-        err_cl_gl = _errorbars_for_plots(self.Survey.nell_xc, self.Survey.nbin, errorbars_gl)
-        return  err_cl_ll, err_cl_gg, err_cl_lg, err_cl_gl    
+        err_cl_lg = np.zeros((self.Survey.nell_xc, self.Survey.nbin, self.Survey.nbin))
+        idx_start = 0
+        for bin1 in range(self.Survey.nbin):
+            for bin2 in range(self.Survey.nbin):
+                err_cl_lg[:, bin1, bin2] = errorbars_lg[idx_start*self.Survey.nell_xc:(idx_start+1)*self.Survey.nell_xc]
+                idx_start += 1
+        return  err_cl_ll, err_cl_gg, err_cl_lg    
 
     
     def get_sigma8_from_a_s_from_chain(self, params, nl_model):

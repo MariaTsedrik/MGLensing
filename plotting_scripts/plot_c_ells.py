@@ -19,6 +19,8 @@ BIAS_LIN = 0
 BIAS_B1B2 = 1
 BIAS_HEFT = 2
 
+print('Ensure that likelihood type is binned in config.yaml')
+
 MGL = MGLensing.MGL("config.yaml")
 zz = MGL.Survey.zz_integr
 nbin = MGL.Survey.nbin
@@ -140,7 +142,7 @@ for bin_i in range(nbin):
     params[f'bs2L_{bin_i+1}']=biasLs2_arr[bin_i]
     params[f'blaplL_{bin_i+1}']=biasLlapl_arr[bin_i]
 
-err_cl_ll, err_cl_gg, err_cl_lg  = MGL.get_errorbars(params)[:-1]
+err_cl_ll, err_cl_gg, err_cl_lg  = MGL.get_errorbars(params)
 
 models = {
     'hmcode': {'nl_model': NL_MODEL_HMCODE, 'bias_model': BIAS_LIN, 'ia_model': 0, 'baryon_model': NO_BARYONS, 'photoz_err_model': 0.},

@@ -1,4 +1,4 @@
-observable: 'WL'
+observable: '3x2pt'
 #Observables 
 #     'WL' -> shear-shear
 #     'GC' -> photo-clustering
@@ -18,19 +18,21 @@ specs:
   #'kmax' -> vary kmax in each z-bin, which technically equals to the 'lmax'-option via lmax=kmax rcom(z_mod)/(1+z_mod)
   #           with z_mod corresponding to a peak of the shear and photo-GC kernels 
   scale_cuts:
-    type: 'kmax'
-    max_WL: #[2000, 2000, 2000, 2000, 2000, 
+    type: 'const_lmax'
+    max_WL: [2000]
+            #[2000, 2000, 2000, 2000, 2000, 
             #       2000, 2000, 2000, 2000, 
             #             2000, 2000, 2000, 
             #                   2000, 2000,
-            #                         1000] #always a list, same length as nbin*(nbin+1)/2 or just 1 for const_lmax
-            [5., 3., 3., 2., 2.]
-    max_GC: #[600, 600, 600, 600, 600, 
+            #                         2000] #always a list, same length as nbin*(nbin+1)/2 or just 1 for const_lmax
+            #[5., 3., 3., 2., 2.]
+    max_GC: [1000]
+            #[600, 600, 600, 600, 600, 
             #      600, 600, 600, 600, 
             #           600, 600, 600, 
-            #                900, 900,
-            #                     900] #always a list, same length as nbin*(nbin+1)/2 or just 1 for const_lmax
-            [0.7, 0.7, 0.7, 0.7, 0.7]
+            #                600, 600,
+            #                     600] #always a list, same length as nbin*(nbin+1)/2 or just 1 for const_lmax
+            #[0.7, 0.7, 0.7, 0.7, 0.7]
     cosmo: # for transformation from k_eff to ell
       'Omega_m': 0.31
       'w0': -1.
@@ -53,7 +55,7 @@ data:
   #     1 -> read from a file
   data_file: 
 
-  nl_model: 1
+  nl_model: 0
   #bacco_option: 'linear'
   #Nonlinear power spectrum
   #     0 -> HMcode
@@ -62,7 +64,7 @@ data:
   #     3 -> gLEMURS
   #     4 -> μ-Σ 
   #     5 -> Dark Scattering (Interacting Dark Energy)
-  bias_model: 2
+  bias_model: 0
   # Photometric galaxy bias model (redshift dependence)
   #     0 -> constant linear bias within bins
   #     1 -> (b1, b2) constant within bins
@@ -85,7 +87,7 @@ data:
   params: ./params_data.yaml
 
 theory:
-  nl_model: 1
+  nl_model: 0
   #bacco_option: 'linear'
   #Nonlinear power spectrum
   #     0 -> HMcode
@@ -94,7 +96,7 @@ theory:
   #     3 -> gLEMURS
   #     4 -> μ-Σ 
   #     5 -> Dark Scattering (Interacting Dark Energy)
-  bias_model: 2
+  bias_model: 0
   # Photometric galaxy bias model (redshift dependence)
   #     0 -> linear interpolation
   #     1 -> constant within bins
@@ -109,15 +111,15 @@ theory:
   #     1 -> Tagn HMcode
   #     2 -> bcemu
   #     3 -> bacco
-  photoz_err_model: 2
+  photoz_err_model: 0
   # Photo-z error on n(z) model
   #     0 -> no photo-z error
   #     1 -> additive mode, n(z') = n(z + dz)
   #     2 -> multiplicative mode, n(z') = n(z(1 + dz))
-  params: ./params_bacco_test.yaml
+  params: ./params_model_hmcode.yaml #./params_bacco_test.yaml
 
 output: 
-  chain_name: params_debug_bacco
+  chain_name: 3x2pt_LSST_Y1_determinants_check
 sampler: 
   mcmc:
     verbose: True
@@ -125,6 +127,6 @@ sampler:
     n_live: 1000
     pool: 20
     resume: False
-    hdf5_name: 'params_debug_bacco'
+    hdf5_name: 3x2pt_LSST_Y1_determinants_check
 
     

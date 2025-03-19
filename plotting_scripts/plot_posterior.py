@@ -26,17 +26,17 @@ def read_last_header_line(file_path):
     else:
         return []
 
-file_paths = [    'chains/lsst/chain_lssty1_add_photoz_shear.txt',
-              'chains/lsst/chain_lssty1_mult_photoz_shear.txt'
+file_paths = [    'chains/chain_3x2pt_LSST_Y1_determinants_check.txt',
+    'chains/chain_3x2pt_LSST_Y1_binned_check.txt',
 
  ]  
 
-file_name = 'lssty1-photoz-errors'
+file_name = 'lhmcode_3x2pt_compare_likes'
 legend_labels = [
-"additive",
-"multiplicative"
+"dets",
+"binned"
 ]
-annotation_text = 'LSST Y1 hmcode\n shear lmax=2000\n $\\delta_z$ = [0.0292, 0.0334, 0.0382, 0.0452, 0.0634]'
+annotation_text = 'LSST Y1 hmcode\n shear lmax=2000\n galaxies lmax=1000'
 # annotation square
 num = 1
 

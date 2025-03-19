@@ -125,8 +125,11 @@ class MGLike:
             chi2 = 0.
             model_data_vector = self.compute_data_vector(param_dic_all) 
             difference_vector = self.Data.data_vector - model_data_vector
-            yt = solve_triangular(self.Data.cholesky_transform, difference_vector, lower=True)
-            chi2 = yt.dot(yt)
+            try:
+                yt = solve_triangular(self.Data.cholesky_transform, difference_vector, lower=True)
+                chi2 = yt.dot(yt)
+            except:
+                chi2 = np.einsum('i, ij, j->', difference_vector, self.Data.inv_data_covariance, difference_vector)    
             return -0.5*chi2    
         else:
             return -np.inf      
