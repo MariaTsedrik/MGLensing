@@ -3,8 +3,6 @@ Quickstart
 
 Here we show one simple use of MGL explaining the basic usage of ``test_run.py`` and ``test_mcmc_run.py``.
 
-(Add briedf explanation of what the code does/timeline of computed quantities)
-
 Let us start considering only weak gravitational lensing as dark matter tracer, using `BACCO-emulator <https://baccoemu.readthedocs.io/en/latest/>`_ .
 The choice of emulators and models need to be written in the file ``config.yaml`` as follows:
 

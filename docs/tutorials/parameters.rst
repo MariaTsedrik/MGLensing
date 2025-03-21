@@ -23,10 +23,10 @@ Bacco emulator
 |                   |  :math:`M_\nu`       | Mnu       | 0     | 0.4   |
 +-------------------+----------------------+-----------+-------+-------+
 
-:math:'k\in[10^{-2},5]\, h/'Mpc'. At higher scales (:math:'k<0.01>\, h/'Mpc') the non-linear power spectrum is extrapolated 
-from the linear power spectrum, while at smaller scales (:math:'k>5\,h/'Mpc) a power law extrapolation is used to get the non-linear power spectrum.
+:math:`k\in[10^{-2},5]\, h/`Mpc`. At higher scales (:math:`k<0.01>\, h/`Mpc`) the non-linear power spectrum is extrapolated 
+from the linear power spectrum, while at smaller scales (:math:`k>5\,h/`Mpc) a power law extrapolation is used to get the non-linear power spectrum.
 
-:math:'z\in[0,1.5]'. At higher redshift the non-linear power spectrum can extrapolated from the linear power spectrum or using ''HMCode''.
+:math:`z\in[0,1.5]`. At higher redshift the non-linear power spectrum can extrapolated from the linear power spectrum or using ``HMCode``.
 
 
 +----------------+--------------------------------------------------+---------------+
@@ -55,9 +55,9 @@ from the linear power spectrum, while at smaller scales (:math:'k>5\,h/'Mpc) a p
 +------+-----------------------+----------+
 |      |  :math:`b_{2,i}`      | b2L_1i   |
 +------+-----------------------+----------+
-|      |  :math:`b_{s^2,i}'    | bs2L_i   |
+|      |  :math:`b_{s^2,i}`    | bs2L_i   |
 +------+-----------------------+----------+
-|      |  :math:`b_{\nabla^2}' | blaplL_1 |
+|      |  :math:`b_{\nabla^2}`` | blaplL_1 |
 +------+-----------------------+----------+
 
 
@@ -87,8 +87,8 @@ HMCode
 |                   |  log:math:`_{10}T_{\rm AGN}` | log10Tagn | 7.6    | 8.3  |
 +-------------------+------------------------------+-----------+--------+------+
 
-:math:'k_{\rm lin}\in[3.7\, 10^{-4}, 50]\, h/'Mpc',
+:math:`k_{\rm lin}\in[3.7\, 10^{-4}, 50]\, h/`Mpc`,
 
-:math:'k_{\rm NL}\in[0.01, 50]\, h/'Mpc'.
+:math:`k_{\rm NL}\in[0.01, 50]\, h/`Mpc`.
 
 
