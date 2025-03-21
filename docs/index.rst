@@ -35,6 +35,7 @@ MGL = Modified Gravity Lensing is a Bayesian analysis code for photometric probe
     tutorials/quickstart
     tutorials/ccl_comparison
     tutorials/mg_models
+    tutorials/parameters
 
 
 .. toctree::
