@@ -7,6 +7,7 @@ Bacco emulator
 ~~~~~~~~~~~~~~
 
 **Non-linear power spectrum**
+
 +----------------------------------+---------------+
 | parameter                        | range         |
 +======================+===========+=======+=======+
@@ -34,6 +35,7 @@ from the linear power spectrum, while at smaller scales (:math:`k>5h/`Mpc) a pow
 
 
 **Baryonic boost**
+
 +--------------------------------------------------+---------------+
 | parameter                                        | range         |
 +===================================+==============+=======+=======+
@@ -54,6 +56,7 @@ from the linear power spectrum, while at smaller scales (:math:`k>5h/`Mpc) a pow
 
 
 **HEFT**
+
 +----------------------------------+
 | parameter                        |
 +=======================+==========+
@@ -72,6 +75,7 @@ HMCode
 ~~~~~~
 
 **Non-linear power spectrum**
+
 +------------------------------------------+---------------+
 | parameter                                | range         |
 +==============================+===========+========+======+
