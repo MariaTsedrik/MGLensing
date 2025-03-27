@@ -18,7 +18,6 @@ This code is not complete to perform a real data analysis (yet), but is a fairly
 - ReACT-based emulators: 
     - normal branch of [DGP gravity](https://arxiv.org/abs/hep-th/0005016) (nDGP); 
     - [growth index parametrisation](https://arxiv.org/abs/astro-ph/0507263) and [time-dependent growth index](https://arxiv.org/abs/2304.07281) with Screening;
-    - $\mu-\Sigma$ parametrisation with Screening;
     - Interacting Dark Energy also known as [Dark Scattering](https://arxiv.org/abs/1605.05623).
 - Galaxy bias:
     - Linear;

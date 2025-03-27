@@ -98,7 +98,8 @@ class HMcode2020():
     def __init__(self):
         print('initialising hmcode')
         # these numers are hand-picked
-        self.zz_pk = np.array([0., 0.01,  0.12, 0.24, 0.38, 0.52, 0.68, 0.86, 1.05, 1.27, 1.5, 1.76, 2.04, 2.36, 2.5, 3.0]) 
+        #self.zz_pk = np.array([0., 0.01,  0.12, 0.24, 0.38, 0.52, 0.68, 0.86, 1.05, 1.27, 1.5, 1.76, 2.04, 2.36, 2.5, 3.0]) 
+        self.zz_pk = np.linspace(0., 4.0, 150)
         self.aa_pk = np.array(1./(1.+self.zz_pk[::-1])) # should be increasing
         self.nz_pk = len(self.zz_pk)
         self.zz_max = self.zz_pk[-1]
@@ -142,7 +143,6 @@ class HMcode2020():
     def check_pars_ini(self, params):
         emu_ranges = emu_ranges_all.copy()
         if 'log10Tagn' not in params:
-            print('here')
             del emu_ranges['log10Tagn'] 
         eva_pars = emu_ranges.keys()     
         # parameters currently available

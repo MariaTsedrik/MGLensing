@@ -154,8 +154,8 @@ class BaccoEmu:
         self.kh_bb = np.logspace(log10(k_min_nl), log10(k_max_boost), num=256)
         self.kh_heft = np.logspace(log10(k_min_heft), log10(k_max_heft), num=128)
         kh_lin_ = np.logspace(log10(k_min_lin), log10(k_max_lin), num=512)
-        self.z_nl_bacco = np.linspace(z_min, z_max_nl, 32)
-        self.z_lin_bacco = np.linspace(z_min, z_max_lin, 32)
+        self.z_nl_bacco = np.linspace(z_min, z_max_nl, 64)
+        self.z_lin_bacco = np.linspace(z_min, z_max_lin, 64)
 
         self.kh_lin_left = kh_lin_[kh_lin_<k_min_nl]
         self.kh_lin_right = kh_lin_[kh_lin_>k_max_nl]
@@ -188,9 +188,13 @@ class BaccoEmu:
             self.get_pk_nl =  self.get_pk_lin 
         elif option=='z_extrap_linear' or option==None:
             self.get_pk_nl = self.get_pk_nl_zextr_lin
+            self.get_heft = self.get_heftget_heft_zextr_lin
         elif option=='z_extrap_hmcode':
             self.HMcodeEmu = HMcode2020()
             self.get_pk_nl = self.get_pk_nl_zextr_hmcode
+            self.get_heft = self.get_heftget_heft_zextr_hmcode
+            # TO-DO add an option for z_max>3 (for now complains for baryon boost):
+            # self.zz_max = self.HMcodeEmu.zz_max
         else:
             raise KeyError("Invalid bacco z>1.5 extrapolation.")
 
@@ -445,7 +449,7 @@ class BaccoEmu:
         return boost_bar
     
 
-    def get_heft(self, params_dic, k, lbin, zz_integr):
+    def get_heftget_heft_zextr_lin(self, params_dic, k, lbin, zz_integr):
         pk_nn_l  = np.zeros((15, lbin, len(zz_integr)), 'float64')
         pk_lin_l  = np.zeros((lbin, len(zz_integr)), 'float64')
         index_pknn = np.array(np.where((k > k_min_h_by_mpc) & (k<k_max_h_by_mpc))).transpose()
@@ -457,6 +461,23 @@ class BaccoEmu:
             if zz_integr[index_z]>1.5 or k[index_l,index_z]<self.kh_nl[0]:
                 pk_lin_l[index_l, index_z] = plin_l_interp(zz_integr[index_z], k[index_l,index_z])    
         return pk_nn_l, pk_lin_l
+    
+    def get_heftget_heft_zextr_hmcode(self, params_dic, k, lbin, zz_integr):
+        pk_nn_l  = np.zeros((15, lbin, len(zz_integr)), 'float64')
+        pk_nn_extr_l  = np.zeros((lbin, len(zz_integr)), 'float64')
+        params_dic['As'] = self.get_a_s(params_dic)
+        pl_l_interp_hmcode = self.HMcodeEmu.get_pk_interp(params_dic)
+        index_pknn = np.array(np.where((k > k_min_h_by_mpc) & (k<k_max_h_by_mpc))).transpose()
+        pnn_l_interp, plin_l_interp = self.get_heft_interp(params_dic)
+        for index_l, index_z in index_pknn:    
+            for index_i in np.arange(15): 
+                if zz_integr[index_z]<=1.5 and k[index_l,index_z]>=self.kh_nl[0]:
+                    pk_nn_l[index_i, index_l, index_z] = pnn_l_interp[index_i](zz_integr[index_z], k[index_l,index_z])   
+            if zz_integr[index_z]<=1.5 and k[index_l,index_z]<self.kh_nl[0]:
+                pk_nn_extr_l[index_l, index_z] = plin_l_interp(zz_integr[index_z], k[index_l,index_z])  
+            else:
+                pk_nn_extr_l[index_l, index_z] = pl_l_interp_hmcode(zz_integr[index_z], k[index_l,index_z])  
+        return pk_nn_l, pk_nn_extr_l
     
     def get_growth(self, params_dic, zz_integr):
         aa_integr =  np.array(1./(1.+zz_integr[::-1]))

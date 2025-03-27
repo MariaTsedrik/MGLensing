@@ -39,9 +39,12 @@ def plot_cl_mgl_vs_ccl(ell, lmax, cl_mgl, cl_mgl_lin, cl_ccl, cl_ccl_lin, err_cl
     for i in range(nbin):
         for j in range(nbin):
             if i >= j:
-                ax[i,j].loglog(ell, abs((cl_mgl[:,i,j]-cl_ccl[i, j, :])/err_cl[:, i, j]), linewidth=2)
-                ax[i,j].loglog(ell, abs((cl_mgl_lin[:,i,j]-cl_ccl_lin[i, j, :])/err_cl[:, i, j]), linewidth=2)
-                ax[i, j].set_ylim(1e-4, 5.)
+                #ax[i,j].loglog(ell, abs((cl_mgl[:,i,j]-cl_ccl[i, j, :])/err_cl[:, i, j]), linewidth=2)
+                #ax[i,j].loglog(ell, abs((cl_mgl_lin[:,i,j]-cl_ccl_lin[i, j, :])/err_cl[:, i, j]), linewidth=2)
+                #ax[i, j].set_ylim(1e-4, 5.)
+                ax[i,j].semilogx(ell, cl_mgl[:,i,j]/cl_ccl[i, j, :], linewidth=2)
+                ax[i,j].semilogx(ell, cl_mgl_lin[:,i,j]/cl_ccl_lin[i, j, :], linewidth=2)
+                ax[i, j].set_ylim(0.98, 1.02)
                 ax[i,j].text(.4, .7, 'bin %s, %s'%(str(i+1),(j+1)), fontsize="medium", horizontalalignment='center', transform=ax[i,j].transAxes)  if i<2 else ax[i,j].text(.4, .2, 'bin %s, %s'%(str(i+1),(j+1)), fontsize="medium", horizontalalignment='center', transform=ax[i,j].transAxes)
                 ax[i, j].axhline(y=1, linestyle='-.', linewidth=2, color='k')
                 #ax[i,j].semilogx(ell, (cl_mgl[:,i,j]-cl_ccl[i, j, :])/err_cl[:, i, j], linewidth=2)
@@ -242,7 +245,7 @@ for i in range(nbin):
 # plot
 # ---- #
 print('C_LL plotting...')
-#plot_cl_mgl_vs_ccl(l_wl, l_wl_max, cl_ll_mgl, cl_ll_mgl_lin, cl_ll_ccl_nl, cl_ll_ccl_lin, err_cl_ll, title='$C^{\\rm LL}_\ell$ Shear-Shear', show=True, filename='mgl_vs_cll_shear')
+plot_cl_mgl_vs_ccl(l_wl, l_wl_max, cl_ll_mgl, cl_ll_mgl_lin, cl_ll_ccl_nl, cl_ll_ccl_lin, err_cl_ll, title='$C^{\\rm LL}_\ell$ Shear-Shear', show=True, filename='mgl_vs_cll_shear')
 #plot_cl_mgl_vs_ccl(l_gc, l_gc_max, cl_gg_mgl, cl_gg_mgl_lin, cl_gg_ccl_nl, cl_gg_ccl_lin, err_cl_gg, title='$C^{\\rm GG}_\ell$ Galaxy-Galaxy', show=False, filename='mgl_vs_cll_galclust_abs')
-plot_cl_mgl_vs_ccl(l_xc, l_gc_max, cl_lg_mgl, cl_lg_mgl_lin, cl_lg_ccl_nl, cl_lg_ccl_lin, err_cl_lg, title='$C^{\\rm LG}_\ell$ Shear-Galaxy', show=False, filename='mgl_vs_cll_crosscorr_abs')
+#plot_cl_mgl_vs_ccl(l_xc, l_gc_max, cl_lg_mgl, cl_lg_mgl_lin, cl_lg_ccl_nl, cl_lg_ccl_lin, err_cl_lg, title='$C^{\\rm LG}_\ell$ Shear-Galaxy', show=False, filename='mgl_vs_cll_crosscorr_abs')
 

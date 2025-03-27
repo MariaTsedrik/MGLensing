@@ -93,8 +93,7 @@ def build_data_matrix_3x2pt(cl_ll, cl_gg, cl_lg, cl_gl,  binned_ell_wl, binned_e
             cov_theory[:, nbin + bin1, nbin + bin2] = itp.splev(
                 all_int_ell_gc[:], spline_gg[bin1, bin2])
             cov_theory_high[:, bin1, bin2] = itp.splev(
-                all_int_ell_wl[ell_jump:], spline_ll[bin1, bin2])      
-    #print(cov_theory_high.shape)        
+                all_int_ell_wl[ell_jump:], spline_ll[bin1, bin2])           
     return cov_theory, cov_theory_high
 
 
@@ -160,6 +159,11 @@ class Theory:
         except KeyError:
             raise ValueError("Invalid nl_model option.")
         check_zmax(self.Survey.zmax, self.StructureEmu)
+
+        #if 'add_noise' in model and not model['add_noise']:
+        #    self.Survey.noise['LL'] = 0.
+        #    self.Survey.noise['GG'] = 0.
+
 
         # assign baryonic prescription
         baryon_models = {
@@ -357,15 +361,15 @@ class Theory:
             params['Omega_c'] = params['Omch2']/params['h']/params['h']
         elif 'Omega_c' in params.keys():
             params['Omch2'] = params['Omega_c']*params['h']*params['h']
-        if 'Omega_nu' in params.keys():
+        if 'Mnu' in params.keys():
+            params['Omnuh2'] = params['Mnu'] * ((params['nnu'] / 3.0) ** 0.75 / 94.06410581217612 * (params['TCMB']/2.7255)**3)
+            params['Omega_nu'] = params['Omnuh2'] / params['h']/params['h']    
+        elif 'Omega_nu' in params.keys():
             params['Omnuh2'] = params['Omega_nu']*params['h']*params['h']   
             params['Mnu'] = params['Omnuh2'] / ((params['nnu'] / 3.0) ** 0.75 / 94.06410581217612 * (params['TCMB']/2.7255)**3)    
         elif 'Omnuh2' in params.keys():
             params['Omega_nu'] = params['Omnuh2'] / params['h']/params['h'] 
             params['Mnu'] = params['Omnuh2'] / ((params['nnu'] / 3.0) ** 0.75 / 94.06410581217612 * (params['TCMB']/2.7255)**3)
-        elif 'Mnu' in params.keys():
-            params['Omnuh2'] = params['Mnu'] * ((params['nnu'] / 3.0) ** 0.75 / 94.06410581217612 * (params['TCMB']/2.7255)**3)
-            params['Omega_nu'] = params['Omnuh2'] / params['h']/params['h']
         if 'Omega_m' not in params.keys():
             params['Omega_m'] = params['Omega_b'] + params['Omega_c'] + params['Omega_nu']    
         params['Omega_cb'] = params['Omega_m'] - params['Omega_nu']
@@ -374,7 +378,7 @@ class Theory:
         if 'As' in params.keys():
             params['log10As'] = log(1e10*params['As'])
         elif 'log10As' in params.keys():
-            params['As'] = exp(params['log10As'])*1e-10 
+            params['As'] = exp(params['log10As'])*1e-10  
         return params        
     
     def check_ranges(self, params):
@@ -1344,7 +1348,10 @@ class Theory:
         idx_start = 0
         for bin1 in range(self.Survey.nbin):
             for bin2 in range(self.Survey.nbin):
-                data_vector[idx_start*self.Survey.nell_xc+start_lg:(idx_start+1)*self.Survey.nell_xc+start_lg] = cl_lg[:, bin1, bin2]
+                # for compute_covariance_3x2pt:
+                # data_vector[idx_start*self.Survey.nell_xc+start_lg:(idx_start+1)*self.Survey.nell_xc+start_lg] = cl_lg[:, bin1, bin2] 
+                # for direct comparison with cosmosis:
+                data_vector[idx_start*self.Survey.nell_xc+start_lg:(idx_start+1)*self.Survey.nell_xc+start_lg] = cl_gl[:, bin1, bin2]
                 idx_start += 1
         # apply mask for different scale-cuts per photo-z bin        
         data_vector_masked = data_vector[self.Survey.mask_data_vector_3x2pt]
@@ -1384,8 +1391,6 @@ class Theory:
         counter_y = 0
         start_lg = self.Survey.lbin*self.Survey.nbin_flat 
         start_gc = start_lg+self.Survey.lbin*self.Survey.nbin**2
-        print(start_lg, start_gc)
-        print(cov_flat.shape)
         for bin1 in range(self.Survey.nbin):
             for bin2 in range(bin1, self.Survey.nbin):
                 for bin3 in range(self.Survey.nbin):
@@ -1469,6 +1474,137 @@ class Theory:
         cov_flat_masked = cov_flat[self.Survey.mask_cov_3x2pt]
         print('cov_flat_masked: ', cov_flat_masked.shape)  
         return cov_flat_masked 
+    
+    def get_cov_diag_ijkl(self, theory_spectra, name1, name2, bin_ij, bin_kl): 
+        c_ij_12 = theory_spectra[name1]
+        c_kl_34 = theory_spectra[name2]
+
+        type_1, type_2 = c_ij_12['types']
+        type_3, type_4 = c_kl_34['types']
+
+        i,j = bin_ij
+        k,l = bin_kl
+
+        bin_pairs = [ (i,k), (j,l), (i,l), (j,k) ]
+        type_pairs = [ (type_1,type_3), (type_2,type_4), (type_1,type_4), (type_2,type_3) ]
+        c_ells = []
+        for bin_pair,type_pair in zip(bin_pairs, type_pairs):
+            bin1, bin2 = bin_pair
+            t1, t2 = type_pair
+            types = (t1, t2)
+            if types not in self.types:
+                #If we don't have a spectra with these types, we probably 
+                #have an equivalent one with the types the other way round.
+                #In this case, we also need to swap bin1 and bin2, because
+                #we are accessing e.g. C^{ik}_{13} via C^{ki}_{31}.
+                types = (types[1], types[0])
+                bin1, bin2 = bin2, bin1
+            s = theory_spectra[ self.types.index( types ) ]
+            c_ells.append(s['cls'][:, bin1, bin2])
+
+        cl2_sum = c_ells[0]*c_ells[1] + c_ells[2]*c_ells[3]
+        # alternative for covariance computed at the center of bins:
+        # denom = ((2*self.Survey.ell+1)*self.Survey.fsky*self.Survey.d_ell_bin) 
+        denom = self.Survey.fsky * (2*self.Survey.ell+1)
+        return ( cl2_sum ) / denom
+
+        
+
+    
+    def compute_covariance_cosmosis_3x2pt(self, params_dic):
+        n_ell = self.Survey.lbin
+        ell_lims = self.Survey.ell_bin_edges
+        ell_all_int = np.arange(self.Survey.lmin, self.Survey.lmax+1).astype(int)
+        self.Survey.lbin = 100
+        ell_vals = np.logspace(log10(self.Survey.lmin), log10(self.Survey.lmax), num=self.Survey.lbin, endpoint=True) 
+        self.Survey.ell = self.Survey.l_wl = self.Survey.l_xc = self.Survey.l_gc = ell_vals
+        self.Survey.nell_wl = self.Survey.nell_xc = self.Survey.nell_gc = len(self.Survey.l_wl)
+
+        cl_ll_, cl_gg_, cl_lg_, _ = self.compute_3x2pt(params_dic)
+        cl_ll = build_data_matrix(cl_ll_, ell_vals, ell_all_int, self.Survey.nbin)
+        cl_gg = build_data_matrix(cl_gg_, ell_vals, ell_all_int, self.Survey.nbin)
+        cl_lg = build_data_matrix(cl_lg_, ell_vals, ell_all_int, self.Survey.nbin)
+        self.Survey.ell = self.Survey.l_wl = self.Survey.l_xc = self.Survey.l_gc = ell_all_int
+        self.Survey.lbin = len(ell_all_int)
+        self.Survey.nell_wl = self.Survey.nell_xc = self.Survey.nell_gc = len(self.Survey.l_wl)
+
+        cl_ll_dic = {'bin_pairs': [(i, j) for i in range(self.Survey.nbin) for j in range(i, self.Survey.nbin)], 
+                    'cls': cl_ll,
+                    'is_auto': True,
+                    'name': 'LL',
+                    'types': (0, 0)
+                    }
+        cl_gg_dic = {'bin_pairs': [(i, j) for i in range(self.Survey.nbin) for j in range(i, self.Survey.nbin)], 
+                    'cls': cl_gg,
+                    'is_auto': True,
+                    'name': 'GG',
+                    'types': (1, 1)
+                    }
+        cl_lg_dic = {'bin_pairs': [(j, i) for i in range(self.Survey.nbin) for j in range(self.Survey.nbin)], #changed from (i, j) to recreate cosmosis
+                    'cls': cl_lg,
+                    'is_auto': False,
+                    'name': 'LG',
+                    'types': (0, 1)
+                    }
+        theory_spectra = [cl_ll_dic, cl_lg_dic, cl_gg_dic]
+        self.types = [cl_ll_dic['types'], cl_lg_dic['types'], cl_gg_dic['types']]
+        # Get the starting index in the full datavector for each spectrum
+        # this will be used later for adding covariance blocks to the full matrix.
+        cl_lengths = [n_ell*self.Survey.nbin_flat, n_ell*self.Survey.nbin**2, n_ell*self.Survey.nbin_flat]
+        cl_starts = []
+        for i in range(3):
+            cl_starts.append( int(sum(cl_lengths[:i])) )
+        covmat = np.zeros((2*n_ell*self.Survey.nbin_flat+n_ell*self.Survey.nbin**2, 2*n_ell*self.Survey.nbin_flat+n_ell*self.Survey.nbin**2), 'float64')
+        # Now loop through pairs of Cls and pairs of bin pairs filling the covariance matrix
+        for i_cl in range(3):
+            cl_spec_i = theory_spectra[i_cl]
+            for j_cl in range(i_cl, 3):
+                cl_spec_j = theory_spectra[j_cl]
+                cov_blocks = {} #collect cov_blocks in this dictionary
+                for i_bp, bin_pair_i in enumerate(cl_spec_i['bin_pairs']):
+                     for j_bp, bin_pair_j in enumerate(cl_spec_j['bin_pairs']):
+                        print(f"Computing covariance {i_cl},{j_cl} pairs <{bin_pair_i} {bin_pair_j}>")
+                        # First check if we've already calculated this
+                        if (i_cl == j_cl) and cl_spec_i['is_auto'] and ( j_bp < i_bp ):
+                            cl_var_binned = cov_blocks[j_bp, i_bp]
+                        else:    
+                            #First calculate the unbinned Cl covariance
+                            cl_var_unbinned = self.get_cov_diag_ijkl( theory_spectra, i_cl, 
+                                    j_cl, bin_pair_i, bin_pair_j)
+                            #Now bin this diaginal covariance
+                            #Var(binned_cl) = \sum_l Var(w_l^2 C(l)) / (\sum_l w_l)^2
+                            #where w_l = 2*l+1
+                            cl_var_binned = np.zeros(n_ell)
+                            for ell_bin, (ell_low, ell_high) in enumerate(zip(ell_lims[:-1], ell_lims[1:])):
+                                #Get the ell values for this bin:
+                                ell_vals_bin = np.arange(ell_low, ell_high).astype(int)
+                                #Get the indices in cl_var_binned these correspond to:
+                                ell_vals_bin_inds = ell_vals_bin - int(ell_lims[0])
+                                cl_var_unbinned_bin = cl_var_unbinned[ell_vals_bin_inds]
+                                cl_var_binned[ell_bin] = np.sum((2*ell_vals_bin+1)**2 * 
+                                    cl_var_unbinned_bin) / np.sum(2*ell_vals_bin+1)**2
+                            # alternative for covariance computed at the center of bins:    
+                            # cl_var_binned = self.get_cov_diag_ijkl(theory_spectra, i_cl, 
+                            #        j_cl, bin_pair_i, bin_pair_j)    
+                            cov_blocks[i_bp, j_bp] = cl_var_binned
+
+                        # Now work out where this goes in the full covariance matrix
+                        # and add it there.
+                        inds_i = np.arange( cl_starts[i_cl] + n_ell*i_bp, 
+                            cl_starts[i_cl] + n_ell*(i_bp+1) )
+                        inds_j = np.arange( cl_starts[j_cl] + n_ell*j_bp, 
+                            cl_starts[j_cl] + n_ell*(j_bp+1) )
+                        cov_inds = np.ix_( inds_i, inds_j )
+                        covmat[ cov_inds ] = np.diag(cl_var_binned)
+                        cov_inds_T = np.ix_( inds_j, inds_i )
+                        covmat[ cov_inds_T ] = np.diag(cl_var_binned)        
+        print('cov_flat: ', covmat.shape)                                      
+        covmat_masked = covmat[self.Survey.mask_cov_3x2pt]
+        print('cov_flat_masked: ', covmat_masked.shape)  
+        self.Survey.ell = self.Survey.l_wl = self.Survey.l_xc = self.Survey.l_gc = self.Survey.l_wl_bin_centers
+        self.Survey.lbin = n_ell
+        self.Survey.nell_wl = self.Survey.nell_xc = self.Survey.nell_gc = n_ell
+        return covmat_masked
     
     
     def compute_data_matrix_wl(self, params_dic):

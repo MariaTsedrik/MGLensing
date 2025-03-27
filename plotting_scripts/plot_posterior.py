@@ -26,17 +26,18 @@ def read_last_header_line(file_path):
     else:
         return []
 
-file_paths = [    'chains/chain_3x2pt_LSST_Y1_determinants_check.txt',
-    'chains/chain_3x2pt_LSST_Y1_binned_check.txt',
-
+file_paths = [    'chains/lsst/chain_lsst_y1_3x2pt_bacco_heft_same_data_model.txt',
+              'chains/lsst/chain_lsst_y1_3x2pt_bacco_heft_data_b1_model_lincut.txt',
+              'chains/lsst/chain_lsst_y1_3x2pt_bacco_heft_data_b1_model_kmax0p3.txt',
  ]  
 
-file_name = 'lhmcode_3x2pt_compare_likes'
+file_name = 'bacco_3x2pt_compare_bias_models'
 legend_labels = [
-"dets",
-"binned"
+'model: heft, GG/GL cuts: kmax=0.7 h/Mpc',
+'model: b1, GG/GL cuts: kmax=0.1 h/Mpc',
+'model: b1, GG/GL cuts: kmax=0.3 h/Mpc'
 ]
-annotation_text = 'LSST Y1 hmcode\n shear lmax=2000\n galaxies lmax=1000'
+annotation_text = 'LSST Y1 data: bacco+heft\n 3x2pt-analysis\n LL-cuts lmax=2800-3000'
 # annotation square
 num = 1
 
@@ -68,7 +69,7 @@ for i in range(n_samples):
 ModelPars = chains_info[0]['pars']
 # add parameters that are not present in the first chain:
 #ModelPars.append('beta_IA')
-
+ModelPars = ModelPars[:7]
 
 
 colors = ['tab:orange', 'tab:blue', 'tab:green', 'tab:red', 'tab:purple', 'tab:olive', 'tab:cyan']

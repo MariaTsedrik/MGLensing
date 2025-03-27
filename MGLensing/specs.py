@@ -12,7 +12,7 @@ DEG2_IN_SPHERE = 4 * np.pi * (180 / np.pi)**2
 dirname = os.path.split(__file__)[0]
 print(dirname)
 H0_h_c = 1./2997.92458 #=100/c in Mpc/h
-z_bins_for_integration = 200
+z_bins_for_integration = 400 
 
 def get_luminosity_func(file_name):
     """
@@ -38,7 +38,7 @@ def get_luminosity_func(file_name):
         lum[index] = line.split()[1]
     return interp1d(zlum, lum,kind='linear')
 
-def reduce_len_by_averaging(arr, target_len=z_bins_for_integration):
+def reduce_len_by_averaging(arr_, target_len=z_bins_for_integration):
     """
     Reduces the length of an array by averaging its elements to match the target length.
 
@@ -55,9 +55,10 @@ def reduce_len_by_averaging(arr, target_len=z_bins_for_integration):
         The reduced array with the specified target length.
     """
     # Number of elements to average together
-    step = len(arr) // target_len  
+    arr = arr_[1:-1]
+    step = len(arr) // (target_len-2)  
     reduced_arr = np.array([np.mean(arr[i:i+step]) for i in range(0, len(arr), step)])
-    return reduced_arr[:target_len]
+    return np.concatenate(([arr_[0]], reduced_arr, [arr_[-1]]))
 
 def get_noise(nbins, gal_per_sqarcmn):
     """
@@ -449,7 +450,7 @@ class LSSTSetUp:
 
         # redshift setup 
         self.zmin = 0.01 
-        self.zmax = 3.0 #actually 4.0,  but changed because of bacco-emu 
+        self.zmax = 3.0 #actually 4.0,  but changed because of linear bacco-emu 
         if survey_info == 'LSST_Y1':
             self.fsky = 0.43 #0.5
             self.gal_per_sqarcmn = 20.0
@@ -480,7 +481,7 @@ class LSSTSetUp:
         # \ell bins setup
         lmin = 20
         self.lmin = lmin
-        self.lbin = 50 #100 
+        self.lbin = 20 #50 #100 
         lmax = 5e3
         self.lmax = lmax
         if likelihood == 'determinants':
@@ -660,7 +661,7 @@ class EuclidSetUp:
         self.z_bin_center_s = self.z_bin_center_l = self.z_bin_center
         # z values for integration (!= from z bins)
         self.zbin_integr = z_bins_for_integration 
-        self.zz_integr = np.linspace(self.zmin, self.zmax, num=self.zbin_integr)
+        self.zz_integr = np.linspace(self.zmin, self.zmax, num=self.zbin_integr, endpoint=True)
         self.aa_integr = np.array(1./(1.+self.zz_integr[::-1])) 
         # normalized galaxy distribution and noise
         self.eta_z_s, self.eta_z_l = self.get_norm_galaxy_distrib()

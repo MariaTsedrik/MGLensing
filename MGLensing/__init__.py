@@ -2,7 +2,7 @@
 
 
 __author__ = ["M. Tsedrik", "O. Truttero"]
-__version__ = "0.0"
+__version__ = "0.1.0"
 __description__ = "MGL = Modified Gravity Lensing: Forecasting Pipeline"
 
 import numpy as np
@@ -122,10 +122,12 @@ class DataClass():
             compute_covariance = {
             'WL': self.DataModel.compute_covariance_wl,
             'GC': self.DataModel.compute_covariance_gc,
-            '3x2pt': self.DataModel.compute_covariance_3x2pt
+            '3x2pt':  self.DataModel.compute_covariance_cosmosis_3x2pt 
             }
             self.data_vector = compute_vector[Survey.observable](self.params_data_dic)
             self.data_covariance = compute_covariance[Survey.observable](self.params_data_dic)
+
+            # hard-coded for now, best to move to plotting_scripts
             plot_cov = False
             if plot_cov:
                 cmap = 'seismic'
@@ -134,7 +136,7 @@ class DataClass():
                 pp_norm = np.zeros((ndata,ndata))
                 for i in range(ndata):
                     for j in range(ndata):
-                        pp_norm[i][j] = cov[i][j]/np.sqrt(cov[i][i]*cov[j][j])      
+                        pp_norm[i][j] = cov[i][j]/np.sqrt(cov[i][i]*cov[j][j])   
                 fig = plt.figure()
                 ax = fig.add_subplot(1, 1, 1)
                 im3 = ax.imshow(pp_norm, cmap=cmap, vmin=-1, vmax=1)
@@ -142,10 +144,11 @@ class DataClass():
                 plt.show()
             try:
                 self.cholesky_transform = cholesky(self.data_covariance, lower=True)
-                print('managed to cholesky')
+                print('managed to do cholesky decomposition')
                 print('######CHOLESKY!!!!########')
             except:                
                 self.inv_data_covariance = np.linalg.inv(self.data_covariance)   
+                print('failed to do cholesky decomposition')
                 print('######INVERSE COVARIANCE!!!!########') 
 
             
@@ -282,6 +285,9 @@ class MGL():
     # functions bellow are not designed to be fast, but user-friendly instead
     # so that one can plot and play with different avaliable settings
     # without re-writing config-files
+    def get_loglike(self, params):
+        return self.Like.compute(params)    
+
     def get_power_spectra(self, params, theo_model):
         """
         Calculate the power spectra for a given set of parameters and theoretical model.
@@ -465,7 +471,7 @@ class MGL():
         # intialise a theory class with the target model
         NewModel = Theory(self.Survey, model) 
         _ = FidModel.StructureEmu.check_pars_ini(params)
-        # if lcmd or w0wacdm, then use hmcode's sigm8-emulator 
+        # if lcmd or w0wacdm, then use hmcode's sigma8-emulator 
         if nl_model==NL_MODEL_HMCODE or nl_model==NL_MODEL_BACCO:
             sigma8 = FidModel.StructureEmu.get_sigma8(params)
         # for extended cosmologies do the re-scaling using linear growth factors   
