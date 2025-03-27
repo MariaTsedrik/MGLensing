@@ -8,8 +8,8 @@ __pycache__/
 *$py.class
 
 # Chains
-#chains/euclid/
-#chains/lsst/
+chains/euclid/
+chains/lsst/
 
 # Distribution / packaging
 .Python
