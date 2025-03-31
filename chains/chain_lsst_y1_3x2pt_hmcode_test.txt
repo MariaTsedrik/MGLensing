@@ -17,7 +17,7 @@
 #             
 #             # Data Model:
 #             #   - Nonlinear Power Spectrum: HMcode (0)
-#             #   - Galaxy Bias Model: b1 constant within bins (0)
+#             #   - Galaxy Bias Model: HEFT (2)
 #             #   - Intrinsic Alignments: zNLA (0)
 #             #   - Baryon Model: no baryons (0)
 #             #   - Parameters: 
@@ -33,11 +33,26 @@
 #             #       - a1_IA: 0.16
 #             #       - eta1_IA: 1.66
 #             #       - beta_IA: 0.0
-#             #       - b1_1: 1.239
-#             #       - b1_2: 1.378
-#             #       - b1_3: 1.525
-#             #       - b1_4: 1.677
-#             #       - b1_5: 1.832
+#             #       - b1L_1: 0.239
+#             #       - b1L_2: 0.378
+#             #       - b1L_3: 0.525
+#             #       - b1L_4: 0.677
+#             #       - b1L_5: 0.832
+#             #       - b2L_1: 0.46036128
+#             #       - b2L_2: 0.4845956
+#             #       - b2L_3: 0.5480625
+#             #       - b2L_4: 0.65459134
+#             #       - b2L_5: 0.80604922
+#             #       - bs2L_1: 0.0
+#             #       - bs2L_2: 0.0
+#             #       - bs2L_3: 0.0
+#             #       - bs2L_4: 0.0
+#             #       - bs2L_5: 0.0
+#             #       - blaplL_1: 0.0
+#             #       - blaplL_2: 0.0
+#             #       - blaplL_3: 0.0
+#             #       - blaplL_4: 0.0
+#             #       - blaplL_5: 0.0
 #             #       - TCMB: 2.7255
 #             #       - nnu: 3.044
 #             #       - Ombh2: 0.02312
@@ -47,6 +62,7 @@
 #             #       - Omega_c: 0.2586053923645651
 #             #       - fb: 0.16129032258064518
 #             #       - As: 2.0989031673191437e-09
+#             #       - sigma8_cb: 0.8130180390256074
 #         #
 #         # Theory Model:
 #         #   - Nonlinear Power Spectrum: HMcode (0)
@@ -75,5 +91,5 @@
 #         ##############################################################
 #              Omega_m          Omega_b          h          log10As          ns          Mnu          a1_IA          eta1_IA          b1_1          b1_2          b1_3          b1_4          b1_5        log_w   log_l
 #         ##############################################################
-#         # loglikelihood = -8438847.32153847 evaluation took  0.04474806785583496 s (--> 0:00:00.044748 hh:mm:ss)
+#         # loglikelihood = -8438874.592033088 evaluation took  0.0449373722076416 s (--> 0:00:00.044937 hh:mm:ss)
 #         

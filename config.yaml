@@ -75,7 +75,7 @@ data:
   #     3 -> gLEMURS
   #     4 -> μ-Σ (Σ is not properly implemented in Cls yet)
   #     5 -> Dark Scattering (Interacting Dark Energy)
-  bias_model: 0
+  bias_model: 2
   # Photometric galaxy bias model (redshift dependence)
   #     0 -> constant linear bias within bins
   #     1 -> (b1, b2) constant within bins

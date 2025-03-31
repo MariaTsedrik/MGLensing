@@ -913,11 +913,13 @@ class Theory:
         if self.StructureEmu.emu_name!='BACCO':
             # re-scale for modified gravity
             # heft pk dimensions are (15, ell, z_integr)
-            dz, _ = self.StructureEmu(params_dic, self.Survey.zz_integr)
+            dz, _ = self.StructureEmu.get_growth(params_dic, self.Survey.zz_integr)
             params_dic['sigma8_cb'] = self.BaccoEmuClass.get_sigma8_cb(params_dic)
             dz_norm, _ = self.BaccoEmuClass.get_growth(params_dic, self.Survey.zz_integr)
             dz_rescale = dz/dz_norm
-            pk_exp, pk_exp_extr = self.BaccoEmuClass.get_heft(params_dic, self.k, self.Survey.lbin, self.Survey.zz_integr)*dz_rescale[np.newaxis, np.newaxis, :]*dz_rescale[np.newaxis, np.newaxis, :]
+            pk_exp, pk_exp_extr = self.BaccoEmuClass.get_heft(params_dic, self.k, self.Survey.lbin, self.Survey.zz_integr)
+            pk_exp = pk_exp*dz_rescale[np.newaxis, np.newaxis, :]*dz_rescale[np.newaxis, np.newaxis, :]
+            pk_exp_extr = pk_exp_extr*dz_rescale[np.newaxis, :]*dz_rescale[np.newaxis, :]
         else:    
             pk_exp, pk_exp_extr = self.BaccoEmuClass.get_heft(params_dic, self.k, self.Survey.lbin, self.Survey.zz_integr)  
         return pk_exp, pk_exp_extr

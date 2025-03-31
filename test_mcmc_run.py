@@ -1,13 +1,15 @@
+import os
+os.environ["OMP_NUM_THREADS"] = "1"
+#os.environ["OMP_PLACES"] = "threads"
+from nautilus import Prior, Sampler
 import numpy as np
 import MGLensing
 import time
 import matplotlib.pyplot as plt
-import os
-from nautilus import Prior, Sampler
 from scipy.stats import norm
 import multiprocessing
 from datetime import timedelta
-os.environ["OMP_NUM_THREADS"] = "1"
+
 
 
 MGLtest = MGLensing.MGL("config.yaml")
