@@ -10,7 +10,7 @@ __pycache__/
 # Chains
 chains/euclid/
 chains/lsst/
-chains/hdf5/
+
 
 # Distribution / packaging
 .Python
