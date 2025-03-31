@@ -26,16 +26,20 @@ def read_last_header_line(file_path):
     else:
         return []
 
-file_paths = [    'chains/lsst/chain_lsst_y1_3x2pt_bacco_heft_same_data_model.txt',
-              'chains/lsst/chain_lsst_y1_3x2pt_bacco_heft_data_b1_model_lincut.txt',
-              'chains/lsst/chain_lsst_y1_3x2pt_bacco_heft_data_b1_model_kmax0p3.txt',
+file_paths = [ 'chains/chain_lsst_y1_3x2pt_bacco_heft_data_b1_hmcode_model_kmax0p1.txt'   
+     #'chains/lsst/chain_lsst_y1_3x2pt_bacco_heft_same_data_model.txt',
+              #'chains/lsst/chain_lsst_y1_3x2pt_bacco_heft_data_b1_model_lincut.txt',
+              #'chains/lsst/chain_lsst_y1_3x2pt_bacco_heft_data_b1_model_kmax0p3.txt',
+              #'chains/chain_lsst_y1_3x2pt_bacco_heft_data_b1_model_kmax0p1.txt'
  ]  
 
-file_name = 'bacco_3x2pt_compare_bias_models'
+file_name = 'hmcode_check'
 legend_labels = [
-'model: heft, GG/GL cuts: kmax=0.7 h/Mpc',
-'model: b1, GG/GL cuts: kmax=0.1 h/Mpc',
-'model: b1, GG/GL cuts: kmax=0.3 h/Mpc'
+    #'before',
+    #'after'
+#'model: heft, GG/GL cuts: kmax=0.7 h/Mpc',
+'model: b1+hmcode, GG/GL cuts: kmax=0.1 h/Mpc',
+#'model: b1, GG/GL cuts: kmax=0.3 h/Mpc'
 ]
 annotation_text = 'LSST Y1 data: bacco+heft\n 3x2pt-analysis\n LL-cuts lmax=2800-3000'
 # annotation square
@@ -69,7 +73,7 @@ for i in range(n_samples):
 ModelPars = chains_info[0]['pars']
 # add parameters that are not present in the first chain:
 #ModelPars.append('beta_IA')
-ModelPars = ModelPars[:7]
+ModelPars = ModelPars[:8]
 
 
 colors = ['tab:orange', 'tab:blue', 'tab:green', 'tab:red', 'tab:purple', 'tab:olive', 'tab:cyan']

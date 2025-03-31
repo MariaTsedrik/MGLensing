@@ -1,0 +1,79 @@
+# 
+#         ##############################################################
+#         # Cosmology Pipeline Configuration
+#         #------------------------------------------------------------
+#         # Observable: WL+XC+GC
+#         # Likelihood: using determinants and summing over all integer ell-values
+#         # Sky Fraction (fsky): 0.43
+#         # Redshift Binning: 5 bins (0.01 ≤ z ≤ 3.0)
+#         # for n(z) LSST-like
+#         # Lensing & Clustering Scales:
+#         #   - l_min: 20
+#         #   - l_max: 5000.0
+#         #   - total l_bins: 20
+#         #   - cut in l_max (WL): 2800
+#         #   - cut in l_max (GC, XC): 68
+#         #
+#             
+#             # Data Model:
+#             #   - Nonlinear Power Spectrum: HMcode (0)
+#             #   - Galaxy Bias Model: b1 constant within bins (0)
+#             #   - Intrinsic Alignments: zNLA (0)
+#             #   - Baryon Model: no baryons (0)
+#             #   - Parameters: 
+#             
+#             #       - Omega_m: 0.31
+#             #       - Omega_b: 0.05
+#             #       - h: 0.68
+#             #       - log10As: 3.044
+#             #       - ns: 0.97
+#             #       - Mnu: 0.06
+#             #       - w0: -1.0
+#             #       - wa: 0.0
+#             #       - a1_IA: 0.16
+#             #       - eta1_IA: 1.66
+#             #       - beta_IA: 0.0
+#             #       - b1_1: 1.239
+#             #       - b1_2: 1.378
+#             #       - b1_3: 1.525
+#             #       - b1_4: 1.677
+#             #       - b1_5: 1.832
+#             #       - TCMB: 2.7255
+#             #       - nnu: 3.044
+#             #       - Ombh2: 0.02312
+#             #       - Omnuh2: 0.000644866570625114
+#             #       - Omega_nu: 0.0013946076354349349
+#             #       - Omega_cb: 0.3086053923645651
+#             #       - Omega_c: 0.2586053923645651
+#             #       - fb: 0.16129032258064518
+#             #       - As: 2.0989031673191437e-09
+#         #
+#         # Theory Model:
+#         #   - Nonlinear Power Spectrum: HMcode (0)
+#         #   - Galaxy Bias Model: b1 constant within bins (0)
+#         #   - Intrinsic Alignments: zNLA (0)
+#         #   - Baryon Model: no baryons (0)
+#         #   - Photo-z Error Model: no photo-z error (0)
+#         #   - Parameter priors:
+#         
+#            #       - Omega_m: [0.25,0.4]
+#            #       - Omega_b: [0.01,0.1]
+#            #       - h: [0.4,1.0]
+#            #       - log10As: [1.7,4.0]
+#            #       - ns: [0.6,1.2]
+#            #       - Mnu: [0.0,0.5]
+#            #       - w0: -1.0
+#            #       - wa: 0.0
+#            #       - a1_IA: [-5.0,5.0]
+#            #       - eta1_IA: [-5.0,5.0]
+#            #       - beta_IA: 0.0
+#            #       - b1_1: [0.0,3.0]
+#            #       - b1_2: [0.0,3.0]
+#            #       - b1_3: [0.0,3.0]
+#            #       - b1_4: [0.0,3.0]
+#            #       - b1_5: [0.0,3.0]
+#         ##############################################################
+#              Omega_m          Omega_b          h          log10As          ns          Mnu          a1_IA          eta1_IA          b1_1          b1_2          b1_3          b1_4          b1_5        log_w   log_l
+#         ##############################################################
+#         # loglikelihood = -8438847.32153847 evaluation took  0.04474806785583496 s (--> 0:00:00.044748 hh:mm:ss)
+#         

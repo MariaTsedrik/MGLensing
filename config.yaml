@@ -5,7 +5,7 @@ observable: '3x2pt'
 #     '3x2pt' -> 3x2pt: shear-shear, photo-clustering, galaxy-galaxy lensing
 
 
-likelihood: 'binned'
+likelihood: 'determinants'
 #Likelihood
 #      'determinants' -> using determinants and summing over all integer ell-values
 #      'binned' -> using covariance and differences between data vectors
@@ -18,7 +18,7 @@ specs:
   #'kmax' -> vary kmax in each z-bin, which technically equals to the 'lmax'-option via lmax=kmax rcom(z_mod)/(1+z_mod)
   #           with z_mod corresponding to a peak of the shear and photo-GC kernels 
   scale_cuts:
-    type: 'lmax'
+    type: 'const_lmax'
     max_WL: #[4900]
             [2800, 2800, 2800, 2800, 2800, 
                    3000, 3000, 3000, 3000, 
@@ -32,16 +32,16 @@ specs:
             #           716, 716, 716, 
             #                780, 780,
             #                     818] #always a list, same length as nbin*(nbin+1)/2 or just 1 for const_lmax
-            #[68, 68, 68, 68, 68, 
-            #     88, 88, 88, 88, 
-            #     102, 102, 102, 
-            #     111, 111,
-            #     116] 
-            [204, 204, 204, 204, 204, 
-                  264, 264, 264, 264, 
-                       306, 306, 306, 
-                            334, 334,
-                                 350] 
+            [68, 68, 68, 68, 68, 
+                 88, 88, 88, 88, 
+                 102, 102, 102, 
+                 111, 111,
+                 116] 
+            #[204, 204, 204, 204, 204, 
+            #      264, 264, 264, 264, 
+            #           306, 306, 306, 
+            #                334, 334,
+            #                     350] 
             #[0.7, 0.7, 0.7, 0.7, 0.7]
     cosmo: # for transformation from k_eff to ell
       'Omega_m': 0.31
@@ -66,7 +66,7 @@ data:
   #     1 -> read from a file
   data_file: 
 
-  nl_model: 1
+  nl_model: 0
   #bacco_option: 'z_extrap_hmcode'
   #Nonlinear power spectrum
   #     0 -> HMcode
@@ -75,7 +75,7 @@ data:
   #     3 -> gLEMURS
   #     4 -> μ-Σ (Σ is not properly implemented in Cls yet)
   #     5 -> Dark Scattering (Interacting Dark Energy)
-  bias_model: 2
+  bias_model: 0
   # Photometric galaxy bias model (redshift dependence)
   #     0 -> constant linear bias within bins
   #     1 -> (b1, b2) constant within bins
@@ -99,7 +99,7 @@ data:
 
 theory:
   add_noise: False
-  nl_model: 1
+  nl_model: 0
   #bacco_option: 'z_extrap_hmcode'
   #Nonlinear power spectrum
   #     0 -> HMcode
@@ -128,10 +128,10 @@ theory:
   #     0 -> no photo-z error
   #     1 -> additive mode, n(z') = n(z + dz)
   #     2 -> multiplicative mode, n(z') = n(z(1 + dz))
-  params: ./params_bacco_b1_test.yaml #./params_model_hmcode.yaml 
+  params: ./params_model_hmcode.yaml  #./params_bacco_b1_test.yaml 
 
 output: 
-  chain_name: lsst_y1_3x2pt_bacco_heft_data_b1_model_kmax0p3
+  chain_name: lsst_y1_3x2pt_hmcode_test
 sampler: 
   mcmc:
     verbose: True
@@ -139,5 +139,5 @@ sampler:
     n_live: 1000
     pool: 20
     resume: False
-    hdf5_name: lsst_y1_3x2pt_bacco_heft_data_b1_model_kmax0p3
+    hdf5_name: lsst_y1_3x2pt_hmcode_test
     
