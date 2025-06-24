@@ -253,6 +253,7 @@ def setup_lmax(obj):
     obj.lmax_xc_vals = np.concatenate(lmax_xc_vals_2d)
     mask_ells_xc = np.array([(obj.ell_bin_edges<= lmax_xc_i) for lmax_xc_i in obj.lmax_xc_vals])
     mask_ells_xc = mask_ells_xc[:, 1:]
+    # mask data vectors
     obj.mask_data_vector_wl = np.concatenate((mask_ells_wl))
     obj.mask_data_vector_gc = np.concatenate((mask_ells_gc))
     obj.mask_data_vector_xc = np.concatenate((mask_ells_xc))
@@ -263,6 +264,14 @@ def setup_lmax(obj):
     obj.ells_wl_max = max_ells_for_plots(obj.nbin, obj.lmax_wl_vals)
     obj.ells_gc_max = max_ells_for_plots(obj.nbin, obj.lmax_gc_vals)
     
+    
+    all_ells_wl = np.array([obj.l_wl for i in range(len(obj.lmax_wl_vals))])
+    all_ells_xc = np.array([obj.l_xc for i in range(len(obj.lmax_xc_vals))])
+    all_ells_gc = np.array([obj.l_gc for i in range(len(obj.lmax_gc_vals))])
+    obj.masked_data_vector_3x2pt_ells = np.concatenate((np.concatenate(all_ells_wl), np.concatenate(all_ells_xc), np.concatenate(all_ells_gc)))[obj.mask_data_vector_3x2pt]
+    obj.mask_ells_wl = mask_ells_wl
+    obj.mask_ells_xc = mask_ells_xc
+    obj.mask_ells_gc = mask_ells_gc
 
 
 def validate_and_setup_lmax(obj, scale_cuts_info, likelihood, lmin, lmax, zz_mod_wl, zz_mod_gg):

@@ -43,7 +43,8 @@ IA_TATT = 1
 BIAS_LIN = 0
 BIAS_B1B2 = 1
 BIAS_HEFT = 2
-
+BIAS_HEFT_PNL = 3
+BIAS_HEFT_PNL_BAR = 4
 
 PHOTOZ_NONE = 0
 PHOTOZ_ADD = 1
@@ -154,6 +155,8 @@ class Theory:
             if model['nl_model'] == NL_MODEL_BACCO:
                 option = model['bacco_option'] if 'bacco_option' in model else 'z_extrap_linear'
                 self.StructureEmu = nl_models[model['nl_model']](option)
+            elif 'option' in model:
+                self.StructureEmu = nl_models[model['nl_model']](model['option'])
             else:
                 self.StructureEmu = nl_models[model['nl_model']]()
         except KeyError:
@@ -195,11 +198,15 @@ class Theory:
             raise ValueError("Invalid ia_model option.")
             
         # assign galaxy bias
-        self.flag_heft = (model['bias_model'] == BIAS_HEFT)
+        self.flag_heft = (model['bias_model'] == BIAS_HEFT) or (model['bias_model'] == BIAS_HEFT_PNL) or (model['bias_model'] == BIAS_HEFT_PNL_BAR)
+        self.flag_heft_pnl_bar = (model['bias_model'] == BIAS_HEFT_PNL_BAR)
+        self.flag_heft_pnl = (model['bias_model'] == BIAS_HEFT_PNL)
         bias_models = {
             BIAS_LIN: (self.get_pgm_lin_bias, self.get_pgg_lin_bias),
             BIAS_B1B2: (self.get_pgm_quadr_bias, self.get_pgg_quadr_bias),
-            BIAS_HEFT: (self.get_pgm_heft_bias, self.get_pgg_heft_bias)
+            BIAS_HEFT: (self.get_pgm_heft_bias, self.get_pgg_heft_bias),
+            BIAS_HEFT_PNL: (self.get_pgm_heft_bias_pnl, self.get_pgg_heft_bias_pnl),
+            BIAS_HEFT_PNL_BAR: (self.get_pgm_heft_bias_pnl, self.get_pgg_heft_bias_pnl)
         }
         try:
             self.get_pgm, self.get_pgg = bias_models[model['bias_model']]
@@ -901,9 +908,9 @@ class Theory:
         Returns:
         -------
         pk_exp : ndarray
-            The power spectrum perturbative expansion terms.
+            The power spectrum perturbative expansion terms within bacco-ranges.
         pk_exp_extr : ndarray
-            The extrapolated power spectrum.
+            The extrapolated power spectrum. Linear on linear scales and for high redshifts.
 
         Notes:
         -----
@@ -922,6 +929,8 @@ class Theory:
             pk_exp_extr = pk_exp_extr*dz_rescale[np.newaxis, :]*dz_rescale[np.newaxis, :]
         else:    
             pk_exp, pk_exp_extr = self.BaccoEmuClass.get_heft(params_dic, self.k, self.Survey.lbin, self.Survey.zz_integr)  
+        self.mask_heft = self.BaccoEmuClass.mask_heft
+        #print('MASK: ', self.mask_heft)
         return pk_exp, pk_exp_extr
     
     def get_pgg_heft_bias(self, params_dic):
@@ -978,6 +987,63 @@ class Theory:
         # return dimension (lbin, z_integr, bin_i, bin_j)
         return pgg
     
+    def get_pgg_heft_bias_pnl(self, params_dic):
+        """Calculate the galaxy-galaxy power spectrum with HEFT Lagrangian bias expansion,
+        in units of (Mpc/h)^3.
+
+        Parameters:
+        ----------
+        params_dic : dict
+            Dictionary containing the bias parameters.
+  
+        Returns:
+        -------
+        pgm : numpy.ndarray
+            The galaxy-galaxy power spectrum.
+        """
+        pk_exp, pk_exp_extr = self.pk_exp, self.pk_exp_extr
+        bL1 = np.array([params_dic['b1L_'+str(i+1)] for i in range(self.Survey.nbin)])
+        bL2 = np.array([params_dic['b2L_'+str(i+1)] for i in range(self.Survey.nbin)])
+        bs2 = np.array([params_dic['bs2L_'+str(i+1)] for i in range(self.Survey.nbin)])
+        blapl = np.array([params_dic['blaplL_'+str(i+1)] for i in range(self.Survey.nbin)])    
+        #p_dmdm = pk_exp[0, :, :]        
+        #p_dmd1 = pk_exp[1, :, :]    
+        p_dmd2 = pk_exp[2, :, :]        
+        p_dms2 = pk_exp[3, :, :]        
+        p_dmk2 = pk_exp[4, :, :]      
+        #p_d1d1 = pk_exp[5, :, :]     
+        p_d1d2 = pk_exp[6, :, :]        
+        p_d1s2 = pk_exp[7, :, :]         
+        p_d1k2 = pk_exp[8, :, :]         
+        p_d2d2 = pk_exp[9, :, :]        
+        p_d2s2 = pk_exp[10, :, :]         
+        p_d2k2 = pk_exp[11, :, :]
+        p_s2s2 = pk_exp[12, :, :] 
+        p_s2k2 = pk_exp[13, :, :] 
+        p_k2k2 = pk_exp[14, :, :] 
+        # need to cut p_nl like p_dmdm and p_dmd1   
+        p_nl = self.pmm if self.flag_heft_pnl_bar  else self.pmm_no_barboost
+        #p_nl = p_nl[self.mask_heft[0]]
+        p_nl = np.where(self.mask_heft[0], p_nl, 0.)
+        pgg = (
+            (1.+bL1[None,None, :,None])*(1.+bL1[None,None, None, :]) * p_nl[:,:,None,None] +
+            (bL2[None,None, :,None] + bL2[None,None, None, :]) * p_dmd2[:,:,None,None] +
+            (bs2[None,None, :,None] + bs2[None,None, None, :]) * p_dms2[:,:,None,None] +
+            (bL1[None,None, :,None]*bL2[None,None, None, :] + bL1[None,None, None, :]*bL2[None,None, :,None]) * p_d1d2[:,:,None,None] +
+            (bL1[None,None, :,None]*bs2[None,None, None, :] + bL1[None,None, None, :]*bs2[None,None, :,None]) * p_d1s2[:,:,None,None] +
+            (bL2[None,None, :,None]*bL2[None,None, None, :]) * p_d2d2[:,:,None,None] +
+            (bL2[None,None, :,None]*bs2[None,None, None, :] + bL2[None,None, None, :]*bs2[None,None, :,None]) * p_d2s2[:,:,None,None] +
+            (bs2[None,None, :,None]*bs2[None,None, None, :])* p_s2s2[:,:,None,None] +
+            (blapl[None,None, :,None] + blapl[None,None, None, :]) * p_dmk2[:,:,None,None] +
+            (bL1[None,None, None, :] * blapl[None,None, :,None] + bL1[None,None, :,None] * blapl[None,None, None, :]) * p_d1k2[:,:,None,None] +
+            (bL2[None,None, None, :] * blapl[None,None, :,None] + bL2[None,None, :,None] * blapl[None,None, None, :]) * p_d2k2[:,:,None,None] +
+            (bs2[None,None, None, :] * blapl[None,None, :,None] + bs2[None,None, :,None] * blapl[None,None, None, :]) * p_s2k2[:,:,None,None] +
+            (blapl[None,None, :,None] * blapl[None,None, None, :]) * p_k2k2[:,:,None,None])
+        pgg_extr = (1.+bL1[None,None, :,None])*(1.+bL1[None,None, None, :]) * pk_exp_extr[:,:,None,None]
+        pgg += pgg_extr 
+        # return dimension (lbin, z_integr, bin_i, bin_j)
+        return pgg
+    
     def get_pgm_heft_bias(self, params_dic):
         """Calculate the galaxy-matter power spectrum with HEFT Lagrangian bias expansion,
         in units of (Mpc/h)^3.
@@ -1004,6 +1070,48 @@ class Theory:
         p_dmk2 = pk_exp[4, :, :]      
         pgm = (p_dmdm[:,:,None]  +
                 bL1[None,None,:] * p_dmd1[:,:,None] +
+                bL2[None,None,:] * p_dmd2[:,:,None] +
+                bs2[None,None,:] * p_dms2[:,:,None] +
+                blapl[None,None,:] * p_dmk2[:,:,None])   
+        pgm_extr = (1.+bL1[None,None,:]) * pk_exp_extr[:,:,None]
+        pgm += pgm_extr
+        # return dimension (lbin, z_integr, bin_i)
+        return pgm
+    
+    def get_pgm_heft_bias_pnl(self, params_dic):
+        """Calculate the galaxy-matter power spectrum with HEFT Lagrangian bias expansion,
+        in units of (Mpc/h)^3.
+
+        Parameters:
+        ----------
+        params_dic : dict
+            Dictionary containing the bias parameters.
+  
+        Returns:
+        -------
+        pgm : numpy.ndarray
+            The matter-galaxy power spectrum.
+        """
+        pk_exp, pk_exp_extr = self.pk_exp, self.pk_exp_extr
+        bL1 = np.array([params_dic['b1L_'+str(i+1)] for i in range(self.Survey.nbin)])
+        bL2 = np.array([params_dic['b2L_'+str(i+1)] for i in range(self.Survey.nbin)])
+        bs2 = np.array([params_dic['bs2L_'+str(i+1)] for i in range(self.Survey.nbin)])
+        blapl = np.array([params_dic['blaplL_'+str(i+1)] for i in range(self.Survey.nbin)])    
+        #p_dmdm = pk_exp[0, :, :]        
+        #p_dmd1 = pk_exp[1, :, :]    
+        p_dmd2 = pk_exp[2, :, :]        
+        p_dms2 = pk_exp[3, :, :]        
+        p_dmk2 = pk_exp[4, :, :]
+        # need to cut p_nl like p_dmdm and p_dmd1   
+        p_nl = self.pmm if self.flag_heft_pnl_bar  else self.pmm_no_barboost
+        #print('flag_heft_pnl_bar: ', self.flag_heft_pnl_bar)
+        #print(p_nl.shape)
+        #print('self.mask_heft[0]: ' , self.mask_heft[0], self.mask_heft[0].shape)
+        #p_nl = p_nl[self.mask_heft[0]]
+        p_nl = np.where(self.mask_heft[0], p_nl, 0.)
+        #print(p_nl.shape)
+        pgm = (
+                (1. + bL1[None,None,:]) * p_nl[:,:,None] +
                 bL2[None,None,:] * p_dmd2[:,:,None] +
                 bs2[None,None,:] * p_dms2[:,:,None] +
                 blapl[None,None,:] * p_dmk2[:,:,None])   
@@ -1203,6 +1311,9 @@ class Theory:
         self.deltaz_s, self.deltaz_l = self.get_deltaz(params_dic)
         if self.flag_heft:
             self.pk_exp, self.pk_exp_extr = self.get_heft_pk_exp(params_dic)
+            if self.flag_heft_pnl_bar or self.flag_heft_pnl:
+                self.pmm, bar_boost = self.get_pmm(params_dic)
+                self.pmm_no_barboost = self.pmm/bar_boost 
         else:
             self.pmm, _ = self.get_pmm(params_dic)  
         self.pgg = self.get_pgg(params_dic)
@@ -1242,10 +1353,15 @@ class Theory:
         self.deltaz_s, self.deltaz_l = self.get_deltaz(params_dic)
         # compute matter-matter power spectrum
         self.pmm, bar_boost = self.get_pmm(params_dic)
+        self.pmm_no_barboost = self.pmm/bar_boost
         # compute galaxy-matter power spectrum
         if self.flag_heft:
             self.pk_exp, self.pk_exp_extr = self.get_heft_pk_exp(params_dic)
-            self.pgm = self.get_pgm(params_dic)*np.sqrt(bar_boost[:, :, None]) 
+            if self.flag_heft_pnl_bar:
+                self.pgm = self.get_pgm(params_dic)
+            else:
+                self.pgm = self.get_pgm(params_dic)*np.sqrt(bar_boost[:, :, None]) 
+            
         else:
             self.pgm = self.get_pgm(params_dic)  
         # compute galaxy-galaxy power spectrum     
@@ -1565,7 +1681,7 @@ class Theory:
                 cov_blocks = {} #collect cov_blocks in this dictionary
                 for i_bp, bin_pair_i in enumerate(cl_spec_i['bin_pairs']):
                      for j_bp, bin_pair_j in enumerate(cl_spec_j['bin_pairs']):
-                        print(f"Computing covariance {i_cl},{j_cl} pairs <{bin_pair_i} {bin_pair_j}>")
+                        #print(f"Computing covariance {i_cl},{j_cl} pairs <{bin_pair_i} {bin_pair_j}>")
                         # First check if we've already calculated this
                         if (i_cl == j_cl) and cl_spec_i['is_auto'] and ( j_bp < i_bp ):
                             cl_var_binned = cov_blocks[j_bp, i_bp]

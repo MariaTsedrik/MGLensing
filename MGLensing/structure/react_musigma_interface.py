@@ -30,25 +30,40 @@ emu_ranges_all = {
 
 def powerlaw_highk_extrap(pk_or_boost, log_k, k_last, kh_high, zz_num):
     last_entry, lastlast_entry = pk_or_boost[:, -1], pk_or_boost[:, -2]
-    m = np.array([log(last_entry[i] / lastlast_entry[i]) / log_k for i in range(zz_num)])
+    m = np.array([log(np.abs(last_entry[i] / lastlast_entry[i])) / log_k for i in range(zz_num)])
     highk_extrap = last_entry[:, np.newaxis] * (kh_high[np.newaxis, :]/k_last)**m[:, np.newaxis]
     return highk_extrap 
 
 class MuSigmaReACT():
-    def __init__(self):
-        self.zz_pk = np.array([0., 0.01,  0.12, 0.24, 0.38, 0.52, 0.68, 0.86, 1.05, 1.27, 1.5, 1.76, 2.04, 2.36, 2.5, 3.0]) # these numers are hand-picked
+    # emulator is trained only for LCDM background!
+    def __init__(self, option=None):
+        #self.zz_pk = np.array([0., 0.01,  0.12, 0.24, 0.38, 0.52, 0.68, 0.86, 1.05, 1.27, 1.5, 1.76, 2.04, 2.36, 2.5, 3.0]) # these numers are hand-picked
+        self.zz_pk = np.linspace(0., 3., 64, endpoint=True)
         self.aa_pk = np.array(1./(1.+self.zz_pk[::-1])) # should be increasing
         self.nz_pk = len(self.zz_pk)
         self.zz_max = self.zz_pk[-1]
         print('initialising mu-Sigma')
         self.cp_nl_musigma_model = cosmopower_NN(restore=True, 
-                      restore_filename=dirname+'/../emulators/MuSigma_nonlinearboost_extAs', 
+                      restore_filename=dirname+'/../../emulators/MuSigma_nonlinearboost_extAs', 
                       )
         self.kh_nl_boost = self.cp_nl_musigma_model.modes # 0.01..10. h/Mpc
         self.cp_lin_musigma_model = cosmopower_NN(restore=True, 
-                      restore_filename=dirname+'/../emulators/MuSigma_linear_log10ps_extAs', 
+                      restore_filename=dirname+'/../../emulators/MuSigma_linear_log10ps_extAs', 
                       )
         self.kh_lin = self.cp_lin_musigma_model.modes # 1.e-4..50. h/Mpc IMPORTANT LATER USED IN TATT
+
+        self.cp_nl_hmcode_model = cosmopower_NN(restore=True, 
+                      restore_filename=dirname+'/../../emulators/log10_total_matter_nonlinear_emu',
+                      )
+        self.kh_nl_hmcode = self.cp_nl_hmcode_model.modes # 0.01..50. h/Mpc    
+        self.cp_lin_model = cosmopower_NN(restore=True, 
+                      restore_filename=dirname+'/../../emulators/log10_total_matter_linear_emu',
+                      )
+        self.kh_lin_hmcode = self.cp_lin_model.modes # 3.7e-4..50. h/Mpc IMPORTANT LATER USED IN TATT
+        self.kh_lin_left_hmcode = self.kh_lin_hmcode[self.kh_lin_hmcode<self.kh_nl_hmcode[0]]
+        self.kh_tot_hmcode = np.concatenate((self.kh_lin_left_hmcode, self.kh_nl_hmcode))
+
+
 
         self.zz_boost = np.minimum(self.zz_pk, 2.5)
         self.kh_lin_left_boost = self.kh_lin[self.kh_lin<self.kh_nl_boost[0]]
@@ -58,6 +73,13 @@ class MuSigmaReACT():
         self.k_nl_boost_lastlast = self.kh_nl_boost[-2]
         self.log_k = log(self.k_nl_boost_last / self.k_nl_boost_lastlast)
         self.emu_name = 'mu_Sigma_ReACT'
+
+        if option=='linear':
+            self.get_pk_nl =  self.get_pk_lin 
+        elif option=='pseudo':
+            self.get_pk_nl = self.get_pk_pseudo
+        else:
+            self.get_pk_nl = self.get_pk_nl_
 
     def check_pars(self, params):
         emu_ranges = emu_ranges_all.copy()
@@ -130,30 +152,114 @@ class MuSigmaReACT():
         mg_pk_lin = self.cp_lin_musigma_model.ten_to_predictions_np(params_react)
         self.pklin_z0 = mg_pk_lin[0] # zz_pk[0] must be 0.! later used in tatt
         # constant extrapolation for k<0.01 h/Mpc
-        mg_boost_left = np.ones(len(self.kh_lin_left_boost))
+        mg_boost_left = np.ones((self.nz_pk, len(self.kh_lin_left_boost)))
         # power law extrapolation for k>10 h/Mpc
-        mg_boost_right = powerlaw_highk_extrap(mg_boost, self.log_k, self.k_nl_boost_last, self.kh_nl_right_boost, self.zz_boost)
+        mg_boost_right = powerlaw_highk_extrap(mg_boost, self.log_k, self.k_nl_boost_last, self.kh_nl_right_boost, self.nz_pk)
         # combine mg_boost at all scales
-        mg_boost_k = np.concatenate((mg_boost_left, mg_boost, mg_boost_right))
+        mg_boost_k = np.concatenate((mg_boost_left, mg_boost, mg_boost_right), axis=1)
         # interpolate
-        mg_boost_interp = RectBivariateSpline(self.zz_boost,
+        mg_boost_interp = RectBivariateSpline(self.zz_pk,
                     self.kh_nl_boost_tot,
                     mg_boost_k,
                     kx=1, ky=1)
-        mg_plin_interp = RectBivariateSpline(self.zz_boost,
+        mg_plin_interp = RectBivariateSpline(self.zz_pk,
                     self.kh_lin,
                     mg_pk_lin,
                     kx=1, ky=1)
         return  mg_boost_interp, mg_plin_interp
+    
+    def get_pk_lin_interp(self, params_dic):
+        ns   = params_dic['ns']
+        a_s   = params_dic['As']
+        h    = params_dic['h']
+        omega_b = params_dic['Omega_b']
+        omega_m = params_dic['Omega_m']
+        omega_nu  = params_dic['Omega_nu']
+        mu0    = params_dic['mu0']
+        sigma0    = params_dic['sigma0']
+        q1    = params_dic['q1']
+        params_react = {
+                'ns'            :  np.full(self.nz_pk, ns),
+                'As'            :  np.full(self.nz_pk, a_s),
+                'H0'            :  np.full(self.nz_pk, h*100),
+                'Omega_b'       :  np.full(self.nz_pk, omega_b),
+                'Omega_m'       :  np.full(self.nz_pk, omega_m),
+                'Omega_nu'      :  np.full(self.nz_pk, omega_nu),
+                'mu0'           :  np.full(self.nz_pk, mu0),
+                'sigma0'        :  np.full(self.nz_pk, sigma0),
+                'q1'            :  np.full(self.nz_pk, q1),
+                'z'             :  self.zz_boost
+            }
+        mg_pk_lin = self.cp_lin_musigma_model.ten_to_predictions_np(params_react)
+        self.pklin_z0 = mg_pk_lin[0] # zz_pk[0] must be 0.! later used in tatt
+        # interpolate
+        mg_plin_interp = RectBivariateSpline(self.zz_pk,
+                    self.kh_lin,
+                    mg_pk_lin,
+                    kx=1, ky=1)
+        return  mg_plin_interp
 
+    def get_pk_hmcode_interp(self, params_dic):
+        ns   = params_dic['ns']
+        a_s   = params_dic['As']
+        h    = params_dic['h']
+        omega_b = params_dic['Omega_b']
+        omega_c = params_dic['Omega_c']
+        params_hmcode = {
+            'ns'            :  np.full(self.nz_pk, ns),
+            'As'            :  a_s if isinstance(a_s, np.ndarray) and len(a_s) == self.nz_pk else np.full(self.nz_pk, a_s),
+            'hubble'        :  np.full(self.nz_pk, h),
+            'omega_baryon'  :  np.full(self.nz_pk, omega_b),
+            'omega_cdm'     :  np.full(self.nz_pk, omega_c),
+            'neutrino_mass' :  np.zeros(self.nz_pk),
+            'w0'            :  np.full(self.nz_pk, -1.),
+            'wa'            :  np.zeros(self.nz_pk),
+            'z'             :  self.zz_pk
+            }
+        pnl_cp  = self.cp_nl_hmcode_model.ten_to_predictions_np(params_hmcode)
+        plin_cp = self.cp_lin_model.ten_to_predictions_np(params_hmcode)
+        plin_left = plin_cp[:, self.kh_lin_hmcode<self.kh_nl_hmcode[0]]
+        pnl  = np.concatenate((plin_left, pnl_cp),axis=1)
+        pnl_interp = RectBivariateSpline(self.zz_pk,
+                            self.kh_tot_hmcode,
+                            pnl,
+                            kx=1, ky=1)     
+        return  pnl_interp
 
-    def get_pk_nl(self, params_dic, k, lbin, zz_integr):
+    def get_pk_nl_(self, params_dic, k, lbin, zz_integr):
         pk_m_l  = np.zeros((lbin, len(zz_integr)), 'float64')
         index_pknn = np.array(np.where((k > k_min_h_by_mpc) & (k < k_max_h_by_mpc))).transpose()
         mg_boost_l_interp, pk_l_interp = self.get_pk_nl_interp(params_dic)
         for index_l, index_z in index_pknn:
             pk_m_l[index_l, index_z] = pk_l_interp(min(zz_integr[index_z], 2.5), k[index_l,index_z])*mg_boost_l_interp(min(zz_integr[index_z], 2.5), k[index_l,index_z])
         return pk_m_l  
+    
+    def get_pk_lin(self, params_dic, k, lbin, zz_integr):
+        pk_m_l  = np.zeros((lbin, len(zz_integr)), 'float64')
+        index_pknn = np.array(np.where((k > k_min_h_by_mpc) & (k < k_max_h_by_mpc))).transpose()
+        pk_l_interp = self.get_pk_lin_interp(params_dic)
+        for index_l, index_z in index_pknn:
+            pk_m_l[index_l, index_z] = pk_l_interp(min(zz_integr[index_z], 2.5), k[index_l,index_z])
+        return pk_m_l  
+    
+    def get_pk_pseudo(self, params_dic, k, lbin, zz_integr):
+        pk_lin_interp = self.get_pk_lin_interp(params_dic)
+        pklin_k0_mg_z = pk_lin_interp(self.zz_pk, 0.01)
+        params_dic_lcdm = params_dic.copy()
+        params_dic_lcdm['mu0'] = 0.0
+        params_dic_lcdm['sigma0'] = 0.0
+        params_dic_lcdm['q1'] = 0.0
+        pk_lcdm_lin_interp = self.get_pk_lin_interp(params_dic_lcdm)
+        pklin_k0_lcdm_z = pk_lcdm_lin_interp(self.zz_pk, 0.01)
+        self.d2_mg_lcdm_z = (pklin_k0_mg_z / pklin_k0_lcdm_z)[:, 0]
+        pk_m_l  = np.zeros((lbin, len(zz_integr)), 'float64')
+        index_pknn = np.array(np.where((k > k_min_h_by_mpc) & (k < k_max_h_by_mpc))).transpose()
+        As_orig = params_dic['As']
+        params_dic['As'] = self.d2_mg_lcdm_z * As_orig
+        pk_l_interp = self.get_pk_hmcode_interp(params_dic)
+        for index_l, index_z in index_pknn:
+            pk_m_l[index_l, index_z] = pk_l_interp(zz_integr[index_z], k[index_l,index_z])
+        return pk_m_l 
     
 
     def get_growth(self, params_dic, zz_integr):
@@ -172,7 +278,8 @@ class MuSigmaReACT():
         e2 = omega_m/a_arr_for_mu**3+omega_lambda
         cosmo = mg.mu_a(background)
         mu0 = params_dic['mu0'] 
-        mu0_arr = 1.+mu0/e2
+        mu0_arr = 1.+mu0/e2*omega_lambda/(1.-omega_m)
+        #mu0_arr = 1.+mu0/e2
         mu_interpolator = itp.interp1d(a_arr_for_mu, mu0_arr, bounds_error=False,
             kind='cubic') 
         da, _ = cosmo.growth_parameters(mu_interp=mu_interpolator) 

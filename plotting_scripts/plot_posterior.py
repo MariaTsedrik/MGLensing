@@ -26,22 +26,19 @@ def read_last_header_line(file_path):
     else:
         return []
 
-file_paths = [ 'chains/chain_lsst_y1_3x2pt_bacco_heft_data_b1_hmcode_model_kmax0p1.txt'   
-     #'chains/lsst/chain_lsst_y1_3x2pt_bacco_heft_same_data_model.txt',
-              #'chains/lsst/chain_lsst_y1_3x2pt_bacco_heft_data_b1_model_lincut.txt',
-              #'chains/lsst/chain_lsst_y1_3x2pt_bacco_heft_data_b1_model_kmax0p3.txt',
-              #'chains/chain_lsst_y1_3x2pt_bacco_heft_data_b1_model_kmax0p1.txt'
+file_paths = [ 'chains/chain_lsst_y1_test_muSigma_linps_lincuts.txt',  
+              'chains/chain_lsst_y1_test_muSigma_linps_pcacuts.txt',
+              'chains/chain_lsst_y1_test_muSigma_nonlinps_nonlincuts.txt',
+
  ]  
 
-file_name = 'hmcode_check'
+file_name = 'mu_chains_lsst_3x2pt'
 legend_labels = [
-    #'before',
-    #'after'
-#'model: heft, GG/GL cuts: kmax=0.7 h/Mpc',
-'model: b1+hmcode, GG/GL cuts: kmax=0.1 h/Mpc',
-#'model: b1, GG/GL cuts: kmax=0.3 h/Mpc'
+'model: $\mu$ lin, cuts: lin (0:09:07)',
+'model: $\mu$ lin, cuts: PCA (2:20:34)',
+'model: $\mu+q_1$ nonlin, cuts: nonlin (0:14:29)',
 ]
-annotation_text = 'LSST Y1 data: bacco+heft\n 3x2pt-analysis\n LL-cuts lmax=2800-3000'
+annotation_text = 'LSST Y1 data \n 3x2pt-analysis\n data: GR\n fixed $\Sigma_0=0$, $\Omega_{\\rm b}$, $n_{\\rm s}$'
 # annotation square
 num = 1
 
@@ -72,8 +69,8 @@ for i in range(n_samples):
 
 ModelPars = chains_info[0]['pars']
 # add parameters that are not present in the first chain:
-#ModelPars.append('beta_IA')
-ModelPars = ModelPars[:8]
+ModelPars.append('q1')
+#ModelPars = ModelPars[:7]
 
 
 colors = ['tab:orange', 'tab:blue', 'tab:green', 'tab:red', 'tab:purple', 'tab:olive', 'tab:cyan']
@@ -86,7 +83,7 @@ plt.rcParams.update({'font.size':16})
 g.settings.legend_fontsize=26#36
 g.settings.axes_fontsize=18#25
 g.settings.axes_labelsize=20#32
-g.settings.linewidth=3   
+g.settings.linewidth=4   
 g.settings.figure_legend_frame = False
 
 

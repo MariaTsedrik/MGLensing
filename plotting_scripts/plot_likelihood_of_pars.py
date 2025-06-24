@@ -94,14 +94,14 @@ loglike = {}
 vary_pars_dic = {}
 n_points = 20
 #cosmo_pars = ['Omega_m', 'sigma8_cb', 'Omega_b', 'h', 'ns', 'Mnu', 'w0', 'wa', 'a1_IA', 'eta1_IA']
-
+cosmo_pars = ['Omega_m', 'sigma8_cb', 'Omega_b', 'h', 'ns', 'Mnu', 'w0', 'wa']
 #b1L = np.array([f'b1L_{bin_i+1}' for bin_i in range(nbin)])
 #b2L = np.array([f'b2L_{bin_i+1}' for bin_i in range(nbin)])
 #bs2L = np.array([f'bs2L_{bin_i+1}' for bin_i in range(nbin)])
 #blL = np.array([f'blaplL_{bin_i+1}' for bin_i in range(nbin)])
 #cosmo_pars = np.concatenate((b1L, b2L, bs2L, blL))
 
-cosmo_pars = ['log10Mc_bc', 'eta_bc', 'beta_bc', 'log10Mz0_bc', 'thetaout_bc',  'thetainn_bc', 'log10Minn_bc']
+#cosmo_pars = ['log10Mc_bc', 'eta_bc', 'beta_bc', 'log10Mz0_bc', 'thetaout_bc',  'thetainn_bc', 'log10Minn_bc']
 params_new = {}
 for pars in cosmo_pars:
     vary_pars = np.linspace(ranges_all[pars]['p1'], ranges_all[pars]['p2'], n_points)

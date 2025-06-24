@@ -1,7 +1,10 @@
+import os
+os.environ["OMP_NUM_THREADS"] = "1"
+os.environ["TF_NUM_INTEROP_THREADS"] = "1"
+os.environ["TF_NUM_INTRAOP_THREADS"] = "1"
 from scipy.interpolate import RectBivariateSpline
 import numpy as np
 import baccoemu 
-import os
 import MGrowth as mg
 from math import log10, log
 from .hmcode2020_interface import HMcode2020
@@ -52,7 +55,8 @@ def fill_in_ell_z_array(interp, k, lbin, zz_integr, zmax=10.):
 
 def powerlaw_highk_extrap(pk_or_boost, log_k, k_last, kh_high, zz_num):
     last_entry, lastlast_entry = pk_or_boost[:, -1], pk_or_boost[:, -2]
-    m = np.array([log(last_entry[i] / lastlast_entry[i]) / log_k for i in range(zz_num)])
+    m = np.array([log(abs(last_entry[i] / lastlast_entry[i])) / log_k for i in range(zz_num)])
+    #m = np.array([log(last_entry[i] / lastlast_entry[i]) / log_k for i in range(zz_num)])
     highk_extrap = last_entry[:, np.newaxis] * (kh_high[np.newaxis, :]/k_last)**m[:, np.newaxis]
     return highk_extrap 
 
@@ -169,6 +173,12 @@ class BaccoEmu:
         self.log_kh_bb = log(self.kh_bb_last / self.kh_bb[-2])
         self.kh_barboost_tot = np.concatenate((self.kh_lin_left, self.kh_bb, self.kh_lin_bb_right))
 
+        self.kh_lin_heft_right = kh_lin_[kh_lin_>k_max_heft]
+        self.kh_heft_last = self.kh_heft[-1]
+        self.log_kh_heft = log(self.kh_heft_last / self.kh_heft[-2])
+        self.kh_heft_tot = np.concatenate((self.kh_heft, self.kh_lin_heft_right))
+
+
         self.kh_lin = self.kh_tot # IMPORTANT LATER USED IN TATT
         #self.kh_lin_last = self.kh_lin[-1]
         #self.log_kh_lin = log(self.kh_lin_last / self.kh_lin[-2])
@@ -188,11 +198,11 @@ class BaccoEmu:
             self.get_pk_nl =  self.get_pk_lin 
         elif option=='z_extrap_linear' or option==None:
             self.get_pk_nl = self.get_pk_nl_zextr_lin
-            self.get_heft = self.get_heftget_heft_zextr_lin
+            self.get_heft = self.get_heft_zextr_lin
         elif option=='z_extrap_hmcode':
             self.HMcodeEmu = HMcode2020()
             self.get_pk_nl = self.get_pk_nl_zextr_hmcode
-            self.get_heft = self.get_heftget_heft_zextr_hmcode
+            self.get_heft = self.get_heft_zextr_hmcode
             # TO-DO add an option for z_max>3 (for now complains for baryon boost):
             # self.zz_max = self.HMcodeEmu.zz_max
         else:
@@ -400,10 +410,20 @@ class BaccoEmu:
                                     self.kh_tot,
                                     plin_bacco[::-1, :],
                                     kx=1, ky=1)
+        #print('last entries (z): ', pnn[:, -2:])
+        # power law extrapolation for k>0.71 h/Mpc
+        pnn_tot = np.zeros((15, len(self.z_nl_bacco), len(self.kh_heft_tot)), 'float64')
+        for i in range(15):
+            pnn_right = powerlaw_highk_extrap(pnn[i], self.log_kh_heft, self.kh_heft_last, self.kh_lin_heft_right, len(self.z_nl_bacco))
+            pnn_tot[i] = np.concatenate((pnn[i], pnn_right), axis=1)
         pnn_interp = [RectBivariateSpline(self.z_nl_bacco, 
-                                    self.kh_heft,
+                                    self.kh_heft_tot,
                                     pnn_i[::-1, :],
-                                    kx=1, ky=1) for pnn_i in pnn]
+                                    kx=1, ky=1) for pnn_i in pnn_tot]
+        #pnn_interp = [RectBivariateSpline(self.z_nl_bacco, 
+        #                            self.kh_heft,
+        #                            pnn_i[::-1, :],
+        #                            kx=1, ky=1) for pnn_i in pnn]
         return pnn_interp, plin_interp 
     
     
@@ -448,9 +468,11 @@ class BaccoEmu:
             boost_bar[index_l, index_z] = boost_bar_interp(min(zz_integr[index_z], 1.5), k[index_l,index_z])
         return boost_bar
     
+   
 
-    def get_heftget_heft_zextr_lin(self, params_dic, k, lbin, zz_integr):
+    def get_heft_zextr_lin(self, params_dic, k, lbin, zz_integr):
         pk_nn_l  = np.zeros((15, lbin, len(zz_integr)), 'float64')
+        pk_nn_l_mask  = np.zeros((15, lbin, len(zz_integr)), 'float64')
         pk_lin_l  = np.zeros((lbin, len(zz_integr)), 'float64')
         index_pknn = np.array(np.where((k > k_min_h_by_mpc) & (k<k_max_h_by_mpc))).transpose()
         pnn_l_interp, plin_l_interp = self.get_heft_interp(params_dic)
@@ -458,12 +480,15 @@ class BaccoEmu:
             for index_i in np.arange(15): 
                 if zz_integr[index_z]<=1.5 and k[index_l,index_z]>=self.kh_nl[0]:
                     pk_nn_l[index_i, index_l, index_z] = pnn_l_interp[index_i](zz_integr[index_z], k[index_l,index_z])   
+                    pk_nn_l_mask[index_i, index_l, index_z] = 1
             if zz_integr[index_z]>1.5 or k[index_l,index_z]<self.kh_nl[0]:
                 pk_lin_l[index_l, index_z] = plin_l_interp(zz_integr[index_z], k[index_l,index_z])    
+        self.mask_heft = pk_nn_l_mask.astype(bool)        
         return pk_nn_l, pk_lin_l
     
-    def get_heftget_heft_zextr_hmcode(self, params_dic, k, lbin, zz_integr):
+    def get_heft_zextr_hmcode(self, params_dic, k, lbin, zz_integr):
         pk_nn_l  = np.zeros((15, lbin, len(zz_integr)), 'float64')
+        pk_nn_l_mask  = np.zeros((15, lbin, len(zz_integr)), 'float64')
         pk_nn_extr_l  = np.zeros((lbin, len(zz_integr)), 'float64')
         params_dic['As'] = self.get_a_s(params_dic)
         pl_l_interp_hmcode = self.HMcodeEmu.get_pk_interp(params_dic)
@@ -473,10 +498,12 @@ class BaccoEmu:
             for index_i in np.arange(15): 
                 if zz_integr[index_z]<=1.5 and k[index_l,index_z]>=self.kh_nl[0]:
                     pk_nn_l[index_i, index_l, index_z] = pnn_l_interp[index_i](zz_integr[index_z], k[index_l,index_z])   
+                    pk_nn_l_mask[index_i, index_l, index_z] = 1
             if zz_integr[index_z]<=1.5 and k[index_l,index_z]<self.kh_nl[0]:
                 pk_nn_extr_l[index_l, index_z] = plin_l_interp(zz_integr[index_z], k[index_l,index_z])  
             else:
                 pk_nn_extr_l[index_l, index_z] = pl_l_interp_hmcode(zz_integr[index_z], k[index_l,index_z])  
+        self.mask_heft = pk_nn_l_mask.astype(bool) 
         return pk_nn_l, pk_nn_extr_l
     
     def get_growth(self, params_dic, zz_integr):

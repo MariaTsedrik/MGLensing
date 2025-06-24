@@ -1,0 +1,64 @@
+name: mgl_new_env
+channels:
+  - conda-forge
+  - defaults
+dependencies:
+  - python=3.11
+  - pip
+  - numpy
+  - scipy
+  - matplotlib-base
+  - h5py
+  - scikit-learn
+  - astropy
+  - cython
+  - tqdm
+  - ipython
+  - ipykernel
+  - jupyter_client
+  - jupyter_core
+  - traitlets
+  - matplotlib-inline
+  - typing_extensions
+  - protobuf
+  - grpcio
+  - libblas=*=*openblas
+  - openblas
+  - joblib
+  - pandas  # Optional, but useful for scientific work
+  - six
+  - typing-extensions
+  - wheel
+  - setuptools
+  - pip:
+      - tensorflow-macos==2.13.0
+      - tensorflow-metal==1.0.0
+      - keras==2.13.1
+      - tensorflow-probability==0.21.0
+      - absl-py
+      - astunparse
+      - gast
+      - google-pasta
+      - opt-einsum
+      - wrapt
+      - tensorboard
+      - tensorboard-data-server
+      - tensorflow-io-gcs-filesystem
+      - tensorflow-estimator
+      - deepdish
+      - getdist
+      - cosmopower
+      - fast-pt
+      - baccoemu
+      - bcemu
+      - mgrowth
+      - nautilus-sampler
+      - namex
+      - tables
+      - dill
+      - progressbar2
+      - sphinx
+      - sphinx-rtd-theme
+      - numpydoc
+      - sphynx
+

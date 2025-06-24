@@ -12,8 +12,8 @@ from datetime import timedelta
 
 
 
-MGLtest = MGLensing.MGL("config.yaml")
-
+#MGLtest = MGLensing.MGL("config.yaml")
+MGLtest = MGLensing.MGL("ini_files/pca/config_muSigma.yaml")
 
 def log_probability_function(pars):
     param_dic = pars | MGLtest.params_fixed
@@ -37,7 +37,7 @@ def main():
     sampler = Sampler(prior, log_probability_function, 
                       filepath='chains/hdf5/'+MGLtest.hdf5_name+'.hdf5', resume=MGLtest.mcmc_resume, n_live=MGLtest.mcmc_nlive, pool=MGLtest.mcmc_pool)
     start = time.time()
-    sampler.run(verbose=MGLtest.mcmc_verbose, discard_exploration=True)
+    sampler.run(verbose=MGLtest.mcmc_verbose, discard_exploration=True, n_eff=5000)
     log_z = sampler.evidence()
     points, log_w, log_l = sampler.posterior()
     finish = time.time()

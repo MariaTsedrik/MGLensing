@@ -95,7 +95,7 @@ class HMcode2020():
     get_sigma8(params_dic):
         Computes the sigma8 parameter based on the provided cosmological parameters.
     """
-    def __init__(self):
+    def __init__(self, option=None):
         print('initialising hmcode')
         # these numers are hand-picked
         #self.zz_pk = np.array([0., 0.01,  0.12, 0.24, 0.38, 0.52, 0.68, 0.86, 1.05, 1.27, 1.5, 1.76, 2.04, 2.36, 2.5, 3.0]) 
@@ -126,6 +126,11 @@ class HMcode2020():
                       restore_filename=dirname+'/../../emulators/sigma8_emu',
                       )
         self.emu_name = 'HMcode2020'
+
+        if option=='linear':
+            self.get_pk_nl =  self.get_pk_lin 
+        else:
+            self.get_pk_nl = self.get_pk_nl_
 
 
     def check_pars(self, params):
@@ -282,7 +287,7 @@ class HMcode2020():
         boost_bar = fill_in_ell_z_array(boost_bar_interp, k, lbin, zz_integr)
         return boost_bar
 
-    def get_pk_nl(self, params_dic, k, lbin, zz_integr):
+    def get_pk_nl_(self, params_dic, k, lbin, zz_integr):
         pk_l_interp = self.get_pk_interp(params_dic)
         pk_nl_l = fill_in_ell_z_array(pk_l_interp, k, lbin, zz_integr)
         return pk_nl_l

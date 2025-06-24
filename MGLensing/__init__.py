@@ -372,15 +372,20 @@ class MGL():
                 Angular power spectrum for galaxy-shear cross-correlations.
         """
         NewModel = Theory(self.Survey, theo_model)  
+        print('Theo model: ', theo_model)
         if theo_model['nl_model'] == NL_MODEL_BACCO and 'sigma8_cb' not in params:
             params['sigma8_cb'] = NewModel.StructureEmu.get_sigma8_cb(params) 
         NewModel.ez, NewModel.rz, NewModel.k = NewModel.get_ez_rz_k(params)
         NewModel.dz, _ = NewModel.StructureEmu.get_growth(params, self.Survey.zz_integr)
         NewModel.deltaz_s, NewModel.deltaz_l = NewModel.get_deltaz(params)
         NewModel.pmm, bar_boost = NewModel.get_pmm(params)
+        NewModel.pmm_no_barboost = NewModel.pmm/bar_boost
         if NewModel.flag_heft:
             NewModel.pk_exp, NewModel.pk_exp_extr = NewModel.get_heft_pk_exp(params)
-            NewModel.pgm = NewModel.get_pgm(params)*np.sqrt(bar_boost[:, :, None]) 
+            if NewModel.flag_heft_pnl_bar:
+                NewModel.pgm = NewModel.get_pgm(params)
+            else:
+                NewModel.pgm = NewModel.get_pgm(params)*np.sqrt(bar_boost[:, :, None]) 
         else:
             NewModel.pgm = NewModel.get_pgm(params)
         NewModel.pgg = NewModel.get_pgg(params)
