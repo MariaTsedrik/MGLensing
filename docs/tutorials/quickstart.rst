@@ -64,7 +64,7 @@ The results, including the log-likelihood value and the time taken, are saved to
     #         # list of fiducial parameters
     #         # 
     #         # Theory model settings
-    #         # list of paramneter priors
+    #         # list of parameter priors
     #
     #         ##############################################################
     #              columns with sampled parameters, log_w, log_l and their values
