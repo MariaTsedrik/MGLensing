@@ -7,7 +7,8 @@ import matplotlib.pyplot as plt
 # Ensure the directories exist
 os.makedirs('figs', exist_ok=True)
 os.makedirs('figs/modelling', exist_ok=True)
-
+folder = os.path.dirname(os.path.abspath(__file__))+'/../'
+os.chdir(folder)
 
 def plot_pk_fields(pmm, pgm, pgg, z_int_pick, bini, binj, show=True, name=""):
     fig, ax = plt.subplots(1, 3, figsize=(12, 5),  facecolor='w')
@@ -21,10 +22,13 @@ def plot_pk_fields(pmm, pgm, pgg, z_int_pick, bini, binj, show=True, name=""):
         secax.set_xlabel('$\ell$')
     ax[0].set_ylabel("$P^{\\rm NL}(k(\ell, z), z)$")
     plt.tight_layout()
-    plt.show() if show else plt.savefig(f'figs/modelling/p_of_k_{name}.png')
+    if show:
+        plt.show()
+    else:
+        plt.savefig(f'/home/s2561233/Documents/lss/nonlinear-bias-3x2-MG/new-MGlensing/MGlensing/figs/modelling/power_spectra/p_of_k_{name}.png')
 
 def plot_pmm(z_int_pick, pmm_list, labels, show=True, name=""):
-    fig, ax = plt.subplots(2, 3, figsize=(12, 5),  facecolor='w')
+    fig, ax = plt.subplots(2, 3, figsize=(15, 10), facecolor='w')
     for i in range(3):
         for j, pmm in enumerate(pmm_list):
             ax[0][i].loglog(k_ell[:, z_int_pick[i]], pmm[:, z_int_pick[i]], label=labels[j] if i == 0 else '')
@@ -36,10 +40,13 @@ def plot_pmm(z_int_pick, pmm_list, labels, show=True, name=""):
     ax[0][0].set_ylabel("$P^{\\rm mm}(k(\ell, z), z)$")
     ax[1][0].set_ylabel("$P^{\\rm mm}/P_{\\rm ref}^{\\rm mm}$")
     plt.tight_layout()
-    plt.show() if show else plt.savefig(f'figs/modelling/pmm_of_k_{name}.png')
+    if show:
+        plt.show()
+    else:
+        plt.savefig(f'/home/s2561233/Documents/lss/nonlinear-bias-3x2-MG/new-MGlensing/MGlensing/figs/modelling/power_spectra/pmm_of_k_{name}.png')
 
 def plot_pgg(z_int_pick, bini, binj, pgg_list, labels, show=True, name=""):
-    fig, ax = plt.subplots(2, 3, figsize=(12, 5), sharex=True,  facecolor='w')
+    fig, ax = plt.subplots(2, 3, figsize=(15, 10), sharex=True,  facecolor='w')
     for i in range(3):
         for j, pgg in enumerate(pgg_list):
             ax[0][i].loglog(k_ell[:, z_int_pick[i]], pgg[:, z_int_pick[i], bini-1, binj-1], label=labels[j] if i == 0 else '')
@@ -54,7 +61,10 @@ def plot_pgg(z_int_pick, bini, binj, pgg_list, labels, show=True, name=""):
     for i in range(3):
         ax[1][i].set_ylim(0.8, 1.2)
     plt.tight_layout()
-    plt.show() if show else plt.savefig(f'figs/modelling/pgg_of_k_{name}.png')
+    if show:
+        plt.show()
+    else:
+        plt.savefig(f'/home/s2561233/Documents/lss/nonlinear-bias-3x2-MG/new-MGlensing/MGlensing/figs/modelling/power_spectra/pgg_of_k_{name}.png')
 
 NL_MODEL_HMCODE = 0
 NL_MODEL_BACCO = 1
@@ -97,8 +107,11 @@ params = {
 
 b0 = 0.68
 bias1_arr = np.array([b0*(1.+z_bin_center_i) for z_bin_center_i in MGL.Survey.z_bin_center_l ])
-bias2_arr = bias1_arr*2. 
-print('bias1_arr , bias2_arr: ', bias1_arr , bias2_arr)
+b_extra_arr = bias1_arr*0.
+bias2_arr = bias1_arr*4. 
+print('bias1_arr: ', bias1_arr)
+print('bias2_arr: ', bias2_arr)
+print('b_extra_arr: ', b_extra_arr)
 bias1_arr = np.array([1.239, 1.378, 1.525, 1.677, 1.832])
 biasL1_arr = bias1_arr-1
 #Lagrangian co-evolution 
@@ -109,6 +122,7 @@ biasL2_arr = (0.9*biasL1_arr**2+0.5)-8./21*biasL1_arr
 biasLs2_arr = np.zeros(nbin)
 biasLlapl_arr = np.zeros(nbin) 
 for bin_i in range(nbin):
+    params[f'be_{bin_i+1}']=b_extra_arr[bin_i]
     params[f'b1_{bin_i+1}']=bias1_arr[bin_i]
     params[f'b2_{bin_i+1}']=bias2_arr[bin_i]
     params[f'b1L_{bin_i+1}']=biasL1_arr[bin_i]
@@ -160,7 +174,7 @@ pmm_bc_b, pmg_bc_b, pgg_bc_b = spectra['bacco_bar'][1:]
 pmg_bc_heft, pgg_bc_heft = spectra['bacco_heft'][2:]
 pmg_bc_b1b2, pgg_bc_b1b2 = spectra['bacco_b1b2'][2:]
 
-plot_pmm(z_int_pick, [pmm_hm, pmm_hm_b, pmm_bc, pmm_bc_b], ['hmcode', 'hmcode+Tagn', 'bacco', 'bacco+bfc'],  show=True)
-plot_pgg(z_int_pick, bin_i, bin_j, [pgg_bc, pgg_bc_b1b2, pgg_bc_heft], ['$b_1$', '$b_1+b_2 k^2$', 'heft'],  show=True)
-plot_pk_fields(pmm_bc, pmg_bc, pgg_bc, z_int_pick, bin_i, bin_j, True)
-plot_pk_fields(pmm_hm, pmg_hm, pgg_hm, z_int_pick, bin_i, bin_j, True)
+plot_pmm(z_int_pick, [pmm_hm, pmm_hm_b, pmm_bc, pmm_bc_b], ['hmcode', 'hmcode+Tagn', 'bacco', 'bacco+bfc'], show=False, name='')
+plot_pgg(z_int_pick, bin_i, bin_j, [pgg_bc, pgg_bc_b1b2, pgg_bc_heft], ['$b_1$', '$b_1+b_2 k^2$', 'heft'], show=False, name='')
+plot_pk_fields(pmm_bc, pmg_bc, pgg_bc, z_int_pick, bin_i, bin_j, show=False, name='')
+plot_pk_fields(pmm_hm, pmg_hm, pgg_hm, z_int_pick, bin_i, bin_j, show=False, name='')

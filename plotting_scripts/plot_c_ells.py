@@ -6,7 +6,7 @@ import MGLensing
 import matplotlib.pyplot as plt
 # Ensure the directories exist
 os.makedirs('figs', exist_ok=True)
-os.makedirs('figs/modelling', exist_ok=True)
+os.makedirs('/home/s2561233/Documents/lss/nonlinear-bias-3x2-MG/new-MGlensing/MGlensing/figs/modelling/c_ell', exist_ok=True)
 NL_MODEL_HMCODE = 0
 NL_MODEL_BACCO = 1
 
@@ -21,6 +21,8 @@ BIAS_HEFT = 2
 
 print('Ensure that likelihood type is binned in config.yaml')
 
+folder = os.path.dirname(os.path.abspath(__file__))+'/../'
+os.chdir(folder)
 MGL = MGLensing.MGL("config.yaml")
 zz = MGL.Survey.zz_integr
 nbin = MGL.Survey.nbin
@@ -42,7 +44,7 @@ def plot_n_of_z(show=True):
     if show:
         plt.show()
     else:
-        plt.savefig('figs/modelling/etas_of_z_' + MGL.Survey.survey_name + '.png')
+        plt.savefig('/home/s2561233/Documents/lss/nonlinear-bias-3x2-MG/new-MGlensing/MGlensing/figs/modelling/c_ell/etas_of_z_' + MGL.Survey.survey_name + '.png')
 
 def plot_cells_ratio(type, cl_ll_list, cl_lg_list, cl_gg_list, show=True, names="", annotation=""):
     types = ['LL', 'LG', 'GG']
@@ -68,7 +70,7 @@ def plot_cells_ratio(type, cl_ll_list, cl_lg_list, cl_gg_list, show=True, names=
     ax[int(nbin / 2)][0].set_ylabel('$C^{\\rm ' + types[type] + '}_{\ell}$ ratio')
     ax[1, 1].annotate(annotation, (1.1, 0.05), xycoords='axes fraction', clip_on=False)
     plt.tight_layout()
-    plt.show() if show else plt.savefig('figs/modelling/c_ells_' + types[type] + '_' + MGL.Survey.survey_name + '_ratio.png')
+    plt.show() if show else plt.savefig('/home/s2561233/Documents/lss/nonlinear-bias-3x2-MG/new-MGlensing/MGlensing/figs/modelling/c_ell/c_ells_' + types[type] + '_' + MGL.Survey.survey_name + '_ratio.png')
 
 def plot_cells(type, cl_ll_list, cl_lg_list, cl_gg_list, show=True, names="", annotation=""):
     types = ['LL', 'LG', 'GG']
@@ -93,15 +95,55 @@ def plot_cells(type, cl_ll_list, cl_lg_list, cl_gg_list, show=True, names="", an
     ax[int(nbin / 2)][0].set_ylabel('$C^{\\rm ' + types[type] + '}_{\ell}$')
     ax[1, 1].annotate(annotation, (1.1, 0.05), xycoords='axes fraction', clip_on=False)
     plt.tight_layout()
-    plt.show() if show else plt.savefig('figs/modelling/c_ells_' + types[type] + '_' + MGL.Survey.survey_name + '.png')
+    plt.show() if show else plt.savefig('/home/s2561233/Documents/lss/nonlinear-bias-3x2-MG/new-MGlensing/MGlensing/figs/modelling/c_ell/c_ells_' + types[type] + '_' + MGL.Survey.survey_name + '.png')
 
+def plot_deltaCl(ell_list, cl_list_1, cl_list_2, cl_list_3, errors, show=True, label="", annotation=""):
+    ''' 
+    Plot the difference between the two Cls divided by the errors (Cl1-Cl2)/sigma.
+    cl_list_1, cl_list_2: list of Cls to be compared, each one contains [LL, LG, GG].
+    errors: list of errors for Cl.
+    '''
+    types = ['LL', 'LG', 'GG']
+    lmax = [ell_list[0][-1], ell_list[1][-1], ell_list[2][-1]]
+    lmax_ij = [l_wl_max, l_gc_max, l_gc_max]
 
+    for type_idx, type_name in enumerate(types):
+        fig, axes = plt.subplots(figsize=(8, 8), nrows=nbin, ncols=nbin, sharex=True, sharey=True, facecolor='w')
+        for i in range(nbin):
+            for j in range(nbin):
+                if i < j:
+                    axes[i, j].axis('off')
+                else:
+                    # Calculate delta Cl
+                    delta_cl12 = (cl_list_2[type_idx][:, i, j] - cl_list_1[type_idx][:, i, j]) / errors[type_idx][:, i, j]
+                    delta_cl13 = (cl_list_3[type_idx][:, i, j] - cl_list_1[type_idx][:, i, j]) / errors[type_idx][:, i, j]
+                    # Plot delta Cl
+                    axes[i, j].semilogx(ell_list[type_idx], delta_cl12, label=label if i == 0 and j == 0 else "")
+                    axes[i, j].semilogx(ell_list[type_idx], delta_cl13, label=label if i == 0 and j == 0 else "")
+                    axes[i, j].axhline(y=0, color='gray', linestyle='--')
+                    # Plot scale cuts
+                    axes[i,j].text(.4, .9, 'bin %s, %s'%(str(i+1),(j+1)), fontsize="medium", horizontalalignment='center', transform=axes[i,j].transAxes)  
+                    axes[i,j].axvspan(xmin=lmax_ij[type_idx][i, j], xmax=lmax[type_idx], color='grey', alpha=0.1)
+                    axes[i,j].set_ylim(-10, 15)
+        for i in range(nbin):
+            axes[nbin - 1][i].set_xlabel('$\ell$')
+        axes[int(nbin / 2)][0].set_ylabel(f'$\\Delta C^{{\\rm {type_name}}}_{{\\ell}} / \\sigma$')
+        axes[1, 1].annotate(annotation, (1.1, 0.05), xycoords='axes fraction', clip_on=False)
+        fig.legend(['b1b2-HEFT', 'b1beb2-HEFT'], loc='upper right', ncol=1, bbox_to_anchor=(1, 0.93), bbox_transform=fig.transFigure, fontsize=15)
+        fig.suptitle('kmax=0.7') #  kmax = config.yaml')
+        plt.subplots_adjust(wspace=0.1, hspace=0.1)  # Reduce space between subplots
+        plt.tight_layout()
+        if show:
+            plt.show()
+        else:
+            plt.savefig(f'/home/s2561233/Documents/lss/nonlinear-bias-3x2-MG/new-MGlensing/MGlensing/figs/modelling/c_ell/deltaCl_{type_name}_{MGL.Survey.survey_name}_with_b_extra.png')
 params = {
     'Omega_m' :  0.315,
     'Omega_c' :  0.315-0.05,
     'Omega_cb' :  0.315,
     'Omega_nu':  0.,
     'As'      :  np.exp(3.07)*1.e-10,
+    'sigma8_cb': 0.83,
     'Omega_b' :  0.05,
     'ns'      :  0.96,
     'h'       :  0.67,
@@ -125,7 +167,7 @@ b0 = 0.68
 bias1_arr = np.array([b0*(1.+z_bin_center_i) for z_bin_center_i in MGL.Survey.z_bin_center_l ])
 bias2_arr = bias1_arr*2. 
 print('bias1_arr , bias2_arr: ', bias1_arr , bias2_arr)
-bias1_arr = np.array([1.239, 1.378, 1.525, 1.677, 1.832])
+# bias1_arr = np.array([1.239, 1.378, 1.525, 1.677, 1.832])
 biasL1_arr = bias1_arr-1
 #Lagrangian co-evolution 
 b2_arr = np.array([-0.258, -0.062, 0.107, 0.267, 0.462])
@@ -136,6 +178,7 @@ biasLs2_arr = np.zeros(nbin)
 biasLlapl_arr = np.zeros(nbin) 
 for bin_i in range(nbin):
     params[f'b1_{bin_i+1}']=bias1_arr[bin_i]
+    params[f'be_{bin_i+1}']=0.
     params[f'b2_{bin_i+1}']=bias2_arr[bin_i]
     params[f'b1L_{bin_i+1}']=biasL1_arr[bin_i]
     params[f'b2L_{bin_i+1}']=biasL2_arr[bin_i]
@@ -145,7 +188,7 @@ for bin_i in range(nbin):
 err_cl_ll, err_cl_gg, err_cl_lg  = MGL.get_errorbars(params)
 
 models = {
-    'hmcode': {'nl_model': NL_MODEL_HMCODE, 'bias_model': BIAS_LIN, 'ia_model': 0, 'baryon_model': NO_BARYONS, 'photoz_err_model': 0.},
+    'hmcode': {'nl_model': NL_MODEL_BACCO, 'bias_model': BIAS_LIN, 'ia_model': 0, 'baryon_model': NO_BARYONS, 'photoz_err_model': 0.},
     'bacco': {'nl_model': NL_MODEL_BACCO, 'bias_model': BIAS_LIN, 'ia_model': 0, 'baryon_model': NO_BARYONS, 'photoz_err_model': 0.}
     }
 
@@ -157,8 +200,28 @@ cl_ll_hm, cl_gg_hm, cl_lg_hm  = cls_dic['hmcode'][:-1]
 cl_ll_bacco, cl_gg_bacco, cl_lg_bacco = cls_dic['bacco'][:-1]
 
 
-for type_i, cl_hm, cl_bacco in zip([0, 1, 2], [cl_ll_hm, cl_lg_hm, cl_gg_hm], [cl_ll_bacco, cl_lg_bacco, cl_gg_bacco]):
-    plot_cells(type_i, [cl_hm, cl_bacco], [cl_hm, cl_bacco], [cl_hm, cl_bacco], False, names=['hmcode', 'bacco'])
+# for type_i, cl_hm, cl_bacco in zip([0, 1, 2], [cl_ll_hm, cl_lg_hm, cl_gg_hm], [cl_ll_bacco, cl_lg_bacco, cl_gg_bacco]):
+#     plot_cells(type_i, [cl_hm, cl_bacco], [cl_hm, cl_bacco], [cl_hm, cl_bacco], False, names=['hmcode', 'bacco'])
 
-for type_i, cl_hm, cl_bacco in zip([0, 1, 2], [cl_ll_hm, cl_lg_hm, cl_gg_hm], [cl_ll_bacco, cl_lg_bacco, cl_gg_bacco]):
-    plot_cells_ratio(type_i, [cl_hm, cl_bacco], [cl_hm, cl_bacco], [cl_hm, cl_bacco], False, names=['hmcode', 'bacco'])
+# for type_i, cl_hm, cl_bacco in zip([0, 1, 2], [cl_ll_hm, cl_lg_hm, cl_gg_hm], [cl_ll_bacco, cl_lg_bacco, cl_gg_bacco]):
+#     plot_cells_ratio(type_i, [cl_hm, cl_bacco], [cl_hm, cl_bacco], [cl_hm, cl_bacco], False, names=['hmcode', 'bacco'])
+
+
+cl_ll_b1b2, cl_gg_b1b2, cl_lg_b1b2, _ = MGL.get_c_ells(params, {'nl_model': NL_MODEL_BACCO, 'bias_model': BIAS_B1B2, 'ia_model': 0, 'baryon_model': NO_BARYONS, 'photoz_err_model': 0.})
+cl_ll_heft, cl_gg_heft, cl_lg_heft, _ = MGL.get_c_ells(params, {'nl_model': NL_MODEL_BACCO, 'bias_model': BIAS_HEFT, 'ia_model': 0, 'baryon_model': NO_BARYONS, 'photoz_err_model': 0.})
+cl_heft_list = [cl_ll_heft, cl_gg_heft, cl_lg_heft]
+cl_b1b2_list = [cl_ll_b1b2, cl_gg_b1b2, cl_lg_b1b2]
+heft_err_list = [err_cl_ll, err_cl_gg, err_cl_lg]
+
+b_extra_arr = bias1_arr*0.5
+for bin_i in range(nbin):
+    params[f'be_{bin_i+1}']=b_extra_arr[bin_i]
+
+cl_ll_b1beb2, cl_gg_b1beb2, cl_lg_b1beb2, _ = MGL.get_c_ells(params, {'nl_model': NL_MODEL_BACCO, 'bias_model': BIAS_B1B2, 'ia_model': 0, 'baryon_model': NO_BARYONS, 'photoz_err_model': 0.})
+cl_b1beb2_list = [cl_ll_b1beb2, cl_gg_b1beb2, cl_lg_b1beb2]
+
+print(bias1_arr)
+print(bias2_arr)
+print(b_extra_arr)
+
+plot_deltaCl([l_wl, l_gc, l_xc], cl_heft_list, cl_b1b2_list, cl_b1beb2_list, heft_err_list, False)

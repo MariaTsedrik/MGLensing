@@ -10,8 +10,12 @@ __pycache__/
 # Chains
 chains/euclid/
 chains/lsst/
+chains/
 chains/mg/
 
+# Test plots
+figs/posteriors/unofficial/
+figs/other/
 
 # Distribution / packaging
 .Python

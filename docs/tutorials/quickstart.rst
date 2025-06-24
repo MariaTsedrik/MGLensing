@@ -29,7 +29,10 @@ The choice of emulators and models need to be written in the file ``config.yaml`
     photoz_err_model: 0
     params: ./params_analysis_test.yaml
 
-Please refer to the complete file to see all options and sections not listed here. For this example we choose to vary cosmological 
+Please refer to the complete file to see all options and sections not listed here. Note that there are three options for the choice of scale cuts type:
+``const_lmax``, ``lmax`` and ``kmax``. If ``cont_lmax`` is chosen, the constant :math:`\ell_{\rm max}` will be taken as the first value of the list provided as input.
+
+For this example we choose to vary cosmological 
 and intrinsic alignment parameters, considering no baryonic feedback and no photo-z error on the sources and lenses distribution.
 
 The fiducial values to build the mock data has to be written in ``params_data.yaml``, while ``params_bacco_test.yaml`` contains 

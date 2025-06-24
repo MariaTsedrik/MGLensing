@@ -1,14 +1,19 @@
+import MGLensing
 import os
 os.environ["OMP_NUM_THREADS"] = "1"
-#os.environ["OMP_PLACES"] = "threads"
+# os.environ["MKL_NUM_THREADS"] = "1"
+# os.environ["NUMEXPR_NUM_THREADS"] = "1"
+# os.environ["OMP_PLACES"] = "threads"
+# os.environ["OMP_PROC_BIND"] = "spread"
 from nautilus import Prior, Sampler
 import numpy as np
-import MGLensing
 import time
 import matplotlib.pyplot as plt
 from scipy.stats import norm
-import multiprocessing
 from datetime import timedelta
+import multiprocessing
+folder = os.path.dirname(os.path.abspath(__file__))
+os.chdir(folder)
 
 
 
@@ -35,7 +40,7 @@ os.makedirs('chains/hdf5', exist_ok=True)
 
 def main():    
     sampler = Sampler(prior, log_probability_function, 
-                      filepath='chains/hdf5/'+MGLtest.hdf5_name+'.hdf5', resume=MGLtest.mcmc_resume, n_live=MGLtest.mcmc_nlive, pool=MGLtest.mcmc_pool)
+                        filepath='chains/hdf5/'+MGLtest.hdf5_name+'.hdf5', resume=MGLtest.mcmc_resume, n_live=MGLtest.mcmc_nlive, pool=MGLtest.mcmc_pool)
     start = time.time()
     sampler.run(verbose=MGLtest.mcmc_verbose, discard_exploration=True, n_eff=5000)
     log_z = sampler.evidence()
@@ -43,7 +48,8 @@ def main():
     finish = time.time()
     chain_time = finish-start
 
-    np.savetxt("chains/chain_"+MGLtest.chain_name+".txt", np.c_[points, log_w, log_l], header=MGLtest.gen_output_header(), footer='log_Z = {log_z};  chain_time = {chain_time} (--> {chain_time_hms} hh:mm:ss)'.format(log_z=log_z, chain_time=chain_time, chain_time_hms=timedelta(seconds=chain_time)))
+    np.savetxt("chains/chain_"+MGLtest.chain_name+".txt", np.c_[points, log_w, log_l], header=MGLtest.gen_output_header(), 
+               footer='log_Z = {log_z};  chain_time = {chain_time} (--> {chain_time_hms} hh:mm:ss)'.format(log_z=log_z, chain_time=chain_time, chain_time_hms=timedelta(seconds=chain_time)))
 
 
 if __name__ == "__main__":

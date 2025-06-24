@@ -1,12 +1,14 @@
 import sys
 import os
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
+folder = os.path.abspath(os.path.join(os.path.dirname(__file__), '..'))
+os.chdir(folder)
 import numpy as np
 import MGLensing
 import yaml
 import matplotlib.pyplot as plt
 from matplotlib import rc
-rc('text', usetex=True)
+rc('text', usetex=False)
 rc('font',**{'family':'serif','serif':['Times']})
 SMALL_SIZE = 16
 MEDIUM_SIZE = 18
@@ -69,7 +71,7 @@ for bin_i in range(nbin):
 ranges_all = {
         'Omega_cb':     {'p1': 0.23,         'p2': 0.4},    
         'Omega_b':      {'p1':0.04,          'p2': 0.06},  
-        'Omega_m':     {'p1': 0.25,         'p2': 0.37}, 
+        'Omega_m':      {'p1': 0.25,         'p2': 0.37}, 
         'h':            {'p1': 0.6,          'p2': 0.8},      
         'sigma8_cb':    {'p1': 0.73,         'p2': 0.9},
         'ns':           {'p1': 0.92,         'p2': 1.01}, 
@@ -93,16 +95,17 @@ print('fiducial like: ', fid_like)
 loglike = {}
 vary_pars_dic = {}
 n_points = 20
-#cosmo_pars = ['Omega_m', 'sigma8_cb', 'Omega_b', 'h', 'ns', 'Mnu', 'w0', 'wa', 'a1_IA', 'eta1_IA']
-cosmo_pars = ['Omega_m', 'sigma8_cb', 'Omega_b', 'h', 'ns', 'Mnu', 'w0', 'wa']
+cosmo_pars = ['Omega_m', 'sigma8_cb', 'Omega_b', 'h', 'ns', 'Mnu', 'w0', 'wa', 'a1_IA', 'eta1_IA']
+
 #b1L = np.array([f'b1L_{bin_i+1}' for bin_i in range(nbin)])
 #b2L = np.array([f'b2L_{bin_i+1}' for bin_i in range(nbin)])
 #bs2L = np.array([f'bs2L_{bin_i+1}' for bin_i in range(nbin)])
 #blL = np.array([f'blaplL_{bin_i+1}' for bin_i in range(nbin)])
 #cosmo_pars = np.concatenate((b1L, b2L, bs2L, blL))
 
-#cosmo_pars = ['log10Mc_bc', 'eta_bc', 'beta_bc', 'log10Mz0_bc', 'thetaout_bc',  'thetainn_bc', 'log10Minn_bc']
+# cosmo_pars = ['log10Mc_bc', 'eta_bc', 'beta_bc', 'log10Mz0_bc', 'thetaout_bc',  'thetainn_bc', 'log10Minn_bc']
 params_new = {}
+print('computing likelihoods...')
 for pars in cosmo_pars:
     vary_pars = np.linspace(ranges_all[pars]['p1'], ranges_all[pars]['p2'], n_points)
     #vary_pars = np.linspace(ranges_all['bias']['p1'], ranges_all['bias']['p2'], n_points)
