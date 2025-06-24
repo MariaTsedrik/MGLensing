@@ -260,7 +260,35 @@ class MGL():
         # save values of parameters (cosmological and nuisances)
         with open(self.config_dic['theory']['params'], "r", encoding="utf-8") as file_in:
             params_dic = yaml.safe_load(file_in)
-
+        # if sampling in bias*sigma8 change values of bias as bias = bias*sigma8 THIS WORKS ONLY IN THE THEORY NOT IN THE FIDUCIALS IN params_data => FIX THIS!!!
+        if self.theo_model_dic['bias_model'] == 5:
+            for i in range(1, 6):
+                # change fiducials
+                params_dic['b1_'+str(i)]['p0'] = params_dic['b1_'+str(i)]['p0']*params_dic['sigma8_cb']['p0']
+                # change prior ranges
+                if params_dic['b1_'+str(i)]['type'] == 'U':
+                    params_dic['b1_'+str(i)]['p1'] = params_dic['b1_'+str(i)]['p1']*params_dic['sigma8_cb']['p1']
+                    params_dic['b1_'+str(i)]['p2'] = params_dic['b1_'+str(i)]['p2']*params_dic['sigma8_cb']['p2']
+        if self.theo_model_dic['bias_model'] == 6:
+            for i in range(1, 6):
+                # change fiducials
+                params_dic['b1L_'+str(i)]['p0'] = params_dic['b1L_'+str(i)]['p0']*params_dic['sigma8_cb']['p0']
+                params_dic['b2L_'+str(i)]['p0'] = params_dic['b2L_'+str(i)]['p0']*params_dic['sigma8_cb']['p0']
+                params_dic['bs2L_'+str(i)]['p0'] = params_dic['bs2L_'+str(i)]['p0']*params_dic['sigma8_cb']['p0']
+                params_dic['blaplL_'+str(i)]['p0'] = params_dic['blaplL_'+str(i)]['p0']*params_dic['sigma8_cb']['p0']
+                # change prior ranges
+                if params_dic['b1L_'+str(i)]['type'] == 'U':
+                    params_dic['b1L_'+str(i)]['p1'] = params_dic['b1L_'+str(i)]['p1']*params_dic['sigma8_cb']['p1']
+                    params_dic['b1L_'+str(i)]['p2'] = params_dic['b1L_'+str(i)]['p2']*params_dic['sigma8_cb']['p2']
+                if params_dic['b2L_'+str(i)]['type'] == 'U':
+                    params_dic['b2L_'+str(i)]['p1'] = params_dic['b2L_'+str(i)]['p1']*params_dic['sigma8_cb']['p1']
+                    params_dic['b2L_'+str(i)]['p2'] = params_dic['b2L_'+str(i)]['p2']*params_dic['sigma8_cb']['p2']
+                if params_dic['bs2L_'+str(i)]['type'] == 'U':
+                    params_dic['bs2L_'+str(i)]['p1'] = params_dic['bs2L_'+str(i)]['p1']*params_dic['sigma8_cb']['p1']
+                    params_dic['bs2L_'+str(i)]['p2'] = params_dic['bs2L_'+str(i)]['p2']*params_dic['sigma8_cb']['p2']
+                if params_dic['blaplL_'+str(i)]['type'] == 'U':
+                    params_dic['blaplL_'+str(i)]['p1'] = params_dic['blaplL_'+str(i)]['p1']*params_dic['sigma8_cb']['p1']
+                    params_dic['blaplL_'+str(i)]['p2'] = params_dic['blaplL_'+str(i)]['p2']*params_dic['sigma8_cb']['p2']
         # initialise data 
         self.Data = DataClass(self.data_model_dic, self.Survey)
         # initialise model
@@ -319,7 +347,7 @@ class MGL():
             params['sigma8_cb'] = NewModel.StructureEmu.get_sigma8_cb(params)
         pmm, bar_boost = NewModel.get_pmm(params)
         NewModel.pmm = pmm
-        if NewModel.flag_heft:
+        if NewModel.flag_heft or NewModel.flag_sample_bheftsigma8:
             NewModel.pk_exp, NewModel.pk_exp_extr = NewModel.get_heft_pk_exp(params)
             pgm = NewModel.get_pgm(params)*np.sqrt(bar_boost[:, :, None]) 
         else:
@@ -380,7 +408,7 @@ class MGL():
         NewModel.deltaz_s, NewModel.deltaz_l = NewModel.get_deltaz(params)
         NewModel.pmm, bar_boost = NewModel.get_pmm(params)
         NewModel.pmm_no_barboost = NewModel.pmm/bar_boost
-        if NewModel.flag_heft:
+        if NewModel.flag_heft or NewModel.flag_sample_bheftsigma8:
             NewModel.pk_exp, NewModel.pk_exp_extr = NewModel.get_heft_pk_exp(params)
             if NewModel.flag_heft_pnl_bar:
                 NewModel.pgm = NewModel.get_pgm(params)
@@ -525,7 +553,7 @@ class MGL():
         def get_model_label(value, model_type):
             model_maps = {
                 "nl_model": {0: "HMcode", 1: "bacco", 2: "nDGP", 3: "gLEMURS", 4: "mu-Sigma", 5:"Dark Scattering"},
-                "bias_model": {0: "b1 constant within bins", 1: "(b1, b2) constant within bins", 2: "HEFT"},
+                "bias_model": {0: "b1 constant within bins", 1: "(b1, b2) constant within bins", 2: "HEFT", 3: 'HEFT with Pnl', 4: 'HEFT with Pnl*S', 5: 'sample in b1*sigma8', 6: 'sample in heft*sigma8'},
                 "ia_model": {0: "zNLA", 1: "TATT"},
                 "baryon_model": {0: "no baryons", 1: "Tagn HMcode", 2: "bcemu", 3: "bacco"},
                 "photoz_err_model": {0: "no photo-z error", 1: "additive mode, n(z') = n(z + dz)", 2: "multiplicative mode, n(z') = n(z(1 + dz))"}

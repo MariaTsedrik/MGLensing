@@ -45,6 +45,8 @@ BIAS_B1B2 = 1
 BIAS_HEFT = 2
 BIAS_HEFT_PNL = 3
 BIAS_HEFT_PNL_BAR = 4
+BIAS_LIN_SIGMA8 = 5
+BIAS_HEFT_SIGMA8 = 6
 
 PHOTOZ_NONE = 0
 PHOTOZ_ADD = 1
@@ -201,16 +203,20 @@ class Theory:
         self.flag_heft = (model['bias_model'] == BIAS_HEFT) or (model['bias_model'] == BIAS_HEFT_PNL) or (model['bias_model'] == BIAS_HEFT_PNL_BAR)
         self.flag_heft_pnl_bar = (model['bias_model'] == BIAS_HEFT_PNL_BAR)
         self.flag_heft_pnl = (model['bias_model'] == BIAS_HEFT_PNL)
+        self.flag_sample_blinsigma8 = (model['bias_model'] == BIAS_LIN_SIGMA8)
+        self.flag_sample_bheftsigma8 = (model['bias_model'] == BIAS_HEFT_SIGMA8)
         bias_models = {
             BIAS_LIN: (self.get_pgm_lin_bias, self.get_pgg_lin_bias),
             BIAS_B1B2: (self.get_pgm_quadr_bias, self.get_pgg_quadr_bias),
             BIAS_HEFT: (self.get_pgm_heft_bias, self.get_pgg_heft_bias),
             BIAS_HEFT_PNL: (self.get_pgm_heft_bias_pnl, self.get_pgg_heft_bias_pnl),
-            BIAS_HEFT_PNL_BAR: (self.get_pgm_heft_bias_pnl, self.get_pgg_heft_bias_pnl)
+            BIAS_HEFT_PNL_BAR: (self.get_pgm_heft_bias_pnl, self.get_pgg_heft_bias_pnl),
+            BIAS_LIN_SIGMA8: (self.get_pgm_lin_bias, self.get_pgg_lin_bias),
+            BIAS_HEFT_SIGMA8: (self.get_pgm_heft_bias, self.get_pgg_heft_bias)
         }
         try:
             self.get_pgm, self.get_pgg = bias_models[model['bias_model']]
-            if self.flag_heft:
+            if self.flag_heft or self.flag_sample_bheftsigma8:
                 self.BaccoEmuClass = BaccoEmu()
         except KeyError:
             raise ValueError("Invalid bias_model option.")
@@ -967,22 +973,43 @@ class Theory:
         p_s2s2 = pk_exp[12, :, :] 
         p_s2k2 = pk_exp[13, :, :] 
         p_k2k2 = pk_exp[14, :, :] 
-        pgg = (p_dmdm[:,:,None,None]  +
-            (bL1[None,None,:,None]+bL1[None,None, None, :]) * p_dmd1[:,:,None,None] +
-            (bL1[None,None, :,None]*bL1[None,None, None, :]) * p_d1d1[:,:,None,None] +
-            (bL2[None,None, :,None] + bL2[None,None, None, :]) * p_dmd2[:,:,None,None] +
-            (bs2[None,None, :,None] + bs2[None,None, None, :]) * p_dms2[:,:,None,None] +
-            (bL1[None,None, :,None]*bL2[None,None, None, :] + bL1[None,None, None, :]*bL2[None,None, :,None]) * p_d1d2[:,:,None,None] +
-            (bL1[None,None, :,None]*bs2[None,None, None, :] + bL1[None,None, None, :]*bs2[None,None, :,None]) * p_d1s2[:,:,None,None] +
-            (bL2[None,None, :,None]*bL2[None,None, None, :]) * p_d2d2[:,:,None,None] +
-            (bL2[None,None, :,None]*bs2[None,None, None, :] + bL2[None,None, None, :]*bs2[None,None, :,None]) * p_d2s2[:,:,None,None] +
-            (bs2[None,None, :,None]*bs2[None,None, None, :])* p_s2s2[:,:,None,None] +
-            (blapl[None,None, :,None] + blapl[None,None, None, :]) * p_dmk2[:,:,None,None] +
-            (bL1[None,None, None, :] * blapl[None,None, :,None] + bL1[None,None, :,None] * blapl[None,None, None, :]) * p_d1k2[:,:,None,None] +
-            (bL2[None,None, None, :] * blapl[None,None, :,None] + bL2[None,None, :,None] * blapl[None,None, None, :]) * p_d2k2[:,:,None,None] +
-            (bs2[None,None, None, :] * blapl[None,None, :,None] + bs2[None,None, :,None] * blapl[None,None, None, :]) * p_s2k2[:,:,None,None] +
-            (blapl[None,None, :,None] * blapl[None,None, None, :]) * p_k2k2[:,:,None,None])
-        pgg_extr = (1.+bL1[None,None, :,None])*(1.+bL1[None,None, None, :]) * pk_exp_extr[:,:,None,None]
+        if self.flag_heft:
+            pgg = (p_dmdm[:,:,None,None]  +
+                (bL1[None,None,:,None]+bL1[None,None, None, :]) * p_dmd1[:,:,None,None] +
+                (bL1[None,None, :,None]*bL1[None,None, None, :]) * p_d1d1[:,:,None,None] +
+                (bL2[None,None, :,None] + bL2[None,None, None, :]) * p_dmd2[:,:,None,None] +
+                (bs2[None,None, :,None] + bs2[None,None, None, :]) * p_dms2[:,:,None,None] +
+                (bL1[None,None, :,None]*bL2[None,None, None, :] + bL1[None,None, None, :]*bL2[None,None, :,None]) * p_d1d2[:,:,None,None] +
+                (bL1[None,None, :,None]*bs2[None,None, None, :] + bL1[None,None, None, :]*bs2[None,None, :,None]) * p_d1s2[:,:,None,None] +
+                (bL2[None,None, :,None]*bL2[None,None, None, :]) * p_d2d2[:,:,None,None] +
+                (bL2[None,None, :,None]*bs2[None,None, None, :] + bL2[None,None, None, :]*bs2[None,None, :,None]) * p_d2s2[:,:,None,None] +
+                (bs2[None,None, :,None]*bs2[None,None, None, :])* p_s2s2[:,:,None,None] +
+                (blapl[None,None, :,None] + blapl[None,None, None, :]) * p_dmk2[:,:,None,None] +
+                (bL1[None,None, None, :] * blapl[None,None, :,None] + bL1[None,None, :,None] * blapl[None,None, None, :]) * p_d1k2[:,:,None,None] +
+                (bL2[None,None, None, :] * blapl[None,None, :,None] + bL2[None,None, :,None] * blapl[None,None, None, :]) * p_d2k2[:,:,None,None] +
+                (bs2[None,None, None, :] * blapl[None,None, :,None] + bs2[None,None, :,None] * blapl[None,None, None, :]) * p_s2k2[:,:,None,None] +
+                (blapl[None,None, :,None] * blapl[None,None, None, :]) * p_k2k2[:,:,None,None])
+            pgg_extr = (1.+bL1[None,None, :,None])*(1.+bL1[None,None, None, :]) * pk_exp_extr[:,:,None,None]
+        elif self.flag_sample_bheftsigma8:
+            sigma8 = params_dic['sigma8_cb']        
+            pgg = (p_dmdm[:,:,None,None]  +
+                (bL1[None,None, :,None]+bL1[None,None, None, :]) * p_dmd1[:,:,None,None] / sigma8 +
+                (bL1[None,None, :,None]*bL1[None,None, None, :]) * p_d1d1[:,:,None,None] / sigma8**2 +
+                (bL2[None,None, :,None] + bL2[None,None, None, :]) * p_dmd2[:,:,None,None] / sigma8**2 +
+                (bs2[None,None, :,None] + bs2[None,None, None, :]) * p_dms2[:,:,None,None] / sigma8**2 +
+                (bL1[None,None, :,None]*bL2[None,None, None, :] + bL1[None,None, None, :]*bL2[None,None, :,None]) * p_d1d2[:,:,None,None] / sigma8**3 +
+                (bL1[None,None, :,None]*bs2[None,None, None, :] + bL1[None,None, None, :]*bs2[None,None, :,None]) * p_d1s2[:,:,None,None] / sigma8**3 +
+                (bL2[None,None, :,None]*bL2[None,None, None, :]) * p_d2d2[:,:,None,None] / sigma8**4 +
+                (bL2[None,None, :,None]*bs2[None,None, None, :] + bL2[None,None, None, :]*bs2[None,None, :,None]) * p_d2s2[:,:,None,None] / sigma8**4 +
+                (bs2[None,None, :,None]*bs2[None,None, None, :])* p_s2s2[:,:,None,None] / sigma8**4 +
+                (blapl[None,None, :,None] + blapl[None,None, None, :]) * p_dmk2[:,:,None,None] / sigma8**3 +
+                (bL1[None,None, None, :] * blapl[None,None, :,None] + bL1[None,None, :,None] * blapl[None,None, None, :]) * p_d1k2[:,:,None,None] / sigma8**4 +
+                (bL2[None,None, None, :] * blapl[None,None, :,None] + bL2[None,None, :,None] * blapl[None,None, None, :]) * p_d2k2[:,:,None,None] / sigma8**5 +
+                (bs2[None,None, None, :] * blapl[None,None, :,None] + bs2[None,None, :,None] * blapl[None,None, None, :]) * p_s2k2[:,:,None,None] / sigma8**5 +
+                (blapl[None,None, :,None] * blapl[None,None, None, :]) * p_k2k2[:,:,None,None] / sigma8**6)
+            pgg_extr = (1.+bL1[None,None, :,None])*(1.+bL1[None,None, None, :]) * pk_exp_extr[:,:,None,None] / sigma8**2
+        else:
+            KeyError('HEFT model not acceptable')
         pgg += pgg_extr 
         # return dimension (lbin, z_integr, bin_i, bin_j)
         return pgg
@@ -1309,11 +1336,14 @@ class Theory:
         self.dz, _ = self.StructureEmu.get_growth(params_dic, self.Survey.zz_integr)
         # get redshift uncertainties
         self.deltaz_s, self.deltaz_l = self.get_deltaz(params_dic)
-        if self.flag_heft:
+        if self.flag_heft or self.flag_sample_bheftsigma8:
             self.pk_exp, self.pk_exp_extr = self.get_heft_pk_exp(params_dic)
             if self.flag_heft_pnl_bar or self.flag_heft_pnl:
                 self.pmm, bar_boost = self.get_pmm(params_dic)
                 self.pmm_no_barboost = self.pmm/bar_boost 
+        elif self.flag_sample_blinsigma8:
+            self.pmm, _, _ = self.get_pmm(params_dic)
+            self.pmm /= params_dic['sigma8_cb']**2
         else:
             self.pmm, _ = self.get_pmm(params_dic)  
         self.pgg = self.get_pgg(params_dic)
@@ -1355,7 +1385,7 @@ class Theory:
         self.pmm, bar_boost = self.get_pmm(params_dic)
         self.pmm_no_barboost = self.pmm/bar_boost
         # compute galaxy-matter power spectrum
-        if self.flag_heft:
+        if self.flag_heft or self.flag_sample_bheftsigma8:
             self.pk_exp, self.pk_exp_extr = self.get_heft_pk_exp(params_dic)
             if self.flag_heft_pnl_bar:
                 self.pgm = self.get_pgm(params_dic)
