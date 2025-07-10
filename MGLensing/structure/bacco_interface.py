@@ -176,7 +176,7 @@ class BaccoEmu:
         self.kh_lin_heft_right = kh_lin_[kh_lin_>k_max_heft]
         self.kh_heft_last = self.kh_heft[-1]
         self.log_kh_heft = log(self.kh_heft_last / self.kh_heft[-2])
-        self.kh_heft_tot = np.concatenate((self.kh_heft, self.kh_lin_heft_right))
+        self.kh_heft_tot = np.concatenate((self.kh_lin_left, self.kh_heft, self.kh_lin_heft_right))
 
 
         self.kh_lin = self.kh_tot # IMPORTANT LATER USED IN TATT
@@ -410,23 +410,332 @@ class BaccoEmu:
                                     self.kh_tot,
                                     plin_bacco[::-1, :],
                                     kx=1, ky=1)
-        #print('last entries (z): ', pnn[:, -2:])
         # power law extrapolation for k>0.71 h/Mpc
-        pnn_tot = np.zeros((15, len(self.z_nl_bacco), len(self.kh_heft_tot)), 'float64')
-        for i in range(15):
-            pnn_right = powerlaw_highk_extrap(pnn[i], self.log_kh_heft, self.kh_heft_last, self.kh_lin_heft_right, len(self.z_nl_bacco))
-            pnn_tot[i] = np.concatenate((pnn[i], pnn_right), axis=1)
-        pnn_interp = [RectBivariateSpline(self.z_nl_bacco, 
-                                    self.kh_heft_tot,
-                                    pnn_i[::-1, :],
-                                    kx=1, ky=1) for pnn_i in pnn_tot]
+        #pnn_tot = np.zeros((15, len(self.z_nl_bacco), len(self.kh_heft_tot)), 'float64')
+        #for i in range(15):
+        #    pnn_right = powerlaw_highk_extrap(pnn[i], self.log_kh_heft, self.kh_heft_last, self.kh_lin_heft_right, len(self.z_nl_bacco))
+        #    pnn_tot[i] = np.concatenate((pnn[i], pnn_right), axis=1)
         #pnn_interp = [RectBivariateSpline(self.z_nl_bacco, 
-        #                            self.kh_heft,
+        #                            self.kh_heft_tot,
         #                            pnn_i[::-1, :],
-        #                            kx=1, ky=1) for pnn_i in pnn]
+        #                            kx=1, ky=1) for pnn_i in pnn_tot]
+        pnn_interp = [RectBivariateSpline(self.z_nl_bacco, 
+                                    self.kh_heft,
+                                    pnn_i[::-1, :],
+                                    kx=1, ky=1) for pnn_i in pnn]
         return pnn_interp, plin_interp 
     
+    def get_heft_pgg_zextr_lin(self, params_dic, k, lbin, zz_integr, nbin=5, flag_sample_bheftsigma8=False):
+        ns   = params_dic['ns']
+        h    = params_dic['h']
+        w0    = params_dic['w0']
+        wa    = params_dic['wa']
+        sigma8_cb = params_dic['sigma8_cb']
+        omega_cb = params_dic['Omega_cb']
+        omega_b = params_dic['Omega_b']
+        m_nu  = params_dic['Mnu']
+        params_bacco = {
+                'ns'            :  ns,
+                'hubble'        :  h,
+                'sigma8_cold'   :  sigma8_cb,
+                'omega_baryon'  :  omega_b,
+                'omega_cold'    :  omega_cb,
+                'neutrino_mass' :  m_nu,
+                'w0'            :  w0,
+                'wa'            :  wa,
+                'expfactor'     :  self.aa_nl
+            }
+        _, pnn = self.heftemulator.get_nonlinear_pnn(k=self.kh_heft, **params_bacco)
+        bL1 = np.array([params_dic['b1L_'+str(i+1)] for i in range(nbin)])
+        bL2 = np.array([params_dic['b2L_'+str(i+1)] for i in range(nbin)])
+        bs2 = np.array([params_dic['bs2L_'+str(i+1)] for i in range(nbin)])
+        blapl = np.array([params_dic['blaplL_'+str(i+1)] for i in range(nbin)])   
+        # term, a, k 
+        if flag_sample_bheftsigma8:
+            sigma8 = params_dic['sigma8_cb']
+        else:
+            sigma8 = 1.
+        p_dmdm = pnn[0, :, :]        
+        p_dmd1 = pnn[1, :, :] / sigma8   
+        p_dmd2 = pnn[2, :, :] / sigma8**2        
+        p_dms2 = pnn[3, :, :] / sigma8**2        
+        p_dmk2 = pnn[4, :, :] / sigma8**3      
+        p_d1d1 = pnn[5, :, :] / sigma8**2     
+        p_d1d2 = pnn[6, :, :] / sigma8**3        
+        p_d1s2 = pnn[7, :, :] / sigma8**3         
+        p_d1k2 = pnn[8, :, :] / sigma8**3          
+        p_d2d2 = pnn[9, :, :] / sigma8**4        
+        p_d2s2 = pnn[10, :, :] / sigma8**4         
+        p_d2k2 = pnn[11, :, :] / sigma8**5
+        p_s2s2 = pnn[12, :, :] / sigma8**4 
+        p_s2k2 = pnn[13, :, :] / sigma8**5 
+        p_k2k2 = pnn[14, :, :] / sigma8**6 
+
+        pgg = (p_dmdm[:,:,None,None]  +
+                (bL1[None,None,:,None]+bL1[None,None, None, :]) * p_dmd1[:,:,None,None] +
+                (bL1[None,None, :,None]*bL1[None,None, None, :]) * p_d1d1[:,:,None,None] +
+                (bL2[None,None, :,None] + bL2[None,None, None, :]) * p_dmd2[:,:,None,None] +
+                (bs2[None,None, :,None] + bs2[None,None, None, :]) * p_dms2[:,:,None,None] +
+                (bL1[None,None, :,None]*bL2[None,None, None, :] + bL1[None,None, None, :]*bL2[None,None, :,None]) * p_d1d2[:,:,None,None] +
+                (bL1[None,None, :,None]*bs2[None,None, None, :] + bL1[None,None, None, :]*bs2[None,None, :,None]) * p_d1s2[:,:,None,None] +
+                (bL2[None,None, :,None]*bL2[None,None, None, :]) * p_d2d2[:,:,None,None] +
+                (bL2[None,None, :,None]*bs2[None,None, None, :] + bL2[None,None, None, :]*bs2[None,None, :,None]) * p_d2s2[:,:,None,None] +
+                (bs2[None,None, :,None]*bs2[None,None, None, :])* p_s2s2[:,:,None,None] +
+                (blapl[None,None, :,None] + blapl[None,None, None, :]) * p_dmk2[:,:,None,None] +
+                (bL1[None,None, None, :] * blapl[None,None, :,None] + bL1[None,None, :,None] * blapl[None,None, None, :]) * p_d1k2[:,:,None,None] +
+                (bL2[None,None, None, :] * blapl[None,None, :,None] + bL2[None,None, :,None] * blapl[None,None, None, :]) * p_d2k2[:,:,None,None] +
+                (bs2[None,None, None, :] * blapl[None,None, :,None] + bs2[None,None, :,None] * blapl[None,None, None, :]) * p_s2k2[:,:,None,None] +
+                (blapl[None,None, :,None] * blapl[None,None, None, :]) * p_k2k2[:,:,None,None])
+        
+        # extrapolation with linear power spectrum for k<0.01 h/Mpc and z>1.5
+        params_bacco_l = params_bacco
+        params_bacco_l['expfactor'] = self.aa_all
+        _, plin_bacco = self.baccoemulator.get_linear_pk(k=self.kh_heft_tot, cold=False, **params_bacco_l)
+        plin_left = plin_bacco[:, self.kh_heft_tot<self.kh_heft[0]] / sigma8**2
+        plin_left = plin_left[self.aa_all>=self.aa_nl[0], :]
+        pgg_ij = np.zeros((lbin, len(zz_integr), nbin, nbin), 'float64')
+        # extrapolation for each pgg_ij
+        for i in range(nbin):
+            for j in range(nbin):
+            # power law extrapolation for k>0.71 h/Mpc
+                pgg_right = powerlaw_highk_extrap(pgg[:, :, i, j], self.log_kh_heft, self.kh_heft_last, self.kh_lin_heft_right, len(self.aa_nl))
+                pgg_lin_left = (1.+bL1[i])*(1.+bL1[j])*plin_left
+                pgg_k  = np.concatenate((pgg_lin_left, pgg[:, :, i, j], pgg_right),axis=1)
+                pggl_highz = (1.+bL1[i])*(1.+bL1[j])*plin_bacco[self.aa_all<self.aa_nl[0], :]
+                pgg_tot  = np.concatenate((pggl_highz, pgg_k),axis=0)
+                # interpolate
+                pgg_interp = RectBivariateSpline(self.zz_all_bacco, 
+                                            self.kh_heft_tot,
+                                            pgg_tot[::-1, :],
+                                            kx=1, ky=1)
+                pgg_ij[:, :, i, j] = fill_in_ell_z_array(pgg_interp, k, lbin, zz_integr)
+        return pgg_ij 
     
+    def get_heft_pgm_zextr_lin(self, params_dic, k, lbin, zz_integr, nbin=5, flag_sample_bheftsigma8=False):
+        ns   = params_dic['ns']
+        h    = params_dic['h']
+        w0    = params_dic['w0']
+        wa    = params_dic['wa']
+        sigma8_cb = params_dic['sigma8_cb']
+        omega_cb = params_dic['Omega_cb']
+        omega_b = params_dic['Omega_b']
+        m_nu  = params_dic['Mnu']
+        params_bacco = {
+                'ns'            :  ns,
+                'hubble'        :  h,
+                'sigma8_cold'   :  sigma8_cb,
+                'omega_baryon'  :  omega_b,
+                'omega_cold'    :  omega_cb,
+                'neutrino_mass' :  m_nu,
+                'w0'            :  w0,
+                'wa'            :  wa,
+                'expfactor'     :  self.aa_nl
+            }
+        _, pnn = self.heftemulator.get_nonlinear_pnn(k=self.kh_heft, **params_bacco)
+        bL1 = np.array([params_dic['b1L_'+str(i+1)] for i in range(nbin)])
+        bL2 = np.array([params_dic['b2L_'+str(i+1)] for i in range(nbin)])
+        bs2 = np.array([params_dic['bs2L_'+str(i+1)] for i in range(nbin)])
+        blapl = np.array([params_dic['blaplL_'+str(i+1)] for i in range(nbin)])   
+        # term, a, k 
+        p_dmdm = pnn[0, :, :]        
+        p_dmd1 = pnn[1, :, :]    
+        p_dmd2 = pnn[2, :, :]        
+        p_dms2 = pnn[3, :, :]        
+        p_dmk2 = pnn[4, :, :]      
+        
+        pgm = (p_dmdm[:,:,None]  +
+                bL1[None,None,:] * p_dmd1[:,:,None] +
+                bL2[None,None,:] * p_dmd2[:,:,None] +
+                bs2[None,None,:] * p_dms2[:,:,None] +
+                blapl[None,None,:] * p_dmk2[:,:,None])   
+        # extrapolation with linear power spectrum for k<0.01 h/Mpc and z>1.5
+        params_bacco_l = params_bacco
+        params_bacco_l['expfactor'] = self.aa_all
+        _, plin_bacco = self.baccoemulator.get_linear_pk(k=self.kh_heft_tot, cold=False, **params_bacco_l)
+        plin_left = plin_bacco[:, self.kh_heft_tot<self.kh_heft[0]]
+        plin_left = plin_left[self.aa_all>=self.aa_nl[0], :]
+        pgm_i = np.zeros((lbin, len(zz_integr), nbin), 'float64')
+        # extrapolation for each pgg_ij
+        for i in range(nbin):
+            # power law extrapolation for k>0.71 h/Mpc
+            pgm_right = powerlaw_highk_extrap(pgm[:, :, i], self.log_kh_heft, self.kh_heft_last, self.kh_lin_heft_right, len(self.aa_nl))
+            pgm_lin_left = (1.+bL1[i])*plin_left
+            pgm_k  = np.concatenate((pgm_lin_left, pgm[:, :, i], pgm_right),axis=1)
+            pgml_highz = (1.+bL1[i])*plin_bacco[self.aa_all<self.aa_nl[0], :]
+            pgm_tot  = np.concatenate((pgml_highz, pgm_k),axis=0)
+            # interpolate
+            pgm_interp = RectBivariateSpline(self.zz_all_bacco, 
+                                        self.kh_heft_tot,
+                                        pgm_tot[::-1, :],
+                                        kx=1, ky=1)
+            pgm_i[:, :, i] = fill_in_ell_z_array(pgm_interp, k, lbin, zz_integr)
+        return pgm_i 
+    
+    def get_heft_nl_pgg_zextr_lin(self, params_dic, k, lbin, zz_integr, nbin=5, flag_heft_pnl_bar=False, flag_sample_bheftsigma8=False):
+        ns   = params_dic['ns']
+        h    = params_dic['h']
+        w0    = params_dic['w0']
+        wa    = params_dic['wa']
+        sigma8_cb = params_dic['sigma8_cb']
+        omega_cb = params_dic['Omega_cb']
+        omega_b = params_dic['Omega_b']
+        m_nu  = params_dic['Mnu']
+        params_bacco = {
+                'ns'            :  ns,
+                'hubble'        :  h,
+                'sigma8_cold'   :  sigma8_cb,
+                'omega_baryon'  :  omega_b,
+                'omega_cold'    :  omega_cb,
+                'neutrino_mass' :  m_nu,
+                'w0'            :  w0,
+                'wa'            :  wa,
+                'expfactor'     :  self.aa_nl
+            }
+        _, pnn = self.heftemulator.get_nonlinear_pnn(k=self.kh_heft, **params_bacco)
+        _, pnl = self.baccoemulator.get_nonlinear_pk(k=self.kh_heft, cold=False, **params_bacco)
+        if flag_heft_pnl_bar:
+            params_bacco['M_c'] = params_dic['log10Mc_bc']
+            params_bacco['eta'] = params_dic['eta_bc']
+            params_bacco['beta'] = params_dic['beta_bc']
+            params_bacco['M1_z0_cen'] = params_dic['log10Mz0_bc']
+            params_bacco['theta_out'] = params_dic['thetaout_bc']
+            params_bacco['theta_inn'] = params_dic['thetainn_bc']
+            params_bacco['M_inn'] = params_dic['log10Minn_bc']
+            _, boost = self.baccoemulator.get_baryonic_boost(k=self.kh_heft, cold=False, **params_bacco)
+            pnl = pnl * boost
+        bL1 = np.array([params_dic['b1L_'+str(i+1)] for i in range(nbin)])
+        bL2 = np.array([params_dic['b2L_'+str(i+1)] for i in range(nbin)])
+        bs2 = np.array([params_dic['bs2L_'+str(i+1)] for i in range(nbin)])
+        blapl = np.array([params_dic['blaplL_'+str(i+1)] for i in range(nbin)])   
+        # term, a, k 
+        if flag_sample_bheftsigma8:
+            sigma8 = params_dic['sigma8_cb']
+        else:
+            sigma8 = 1.
+        #p_dmdm = pnn[0, :, :]        
+        #p_dmd1 = pnn[1, :, :] / sigma8   
+        p_dmd2 = pnn[2, :, :] / sigma8**2        
+        p_dms2 = pnn[3, :, :] / sigma8**2        
+        p_dmk2 = pnn[4, :, :] / sigma8**3      
+        #p_d1d1 = pnn[5, :, :] / sigma8**2     
+        p_d1d2 = pnn[6, :, :] / sigma8**3        
+        p_d1s2 = pnn[7, :, :] / sigma8**3         
+        p_d1k2 = pnn[8, :, :] / sigma8**3          
+        p_d2d2 = pnn[9, :, :] / sigma8**4        
+        p_d2s2 = pnn[10, :, :] / sigma8**4         
+        p_d2k2 = pnn[11, :, :] / sigma8**5
+        p_s2s2 = pnn[12, :, :] / sigma8**4 
+        p_s2k2 = pnn[13, :, :] / sigma8**5 
+        p_k2k2 = pnn[14, :, :] / sigma8**6 
+
+        pgg = ((1.+bL1[None,None, :,None])*(1.+bL1[None,None, None, :]) * p_nl[:,:,None,None] +
+                (bL2[None,None, :,None] + bL2[None,None, None, :]) * p_dmd2[:,:,None,None] +
+                (bs2[None,None, :,None] + bs2[None,None, None, :]) * p_dms2[:,:,None,None] +
+                (bL1[None,None, :,None]*bL2[None,None, None, :] + bL1[None,None, None, :]*bL2[None,None, :,None]) * p_d1d2[:,:,None,None] +
+                (bL1[None,None, :,None]*bs2[None,None, None, :] + bL1[None,None, None, :]*bs2[None,None, :,None]) * p_d1s2[:,:,None,None] +
+                (bL2[None,None, :,None]*bL2[None,None, None, :]) * p_d2d2[:,:,None,None] +
+                (bL2[None,None, :,None]*bs2[None,None, None, :] + bL2[None,None, None, :]*bs2[None,None, :,None]) * p_d2s2[:,:,None,None] +
+                (bs2[None,None, :,None]*bs2[None,None, None, :])* p_s2s2[:,:,None,None] +
+                (blapl[None,None, :,None] + blapl[None,None, None, :]) * p_dmk2[:,:,None,None] +
+                (bL1[None,None, None, :] * blapl[None,None, :,None] + bL1[None,None, :,None] * blapl[None,None, None, :]) * p_d1k2[:,:,None,None] +
+                (bL2[None,None, None, :] * blapl[None,None, :,None] + bL2[None,None, :,None] * blapl[None,None, None, :]) * p_d2k2[:,:,None,None] +
+                (bs2[None,None, None, :] * blapl[None,None, :,None] + bs2[None,None, :,None] * blapl[None,None, None, :]) * p_s2k2[:,:,None,None] +
+                (blapl[None,None, :,None] * blapl[None,None, None, :]) * p_k2k2[:,:,None,None])
+        
+        # extrapolation with linear power spectrum for k<0.01 h/Mpc and z>1.5
+        params_bacco_l = params_bacco
+        params_bacco_l['expfactor'] = self.aa_all
+        _, plin_bacco = self.baccoemulator.get_linear_pk(k=self.kh_heft_tot, cold=False, **params_bacco_l)
+        plin_left = plin_bacco[:, self.kh_heft_tot<self.kh_heft[0]] / sigma8**2
+        plin_left = plin_left[self.aa_all>=self.aa_nl[0], :]
+        pgg_ij = np.zeros((lbin, len(zz_integr), nbin, nbin), 'float64')
+        # extrapolation for each pgg_ij
+        for i in range(nbin):
+            for j in range(nbin):
+            # power law extrapolation for k>0.71 h/Mpc
+                pgg_right = powerlaw_highk_extrap(pgg[:, :, i, j], self.log_kh_heft, self.kh_heft_last, self.kh_lin_heft_right, len(self.aa_nl))
+                pgg_lin_left = (1.+bL1[i])*(1.+bL1[j])*plin_left
+                pgg_k  = np.concatenate((pgg_lin_left, pgg[:, :, i, j], pgg_right),axis=1)
+                pggl_highz = (1.+bL1[i])*(1.+bL1[j])*plin_bacco[self.aa_all<self.aa_nl[0], :]
+                pgg_tot  = np.concatenate((pggl_highz, pgg_k),axis=0)
+                # interpolate
+                pgg_interp = RectBivariateSpline(self.zz_all_bacco, 
+                                            self.kh_heft_tot,
+                                            pgg_tot[::-1, :],
+                                            kx=1, ky=1)
+                pgg_ij[:, :, i, j] = fill_in_ell_z_array(pgg_interp, k, lbin, zz_integr)
+        return pgg
+
+    def get_heft_nl_pgm_zextr_lin(self, params_dic, k, lbin, zz_integr, nbin=5, flag_heft_pnl_bar=False, flag_sample_bheftsigma8=False):
+        ns   = params_dic['ns']
+        h    = params_dic['h']
+        w0    = params_dic['w0']
+        wa    = params_dic['wa']
+        sigma8_cb = params_dic['sigma8_cb']
+        omega_cb = params_dic['Omega_cb']
+        omega_b = params_dic['Omega_b']
+        m_nu  = params_dic['Mnu']
+        params_bacco = {
+                'ns'            :  ns,
+                'hubble'        :  h,
+                'sigma8_cold'   :  sigma8_cb,
+                'omega_baryon'  :  omega_b,
+                'omega_cold'    :  omega_cb,
+                'neutrino_mass' :  m_nu,
+                'w0'            :  w0,
+                'wa'            :  wa,
+                'expfactor'     :  self.aa_nl
+            }
+        _, pnn = self.heftemulator.get_nonlinear_pnn(k=self.kh_heft, **params_bacco)
+        _, pnl = self.baccoemulator.get_nonlinear_pk(k=self.kh_heft, cold=False, **params_bacco)
+        if flag_heft_pnl_bar:
+            params_bacco['M_c'] = params_dic['log10Mc_bc']
+            params_bacco['eta'] = params_dic['eta_bc']
+            params_bacco['beta'] = params_dic['beta_bc']
+            params_bacco['M1_z0_cen'] = params_dic['log10Mz0_bc']
+            params_bacco['theta_out'] = params_dic['thetaout_bc']
+            params_bacco['theta_inn'] = params_dic['thetainn_bc']
+            params_bacco['M_inn'] = params_dic['log10Minn_bc']
+            _, boost = self.baccoemulator.get_baryonic_boost(k=self.kh_heft, cold=False, **params_bacco)
+            pnl = pnl * boost
+        bL1 = np.array([params_dic['b1L_'+str(i+1)] for i in range(nbin)])
+        bL2 = np.array([params_dic['b2L_'+str(i+1)] for i in range(nbin)])
+        bs2 = np.array([params_dic['bs2L_'+str(i+1)] for i in range(nbin)])
+        blapl = np.array([params_dic['blaplL_'+str(i+1)] for i in range(nbin)])   
+        # term, a, k 
+        #p_dmdm = pnn[0, :, :]        
+        #p_dmd1 = pnn[1, :, :]    
+        p_dmd2 = pnn[2, :, :]        
+        p_dms2 = pnn[3, :, :]        
+        p_dmk2 = pnn[4, :, :]      
+        
+        pgm = ((1. + bL1[None,None,:]) * pnl[:,:,None] +
+                bL2[None,None,:] * p_dmd2[:,:,None] +
+                bs2[None,None,:] * p_dms2[:,:,None] +
+                blapl[None,None,:] * p_dmk2[:,:,None])   
+        # extrapolation with linear power spectrum for k<0.01 h/Mpc and z>1.5
+        params_bacco_l = params_bacco
+        params_bacco_l['expfactor'] = self.aa_all
+        _, plin_bacco = self.baccoemulator.get_linear_pk(k=self.kh_heft_tot, cold=False, **params_bacco_l)
+        plin_left = plin_bacco[:, self.kh_heft_tot<self.kh_heft[0]]
+        plin_left = plin_left[self.aa_all>=self.aa_nl[0], :]
+        pgm_i = np.zeros((lbin, len(zz_integr), nbin), 'float64')
+        # extrapolation for each pgg_ij
+        for i in range(nbin):
+            # power law extrapolation for k>0.71 h/Mpc
+            pgm_right = powerlaw_highk_extrap(pgm[:, :, i], self.log_kh_heft, self.kh_heft_last, self.kh_lin_heft_right, len(self.aa_nl))
+            pgm_lin_left = (1.+bL1[i])*plin_left
+            pgm_k  = np.concatenate((pgm_lin_left, pgm[:, :, i], pgm_right),axis=1)
+            pgml_highz = (1.+bL1[i])*plin_bacco[self.aa_all<self.aa_nl[0], :]
+            pgm_tot  = np.concatenate((pgml_highz, pgm_k),axis=0)
+            # interpolate
+            pgm_interp = RectBivariateSpline(self.zz_all_bacco, 
+                                        self.kh_heft_tot,
+                                        pgm_tot[::-1, :],
+                                        kx=1, ky=1)
+            pgm_i[:, :, i] = fill_in_ell_z_array(pgm_interp, k, lbin, zz_integr)
+        return pgm
+
     def get_barboost(self, params_dic, k, lbin, zz_integr):
         boost_bar_interp = self.get_barboost_interp(params_dic)
         boost_bar = fill_in_ell_z_array(boost_bar_interp, k, lbin, zz_integr, zmax=1.5)
@@ -452,11 +761,7 @@ class BaccoEmu:
     
     def get_pk_lin(self, params_dic, k, lbin, zz_integr):
         pk_l_interp = self.get_pk_lin_interp(params_dic)
-        pk_lin_l = fill_in_ell_z_array(pk_l_interp, k, lbin, zz_integr)
-        #pk_lin_l = np.zeros((lbin, len(zz_integr)), 'float64')
-        #index_pknn = np.array(np.where((k > k_min_h_by_mpc) & (k < 1000.))).transpose()
-        #for index_l, index_z in index_pknn:
-        #    pk_lin_l[index_l, index_z] = pk_l_interp(zz_integr[index_z], k[index_l,index_z])    
+        pk_lin_l = fill_in_ell_z_array(pk_l_interp, k, lbin, zz_integr) 
         return pk_lin_l
     
     
@@ -468,7 +773,7 @@ class BaccoEmu:
             boost_bar[index_l, index_z] = boost_bar_interp(min(zz_integr[index_z], 1.5), k[index_l,index_z])
         return boost_bar
     
-   
+    
 
     def get_heft_zextr_lin(self, params_dic, k, lbin, zz_integr):
         pk_nn_l  = np.zeros((15, lbin, len(zz_integr)), 'float64')
@@ -478,13 +783,15 @@ class BaccoEmu:
         pnn_l_interp, plin_l_interp = self.get_heft_interp(params_dic)
         for index_l, index_z in index_pknn:    
             for index_i in np.arange(15): 
-                if zz_integr[index_z]<=1.5 and k[index_l,index_z]>=self.kh_nl[0]:
-                    pk_nn_l[index_i, index_l, index_z] = pnn_l_interp[index_i](zz_integr[index_z], k[index_l,index_z])   
-                    pk_nn_l_mask[index_i, index_l, index_z] = 1
+                #if zz_integr[index_z]<=1.5 and k[index_l,index_z]>=self.kh_nl[0]:
+                if zz_integr[index_z] <= 1.5 and k[index_l, index_z] >= self.kh_nl[0] and k[index_l, index_z] < 0.71:    
+                    pk_nn_l[index_i, index_l, index_z] = pnn_l_interp[index_i](zz_integr[index_z], k[index_l, index_z])   
+                    pk_nn_l_mask[index_i, index_l, index_z] = 1  
             if zz_integr[index_z]>1.5 or k[index_l,index_z]<self.kh_nl[0]:
                 pk_lin_l[index_l, index_z] = plin_l_interp(zz_integr[index_z], k[index_l,index_z])    
-        self.mask_heft = pk_nn_l_mask.astype(bool)        
+        self.mask_heft = pk_nn_l_mask.astype(bool)    
         return pk_nn_l, pk_lin_l
+
     
     def get_heft_zextr_hmcode(self, params_dic, k, lbin, zz_integr):
         pk_nn_l  = np.zeros((15, lbin, len(zz_integr)), 'float64')

@@ -52,6 +52,7 @@ PHOTOZ_NONE = 0
 PHOTOZ_ADD = 1
 PHOTOZ_MULT = 2
 
+
 def check_zmax(zmax, emu_obj):
     emu_z_max = emu_obj.zz_max
     if zmax > emu_z_max:
@@ -99,7 +100,7 @@ def build_data_matrix_3x2pt(cl_ll, cl_gg, cl_lg, cl_gl,  binned_ell_wl, binned_e
                 all_int_ell_wl[ell_jump:], spline_ll[bin1, bin2])           
     return cov_theory, cov_theory_high
 
-
+#flag_test_heft_new_extrap = True
 class Theory:
     def __init__(self, SurveyClass, model: dict):
         """
@@ -180,7 +181,10 @@ class Theory:
         if self.BaryonsEmu:
             self.BaryonsEmu = self.BaryonsEmu()
             check_zmax(self.Survey.zmax, self.BaryonsEmu)
-    
+        if 'cross_sqrt_baryon' in model:    
+            self.flag_cross_sqrt_bar_boost = (model['cross_sqrt_baryon'] == True)
+        else:
+            self.flag_cross_sqrt_bar_boost = False    
         # assign intrinsic alignment     
         ia_models = {
             IA_NLA: (self.get_pk_nla, self.get_pk_cross_nla),
@@ -931,6 +935,7 @@ class Theory:
             dz_norm, _ = self.BaccoEmuClass.get_growth(params_dic, self.Survey.zz_integr)
             dz_rescale = dz/dz_norm
             pk_exp, pk_exp_extr = self.BaccoEmuClass.get_heft(params_dic, self.k, self.Survey.lbin, self.Survey.zz_integr)
+            # this is wrong, not all terms are re-scaled with D2, loop-correction must have D4
             pk_exp = pk_exp*dz_rescale[np.newaxis, np.newaxis, :]*dz_rescale[np.newaxis, np.newaxis, :]
             pk_exp_extr = pk_exp_extr*dz_rescale[np.newaxis, :]*dz_rescale[np.newaxis, :]
         else:    
@@ -939,6 +944,7 @@ class Theory:
         #print('MASK: ', self.mask_heft)
         return pk_exp, pk_exp_extr
     
+
     def get_pgg_heft_bias(self, params_dic):
         """Calculate the galaxy-galaxy power spectrum with HEFT Lagrangian bias expansion,
         in units of (Mpc/h)^3.
@@ -950,67 +956,10 @@ class Theory:
   
         Returns:
         -------
-        pgm : numpy.ndarray
+        pgg : numpy.ndarray
             The galaxy-galaxy power spectrum.
         """
-        pk_exp, pk_exp_extr = self.pk_exp, self.pk_exp_extr
-        bL1 = np.array([params_dic['b1L_'+str(i+1)] for i in range(self.Survey.nbin)])
-        bL2 = np.array([params_dic['b2L_'+str(i+1)] for i in range(self.Survey.nbin)])
-        bs2 = np.array([params_dic['bs2L_'+str(i+1)] for i in range(self.Survey.nbin)])
-        blapl = np.array([params_dic['blaplL_'+str(i+1)] for i in range(self.Survey.nbin)])    
-        p_dmdm = pk_exp[0, :, :]        
-        p_dmd1 = pk_exp[1, :, :]    
-        p_dmd2 = pk_exp[2, :, :]        
-        p_dms2 = pk_exp[3, :, :]        
-        p_dmk2 = pk_exp[4, :, :]      
-        p_d1d1 = pk_exp[5, :, :]     
-        p_d1d2 = pk_exp[6, :, :]        
-        p_d1s2 = pk_exp[7, :, :]         
-        p_d1k2 = pk_exp[8, :, :]         
-        p_d2d2 = pk_exp[9, :, :]        
-        p_d2s2 = pk_exp[10, :, :]         
-        p_d2k2 = pk_exp[11, :, :]
-        p_s2s2 = pk_exp[12, :, :] 
-        p_s2k2 = pk_exp[13, :, :] 
-        p_k2k2 = pk_exp[14, :, :] 
-        if self.flag_heft:
-            pgg = (p_dmdm[:,:,None,None]  +
-                (bL1[None,None,:,None]+bL1[None,None, None, :]) * p_dmd1[:,:,None,None] +
-                (bL1[None,None, :,None]*bL1[None,None, None, :]) * p_d1d1[:,:,None,None] +
-                (bL2[None,None, :,None] + bL2[None,None, None, :]) * p_dmd2[:,:,None,None] +
-                (bs2[None,None, :,None] + bs2[None,None, None, :]) * p_dms2[:,:,None,None] +
-                (bL1[None,None, :,None]*bL2[None,None, None, :] + bL1[None,None, None, :]*bL2[None,None, :,None]) * p_d1d2[:,:,None,None] +
-                (bL1[None,None, :,None]*bs2[None,None, None, :] + bL1[None,None, None, :]*bs2[None,None, :,None]) * p_d1s2[:,:,None,None] +
-                (bL2[None,None, :,None]*bL2[None,None, None, :]) * p_d2d2[:,:,None,None] +
-                (bL2[None,None, :,None]*bs2[None,None, None, :] + bL2[None,None, None, :]*bs2[None,None, :,None]) * p_d2s2[:,:,None,None] +
-                (bs2[None,None, :,None]*bs2[None,None, None, :])* p_s2s2[:,:,None,None] +
-                (blapl[None,None, :,None] + blapl[None,None, None, :]) * p_dmk2[:,:,None,None] +
-                (bL1[None,None, None, :] * blapl[None,None, :,None] + bL1[None,None, :,None] * blapl[None,None, None, :]) * p_d1k2[:,:,None,None] +
-                (bL2[None,None, None, :] * blapl[None,None, :,None] + bL2[None,None, :,None] * blapl[None,None, None, :]) * p_d2k2[:,:,None,None] +
-                (bs2[None,None, None, :] * blapl[None,None, :,None] + bs2[None,None, :,None] * blapl[None,None, None, :]) * p_s2k2[:,:,None,None] +
-                (blapl[None,None, :,None] * blapl[None,None, None, :]) * p_k2k2[:,:,None,None])
-            pgg_extr = (1.+bL1[None,None, :,None])*(1.+bL1[None,None, None, :]) * pk_exp_extr[:,:,None,None]
-        elif self.flag_sample_bheftsigma8:
-            sigma8 = params_dic['sigma8_cb']        
-            pgg = (p_dmdm[:,:,None,None]  +
-                (bL1[None,None, :,None]+bL1[None,None, None, :]) * p_dmd1[:,:,None,None] / sigma8 +
-                (bL1[None,None, :,None]*bL1[None,None, None, :]) * p_d1d1[:,:,None,None] / sigma8**2 +
-                (bL2[None,None, :,None] + bL2[None,None, None, :]) * p_dmd2[:,:,None,None] / sigma8**2 +
-                (bs2[None,None, :,None] + bs2[None,None, None, :]) * p_dms2[:,:,None,None] / sigma8**2 +
-                (bL1[None,None, :,None]*bL2[None,None, None, :] + bL1[None,None, None, :]*bL2[None,None, :,None]) * p_d1d2[:,:,None,None] / sigma8**3 +
-                (bL1[None,None, :,None]*bs2[None,None, None, :] + bL1[None,None, None, :]*bs2[None,None, :,None]) * p_d1s2[:,:,None,None] / sigma8**3 +
-                (bL2[None,None, :,None]*bL2[None,None, None, :]) * p_d2d2[:,:,None,None] / sigma8**4 +
-                (bL2[None,None, :,None]*bs2[None,None, None, :] + bL2[None,None, None, :]*bs2[None,None, :,None]) * p_d2s2[:,:,None,None] / sigma8**4 +
-                (bs2[None,None, :,None]*bs2[None,None, None, :])* p_s2s2[:,:,None,None] / sigma8**4 +
-                (blapl[None,None, :,None] + blapl[None,None, None, :]) * p_dmk2[:,:,None,None] / sigma8**3 +
-                (bL1[None,None, None, :] * blapl[None,None, :,None] + bL1[None,None, :,None] * blapl[None,None, None, :]) * p_d1k2[:,:,None,None] / sigma8**4 +
-                (bL2[None,None, None, :] * blapl[None,None, :,None] + bL2[None,None, :,None] * blapl[None,None, None, :]) * p_d2k2[:,:,None,None] / sigma8**5 +
-                (bs2[None,None, None, :] * blapl[None,None, :,None] + bs2[None,None, :,None] * blapl[None,None, None, :]) * p_s2k2[:,:,None,None] / sigma8**5 +
-                (blapl[None,None, :,None] * blapl[None,None, None, :]) * p_k2k2[:,:,None,None] / sigma8**6)
-            pgg_extr = (1.+bL1[None,None, :,None])*(1.+bL1[None,None, None, :]) * pk_exp_extr[:,:,None,None] / sigma8**2
-        else:
-            KeyError('HEFT model not acceptable')
-        pgg += pgg_extr 
+        pgg = self.BaccoEmuClass.get_heft_pgg_zextr_lin(params_dic, self.k, self.Survey.lbin, self.Survey.zz_integr, self.Survey.nbin, self.flag_sample_bheftsigma8)
         # return dimension (lbin, z_integr, bin_i, bin_j)
         return pgg
     
@@ -1025,49 +974,10 @@ class Theory:
   
         Returns:
         -------
-        pgm : numpy.ndarray
+        pgg : numpy.ndarray
             The galaxy-galaxy power spectrum.
         """
-        pk_exp, pk_exp_extr = self.pk_exp, self.pk_exp_extr
-        bL1 = np.array([params_dic['b1L_'+str(i+1)] for i in range(self.Survey.nbin)])
-        bL2 = np.array([params_dic['b2L_'+str(i+1)] for i in range(self.Survey.nbin)])
-        bs2 = np.array([params_dic['bs2L_'+str(i+1)] for i in range(self.Survey.nbin)])
-        blapl = np.array([params_dic['blaplL_'+str(i+1)] for i in range(self.Survey.nbin)])    
-        #p_dmdm = pk_exp[0, :, :]        
-        #p_dmd1 = pk_exp[1, :, :]    
-        p_dmd2 = pk_exp[2, :, :]        
-        p_dms2 = pk_exp[3, :, :]        
-        p_dmk2 = pk_exp[4, :, :]      
-        #p_d1d1 = pk_exp[5, :, :]     
-        p_d1d2 = pk_exp[6, :, :]        
-        p_d1s2 = pk_exp[7, :, :]         
-        p_d1k2 = pk_exp[8, :, :]         
-        p_d2d2 = pk_exp[9, :, :]        
-        p_d2s2 = pk_exp[10, :, :]         
-        p_d2k2 = pk_exp[11, :, :]
-        p_s2s2 = pk_exp[12, :, :] 
-        p_s2k2 = pk_exp[13, :, :] 
-        p_k2k2 = pk_exp[14, :, :] 
-        # need to cut p_nl like p_dmdm and p_dmd1   
-        p_nl = self.pmm if self.flag_heft_pnl_bar  else self.pmm_no_barboost
-        #p_nl = p_nl[self.mask_heft[0]]
-        p_nl = np.where(self.mask_heft[0], p_nl, 0.)
-        pgg = (
-            (1.+bL1[None,None, :,None])*(1.+bL1[None,None, None, :]) * p_nl[:,:,None,None] +
-            (bL2[None,None, :,None] + bL2[None,None, None, :]) * p_dmd2[:,:,None,None] +
-            (bs2[None,None, :,None] + bs2[None,None, None, :]) * p_dms2[:,:,None,None] +
-            (bL1[None,None, :,None]*bL2[None,None, None, :] + bL1[None,None, None, :]*bL2[None,None, :,None]) * p_d1d2[:,:,None,None] +
-            (bL1[None,None, :,None]*bs2[None,None, None, :] + bL1[None,None, None, :]*bs2[None,None, :,None]) * p_d1s2[:,:,None,None] +
-            (bL2[None,None, :,None]*bL2[None,None, None, :]) * p_d2d2[:,:,None,None] +
-            (bL2[None,None, :,None]*bs2[None,None, None, :] + bL2[None,None, None, :]*bs2[None,None, :,None]) * p_d2s2[:,:,None,None] +
-            (bs2[None,None, :,None]*bs2[None,None, None, :])* p_s2s2[:,:,None,None] +
-            (blapl[None,None, :,None] + blapl[None,None, None, :]) * p_dmk2[:,:,None,None] +
-            (bL1[None,None, None, :] * blapl[None,None, :,None] + bL1[None,None, :,None] * blapl[None,None, None, :]) * p_d1k2[:,:,None,None] +
-            (bL2[None,None, None, :] * blapl[None,None, :,None] + bL2[None,None, :,None] * blapl[None,None, None, :]) * p_d2k2[:,:,None,None] +
-            (bs2[None,None, None, :] * blapl[None,None, :,None] + bs2[None,None, :,None] * blapl[None,None, None, :]) * p_s2k2[:,:,None,None] +
-            (blapl[None,None, :,None] * blapl[None,None, None, :]) * p_k2k2[:,:,None,None])
-        pgg_extr = (1.+bL1[None,None, :,None])*(1.+bL1[None,None, None, :]) * pk_exp_extr[:,:,None,None]
-        pgg += pgg_extr 
+        pgg = self.BaccoEmuClass.get_heft_nl_pgg_zextr_lin(params_dic, self.k, self.Survey.lbin, self.Survey.zz_integr, self.Survey.nbin, self.flag_heft_pnl_bar, self.flag_sample_bheftsigma8)
         # return dimension (lbin, z_integr, bin_i, bin_j)
         return pgg
     
@@ -1085,23 +995,7 @@ class Theory:
         pgm : numpy.ndarray
             The matter-galaxy power spectrum.
         """
-        pk_exp, pk_exp_extr = self.pk_exp, self.pk_exp_extr
-        bL1 = np.array([params_dic['b1L_'+str(i+1)] for i in range(self.Survey.nbin)])
-        bL2 = np.array([params_dic['b2L_'+str(i+1)] for i in range(self.Survey.nbin)])
-        bs2 = np.array([params_dic['bs2L_'+str(i+1)] for i in range(self.Survey.nbin)])
-        blapl = np.array([params_dic['blaplL_'+str(i+1)] for i in range(self.Survey.nbin)])    
-        p_dmdm = pk_exp[0, :, :]        
-        p_dmd1 = pk_exp[1, :, :]    
-        p_dmd2 = pk_exp[2, :, :]        
-        p_dms2 = pk_exp[3, :, :]        
-        p_dmk2 = pk_exp[4, :, :]      
-        pgm = (p_dmdm[:,:,None]  +
-                bL1[None,None,:] * p_dmd1[:,:,None] +
-                bL2[None,None,:] * p_dmd2[:,:,None] +
-                bs2[None,None,:] * p_dms2[:,:,None] +
-                blapl[None,None,:] * p_dmk2[:,:,None])   
-        pgm_extr = (1.+bL1[None,None,:]) * pk_exp_extr[:,:,None]
-        pgm += pgm_extr
+        pgm = self.BaccoEmuClass.get_heft_pgm_zextr_lin(params_dic, self.k, self.Survey.lbin, self.Survey.zz_integr, self.Survey.nbin)
         # return dimension (lbin, z_integr, bin_i)
         return pgm
     
@@ -1119,31 +1013,7 @@ class Theory:
         pgm : numpy.ndarray
             The matter-galaxy power spectrum.
         """
-        pk_exp, pk_exp_extr = self.pk_exp, self.pk_exp_extr
-        bL1 = np.array([params_dic['b1L_'+str(i+1)] for i in range(self.Survey.nbin)])
-        bL2 = np.array([params_dic['b2L_'+str(i+1)] for i in range(self.Survey.nbin)])
-        bs2 = np.array([params_dic['bs2L_'+str(i+1)] for i in range(self.Survey.nbin)])
-        blapl = np.array([params_dic['blaplL_'+str(i+1)] for i in range(self.Survey.nbin)])    
-        #p_dmdm = pk_exp[0, :, :]        
-        #p_dmd1 = pk_exp[1, :, :]    
-        p_dmd2 = pk_exp[2, :, :]        
-        p_dms2 = pk_exp[3, :, :]        
-        p_dmk2 = pk_exp[4, :, :]
-        # need to cut p_nl like p_dmdm and p_dmd1   
-        p_nl = self.pmm if self.flag_heft_pnl_bar  else self.pmm_no_barboost
-        #print('flag_heft_pnl_bar: ', self.flag_heft_pnl_bar)
-        #print(p_nl.shape)
-        #print('self.mask_heft[0]: ' , self.mask_heft[0], self.mask_heft[0].shape)
-        #p_nl = p_nl[self.mask_heft[0]]
-        p_nl = np.where(self.mask_heft[0], p_nl, 0.)
-        #print(p_nl.shape)
-        pgm = (
-                (1. + bL1[None,None,:]) * p_nl[:,:,None] +
-                bL2[None,None,:] * p_dmd2[:,:,None] +
-                bs2[None,None,:] * p_dms2[:,:,None] +
-                blapl[None,None,:] * p_dmk2[:,:,None])   
-        pgm_extr = (1.+bL1[None,None,:]) * pk_exp_extr[:,:,None]
-        pgm += pgm_extr
+        pgm = self.BaccoEmuClass.get_heft_nl_pgm_zextr_lin(params_dic, self.k, self.Survey.lbin, self.Survey.zz_integr, self.Survey.nbin, self.flag_heft_pnl_bar)
         # return dimension (lbin, z_integr, bin_i)
         return pgm
         
@@ -1336,17 +1206,28 @@ class Theory:
         self.dz, _ = self.StructureEmu.get_growth(params_dic, self.Survey.zz_integr)
         # get redshift uncertainties
         self.deltaz_s, self.deltaz_l = self.get_deltaz(params_dic)
-        if self.flag_heft or self.flag_sample_bheftsigma8:
-            self.pk_exp, self.pk_exp_extr = self.get_heft_pk_exp(params_dic)
-            if self.flag_heft_pnl_bar or self.flag_heft_pnl:
-                self.pmm, bar_boost = self.get_pmm(params_dic)
-                self.pmm_no_barboost = self.pmm/bar_boost 
-        elif self.flag_sample_blinsigma8:
-            self.pmm, _, _ = self.get_pmm(params_dic)
-            self.pmm /= params_dic['sigma8_cb']**2
-        else:
+        #if flag_test_heft_new_extrap:
+        #    print('compute with flag_test_heft_new_extrap')
+        #    self.pgg = self.BaccoEmuClass.get_heft_pgg_zextr_lin(params_dic, self.k, self.Survey.lbin, self.Survey.zz_integr, self.Survey.nbin)
+        #else:    
+        #    if self.flag_heft or self.flag_sample_bheftsigma8:
+        #        self.pk_exp, self.pk_exp_extr = self.get_heft_pk_exp(params_dic)
+        #        if self.flag_heft_pnl_bar or self.flag_heft_pnl:
+        #            self.pmm, bar_boost = self.get_pmm(params_dic)
+        #            self.pmm_no_barboost = self.pmm/bar_boost 
+        #    elif self.flag_sample_blinsigma8:
+        #        self.pmm, _, _ = self.get_pmm(params_dic)
+        #        self.pmm /= params_dic['sigma8_cb']**2
+        #    else:
+        #        self.pmm, _ = self.get_pmm(params_dic)              
+        #    self.pgg = self.get_pgg(params_dic)
+        if self.flag_heft:
+            self.pgg = self.get_pgg(params_dic)
+        else:    
             self.pmm, _ = self.get_pmm(params_dic)  
-        self.pgg = self.get_pgg(params_dic)
+            if self.flag_sample_blinsigma8:
+                self.pmm /= params_dic['sigma8_cb']**2
+            self.pgg = self.get_pgg(params_dic)
         self.w_g = self.get_gg_kernel(params_dic)
         # compute photometric galaxy clustring angular power spectra cl_gg(l, bin_i, bin_j)
         # window function w_g(l,z,bin) in units of h/Mpc
@@ -1384,18 +1265,27 @@ class Theory:
         # compute matter-matter power spectrum
         self.pmm, bar_boost = self.get_pmm(params_dic)
         self.pmm_no_barboost = self.pmm/bar_boost
-        # compute galaxy-matter power spectrum
-        if self.flag_heft or self.flag_sample_bheftsigma8:
-            self.pk_exp, self.pk_exp_extr = self.get_heft_pk_exp(params_dic)
-            if self.flag_heft_pnl_bar:
-                self.pgm = self.get_pgm(params_dic)
-            else:
-                self.pgm = self.get_pgm(params_dic)*np.sqrt(bar_boost[:, :, None]) 
-            
-        else:
-            self.pgm = self.get_pgm(params_dic)  
-        # compute galaxy-galaxy power spectrum     
-        self.pgg = self.get_pgg(params_dic)
+        #if flag_test_heft_new_extrap:
+        #    print('compute with flag_test_heft_new_extrap')
+        #    self.pgg = self.BaccoEmuClass.get_heft_pgg_zextr_lin(params_dic, self.k, self.Survey.lbin, self.Survey.zz_integr, self.Survey.nbin)
+        #    self.pgm = self.BaccoEmuClass.get_heft_pgm_zextr_lin(params_dic, self.k, self.Survey.lbin, self.Survey.zz_integr, self.Survey.nbin)
+        #else:
+            # compute galaxy-matter power spectrum
+            #if self.flag_heft or self.flag_sample_bheftsigma8:
+            #    self.pk_exp, self.pk_exp_extr = self.get_heft_pk_exp(params_dic)
+            #    if self.flag_heft_pnl_bar:
+            #        self.pgm = self.get_pgm(params_dic)
+            #    else:
+            #        self.pgm = self.get_pgm(params_dic)*np.sqrt(bar_boost[:, :, None])                 
+            #else:
+            #    self.pgm = self.get_pgm(params_dic)  
+            # compute galaxy-galaxy power spectrum     
+            #self.pgg = self.get_pgg(params_dic)
+        if self.flag_cross_sqrt_bar_boost:
+            self.pgm = self.get_pgm(params_dic)*np.sqrt(bar_boost[:, :, None])                 
+        else:        
+            self.pgm = self.get_pgm(params_dic)     
+        self.pgg = self.get_pgg(params_dic)    
         # compute properties used in various calculations just once:
         self.w_gamma = self.get_wl_kernel(params_dic)
         self.w_ia = self.get_ia_kernel(params_dic)

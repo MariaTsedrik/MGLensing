@@ -129,7 +129,11 @@ class MGLike:
                 yt = solve_triangular(self.Data.cholesky_transform, difference_vector, lower=True)
                 chi2 = yt.dot(yt)
             except:
-                chi2 = np.einsum('i, ij, j->', difference_vector, self.Data.inv_data_covariance, difference_vector)    
+                if hasattr(self.Data, 'inv_data_covariance') and self.Data.inv_data_covariance is not None:
+                    chi2 = np.einsum('i, ij, j->', difference_vector, self.Data.inv_data_covariance, difference_vector)
+                else:
+                    raise ValueError('solve_triangular breaks when ', param_dic)
+                #    return -np.inf  
             return -0.5*chi2    
         else:
             return -np.inf      

@@ -17,8 +17,8 @@ os.chdir(folder)
 
 
 
-#MGLtest = MGLensing.MGL("config.yaml")
-MGLtest = MGLensing.MGL("ini_files/pca/config_muSigma.yaml")
+MGLtest = MGLensing.MGL("config.yaml")
+#MGLtest = MGLensing.MGL("ini_files/pca/config_muSigma.yaml")
 
 def log_probability_function(pars):
     param_dic = pars | MGLtest.params_fixed

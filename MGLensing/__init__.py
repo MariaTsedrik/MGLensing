@@ -39,6 +39,7 @@ def _errorbars_for_plots(nell, n, flat_array):
             idx_start += 1
     return matrix_errs
 
+#flag_test_heft_new_extrap = True
 class DataClass():
     """
     A class to handle data operations for a given survey.
@@ -124,7 +125,9 @@ class DataClass():
             'GC': self.DataModel.compute_covariance_gc,
             '3x2pt':  self.DataModel.compute_covariance_cosmosis_3x2pt 
             }
+            print('computing data vector')
             self.data_vector = compute_vector[Survey.observable](self.params_data_dic)
+            print('computing data covariance')
             self.data_covariance = compute_covariance[Survey.observable](self.params_data_dic)
 
             # hard-coded for now, best to move to plotting_scripts
@@ -408,15 +411,25 @@ class MGL():
         NewModel.deltaz_s, NewModel.deltaz_l = NewModel.get_deltaz(params)
         NewModel.pmm, bar_boost = NewModel.get_pmm(params)
         NewModel.pmm_no_barboost = NewModel.pmm/bar_boost
-        if NewModel.flag_heft or NewModel.flag_sample_bheftsigma8:
-            NewModel.pk_exp, NewModel.pk_exp_extr = NewModel.get_heft_pk_exp(params)
-            if NewModel.flag_heft_pnl_bar:
-                NewModel.pgm = NewModel.get_pgm(params)
-            else:
-                NewModel.pgm = NewModel.get_pgm(params)*np.sqrt(bar_boost[:, :, None]) 
-        else:
-            NewModel.pgm = NewModel.get_pgm(params)
-        NewModel.pgg = NewModel.get_pgg(params)
+        #if flag_test_heft_new_extrap:
+        #    print('compute with flag_test_heft_new_extrap')
+        #    NewModel.pgg = NewModel.StructureEmu.get_heft_pgg_zextr_lin(params, NewModel.k, self.Survey.lbin, self.Survey.zz_integr, self.Survey.nbin)
+        #    NewModel.pgm = NewModel.StructureEmu.get_heft_pgm_zextr_lin(params, NewModel.k, self.Survey.lbin, self.Survey.zz_integr, self.Survey.nbin)
+        #else:
+        #    if NewModel.flag_heft or NewModel.flag_sample_bheftsigma8:
+        #        NewModel.pk_exp, NewModel.pk_exp_extr = NewModel.get_heft_pk_exp(params)
+        #        if NewModel.flag_heft_pnl_bar:
+        #            NewModel.pgm = NewModel.get_pgm(params)
+        #        else:
+        #            NewModel.pgm = NewModel.get_pgm(params)*np.sqrt(bar_boost[:, :, None]) 
+        #    else:
+        #        NewModel.pgm = NewModel.get_pgm(params)
+        #    NewModel.pgg = NewModel.get_pgg(params)
+        if NewModel.flag_cross_sqrt_bar_boost:
+            NewModel.pgm = NewModel.get_pgm(params)*np.sqrt(bar_boost[:, :, None])                 
+        else:        
+            NewModel.pgm = NewModel.get_pgm(params)     
+        NewModel.pgg = NewModel.get_pgg(params)    
         NewModel.w_gamma = NewModel.get_wl_kernel(params)
         NewModel.w_ia = NewModel.get_ia_kernel(params)
         NewModel.pk_delta_ia, NewModel.pk_iaia = NewModel.get_pk_ia(params)
