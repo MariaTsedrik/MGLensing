@@ -628,7 +628,7 @@ class BaccoEmu:
         p_s2k2 = pnn[13, :, :] / sigma8**5 
         p_k2k2 = pnn[14, :, :] / sigma8**6 
 
-        pgg = ((1.+bL1[None,None, :,None])*(1.+bL1[None,None, None, :]) * p_nl[:,:,None,None] +
+        pgg = ((1.+bL1[None,None, :,None])*(1.+bL1[None,None, None, :]) * pnl[:,:,None,None] +
                 (bL2[None,None, :,None] + bL2[None,None, None, :]) * p_dmd2[:,:,None,None] +
                 (bs2[None,None, :,None] + bs2[None,None, None, :]) * p_dms2[:,:,None,None] +
                 (bL1[None,None, :,None]*bL2[None,None, None, :] + bL1[None,None, None, :]*bL2[None,None, :,None]) * p_d1d2[:,:,None,None] +
@@ -664,7 +664,7 @@ class BaccoEmu:
                                             pgg_tot[::-1, :],
                                             kx=1, ky=1)
                 pgg_ij[:, :, i, j] = fill_in_ell_z_array(pgg_interp, k, lbin, zz_integr)
-        return pgg
+        return pgg_ij
 
     def get_heft_nl_pgm_zextr_lin(self, params_dic, k, lbin, zz_integr, nbin=5, flag_heft_pnl_bar=False, flag_sample_bheftsigma8=False):
         ns   = params_dic['ns']
@@ -734,7 +734,7 @@ class BaccoEmu:
                                         pgm_tot[::-1, :],
                                         kx=1, ky=1)
             pgm_i[:, :, i] = fill_in_ell_z_array(pgm_interp, k, lbin, zz_integr)
-        return pgm
+        return pgm_i
 
     def get_barboost(self, params_dic, k, lbin, zz_integr):
         boost_bar_interp = self.get_barboost_interp(params_dic)

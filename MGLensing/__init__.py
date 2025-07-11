@@ -346,16 +346,22 @@ class MGL():
         NewModel = Theory(self.Survey, theo_model)
         _, _, k = NewModel.get_ez_rz_k(params)
         NewModel.k = k
-        if theo_model['nl_model'] == NL_MODEL_BACCO:
+        if theo_model['nl_model'] == NL_MODEL_BACCO and 'sigma8_cb' not in params:
             params['sigma8_cb'] = NewModel.StructureEmu.get_sigma8_cb(params)
         pmm, bar_boost = NewModel.get_pmm(params)
         NewModel.pmm = pmm
-        if NewModel.flag_heft or NewModel.flag_sample_bheftsigma8:
-            NewModel.pk_exp, NewModel.pk_exp_extr = NewModel.get_heft_pk_exp(params)
-            pgm = NewModel.get_pgm(params)*np.sqrt(bar_boost[:, :, None]) 
-        else:
-            pgm = NewModel.get_pgm(params)  
-        pgg = NewModel.get_pgg(params)    
+        NewModel.pmm_no_barboost = NewModel.pmm/bar_boost
+        #if NewModel.flag_heft or NewModel.flag_sample_bheftsigma8:
+        #    NewModel.pk_exp, NewModel.pk_exp_extr = NewModel.get_heft_pk_exp(params)
+        #    pgm = NewModel.get_pgm(params)*np.sqrt(bar_boost[:, :, None]) 
+        #else:
+        #    pgm = NewModel.get_pgm(params)  
+        if NewModel.flag_cross_sqrt_bar_boost:
+            print('cross sqrt bar boost')
+            pgm = NewModel.get_pgm(params)*np.sqrt(bar_boost[:, :, None])                 
+        else:        
+            pgm = NewModel.get_pgm(params)     
+        pgg = NewModel.get_pgg(params)     
         return k, pmm, pgm, pgg
         
     

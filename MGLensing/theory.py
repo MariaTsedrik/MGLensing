@@ -9,6 +9,7 @@ from .structure.react_ndgp_interface import DGPReACT
 from .structure.react_gamma_interface import GammaReACT
 from .structure.react_musigma_interface import MuSigmaReACT
 from .structure.react_ide_interface import DarkScatteringReACT
+from .structure.react_fr_interface import FofRReACT
 from math import sqrt, log, exp, pow, log10
 import os
 import fastpt as fpt
@@ -30,6 +31,7 @@ NL_MODEL_NDGP = 2
 NL_MODEL_GAMMAZ = 3
 NL_MODEL_MUSIGMA = 4
 NL_MODEL_DS = 5
+NL_MODEL_FOFR = 6
 
 
 NO_BARYONS = 0
@@ -152,7 +154,8 @@ class Theory:
             NL_MODEL_NDGP: DGPReACT,
             NL_MODEL_GAMMAZ: GammaReACT,
             NL_MODEL_MUSIGMA: MuSigmaReACT,
-            NL_MODEL_DS: DarkScatteringReACT
+            NL_MODEL_DS: DarkScatteringReACT,
+            NL_MODEL_FOFR: FofRReACT
         }
         try:
             if model['nl_model'] == NL_MODEL_BACCO:
@@ -165,6 +168,10 @@ class Theory:
         except KeyError:
             raise ValueError("Invalid nl_model option.")
         check_zmax(self.Survey.zmax, self.StructureEmu)
+        if model['nl_model'] == NL_MODEL_FOFR:
+            self.flag_fofr = True
+        else:
+            self.flag_fofr = False    
 
         #if 'add_noise' in model and not model['add_noise']:
         #    self.Survey.noise['LL'] = 0.
@@ -692,7 +699,7 @@ class Theory:
         f_ia = ((1. + self.Survey.zz_integr) / (1. + PIVOT_REDSHIFT))**eta_ia * (self.Survey.lum_func(self.Survey.zz_integr))**beta_ia
         # dz (ell, zz_inegr) must be normalise to unity at z=0 to cancel the linear growth of the density field 
         # and yield a constant amplitude in the primordial alignment scenario
-        dz = self.dz[None,:] 
+        dz = self.dz if self.flag_fofr else self.dz[None,:] 
         # growth factor can be scale-dependent for f(R) in the future potentially
         # dimensions of is power spectra: (ell, zz_integr)
         self.factor_nla = - a_ia*C_IA*omega_m*f_ia[None,:]/dz
