@@ -157,7 +157,7 @@ def from_keff_to_lmax(n, k_eff, z_mod, params_dic):
             z = z_mod[bin1]
             lmax_i = k_eff[bin1] * get_rcom(params_dic, z) / (1. + z)
             lmax.append( lmax_i )
-            print('bin1, bin2: ', bin1, bin2, 'k_eff[bin1]: ', k_eff[bin1], 'lmax: ', lmax_i)
+            print('bin1, bin2: ', bin1, bin2, 'k_eff[bin1]: ', k_eff[bin1], 'z_mod[bin1]: ', z, 'lmax: ', lmax_i)
     return lmax
 
 def max_ells_for_plots(n, flat_array):
@@ -263,6 +263,7 @@ def setup_lmax(obj):
     obj.mask_cov_3x2pt = np.ix_(obj.mask_data_vector_3x2pt, obj.mask_data_vector_3x2pt)
     obj.ells_wl_max = max_ells_for_plots(obj.nbin, obj.lmax_wl_vals)
     obj.ells_gc_max = max_ells_for_plots(obj.nbin, obj.lmax_gc_vals)
+
     
     
     all_ells_wl = np.array([obj.l_wl for i in range(len(obj.lmax_wl_vals))])
@@ -327,7 +328,7 @@ def validate_and_setup_lmax(obj, scale_cuts_info, likelihood, lmin, lmax, zz_mod
         setup_lmax(obj)
     elif scale_cuts_info['type'] == 'kmax':   
         if likelihood!='binned':
-            raise ValueError('Varied lmax is applicable only for the binned approach!') 
+            raise ValueError('Varied kmax is applicable only for the binned approach!') 
         check_length(scale_cuts_info, obj.nbin)
         params_dic = scale_cuts_info['cosmo']
         lmax_wl = from_keff_to_lmax(obj.nbin, scale_cuts_info['max_WL'], zz_mod_wl, params_dic)

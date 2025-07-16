@@ -124,16 +124,21 @@ class MGLike:
         if status:  
             chi2 = 0.
             model_data_vector = self.compute_data_vector(param_dic_all) 
+            if self.Theo.flag_nan:
+                #print('detected NaNs before computing likelihood')
+                return -np.inf
             difference_vector = self.Data.data_vector - model_data_vector
             try:
                 yt = solve_triangular(self.Data.cholesky_transform, difference_vector, lower=True)
                 chi2 = yt.dot(yt)
             except:
-                if hasattr(self.Data, 'inv_data_covariance') and self.Data.inv_data_covariance is not None:
-                    chi2 = np.einsum('i, ij, j->', difference_vector, self.Data.inv_data_covariance, difference_vector)
-                else:
-                    raise ValueError('solve_triangular breaks when ', param_dic)
+                # If the cholesky transform fails, we can try to use the inverse covariance matrix
+                #print(('solve_triangular breaks when ', param_dic))
+                #if hasattr(self.Data, 'inv_data_covariance') and self.Data.inv_data_covariance is not None:
+                #    chi2 = np.einsum('i, ij, j->', difference_vector, self.Data.inv_data_covariance, difference_vector)
+                #else:
                 #    return -np.inf  
+                chi2 = np.einsum('i, ij, j->', difference_vector, self.Data.inv_data_covariance, difference_vector)    
             return -0.5*chi2    
         else:
             return -np.inf      

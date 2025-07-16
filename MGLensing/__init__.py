@@ -127,6 +127,10 @@ class DataClass():
             }
             print('computing data vector')
             self.data_vector = compute_vector[Survey.observable](self.params_data_dic)
+            print('wl_masked_ells: ', sum(Survey.mask_data_vector_wl))
+            print('gc_masked_ells: ', sum(Survey.mask_data_vector_gc))
+            print('xc_masked_ells: ', sum(Survey.mask_data_vector_xc))
+            print('3x2pt_masked_ells: ', sum(Survey.mask_data_vector_3x2pt))
             print('computing data covariance')
             self.data_covariance = compute_covariance[Survey.observable](self.params_data_dic)
 
@@ -522,7 +526,7 @@ class MGL():
         model['nl_model'] = nl_model
         # intialise a theory class with the target model
         NewModel = Theory(self.Survey, model) 
-        _ = FidModel.StructureEmu.check_pars_ini(params)
+        #_ = FidModel.StructureEmu.check_pars_ini(params)
         # if lcmd or w0wacdm, then use hmcode's sigma8-emulator 
         if nl_model==NL_MODEL_HMCODE or nl_model==NL_MODEL_BACCO:
             sigma8 = FidModel.StructureEmu.get_sigma8(params)
@@ -606,6 +610,7 @@ class MGL():
             #   - Galaxy Bias Model: {get_model_label(self.data_model_dic.get("bias_model", -1), "bias_model")} ({self.data_model_dic.get("bias_model", "N/A")})
             #   - Intrinsic Alignments: {get_model_label(self.data_model_dic.get("ia_model", -1), "ia_model")} ({self.data_model_dic.get("ia_model", "N/A")})
             #   - Baryon Model: {get_model_label(self.data_model_dic.get("baryon_model", -1), "baryon_model")} ({self.data_model_dic.get("baryon_model", "N/A")})
+            #   - Cross Correlation sqrt(Baryonic Supression): {self.data_model_dic.get("cross_sqrt_baryon", False)} 
             #   - Parameters: 
             """
             for par_i in self.Data.params_data_dic.keys():
@@ -623,6 +628,7 @@ class MGL():
         #   - Galaxy Bias Model: {get_model_label(self.theo_model_dic.get("bias_model", -1), "bias_model")} ({self.theo_model_dic.get("bias_model", "N/A")})
         #   - Intrinsic Alignments: {get_model_label(self.theo_model_dic.get("ia_model", -1), "ia_model")} ({self.theo_model_dic.get("ia_model", "N/A")})
         #   - Baryon Model: {get_model_label(self.theo_model_dic.get("baryon_model", -1), "baryon_model")} ({self.theo_model_dic.get("baryon_model", "N/A")})
+        #   - Cross Correlation sqrt(Baryonic Supression): {self.theo_model_dic.get("cross_sqrt_baryon", False)} 
         #   - Photo-z Error Model: {get_model_label(self.theo_model_dic.get("photoz_err_model", -1), "photoz_err_model")} ({self.theo_model_dic.get("photoz_err_model", "N/A")})
         #   - Parameter priors:
         """

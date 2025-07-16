@@ -67,10 +67,10 @@ def plot_cells_diag(type,  cl_gg_list, show=True):
     
     c = [-0.5, 0., 0.5]
     
-    fig, ax = plt.subplots(figsize=(10, 4), nrows=1, ncols=nbin, sharex=True, sharey=True, facecolor='w')
+    fig, ax = plt.subplots(figsize=(14, 4), nrows=1, ncols=nbin, sharex=True, sharey=True, facecolor='w')
     
-    #for ind in range(len(cls[type])-1):
-    for ind in range(len(cls[type])):    
+    for ind in range(len(cls[type])-1):
+    #for ind in range(len(cls[type])):    
         print(ind)
         for i in range(nbin):
             j=i
@@ -79,17 +79,18 @@ def plot_cells_diag(type,  cl_gg_list, show=True):
             ax[i].loglog(ells[type], cls[type][ind][:, i, j], label=str(ind+1) if i==0 else "")
             ax[i].loglog(ells[type], cls_heft_extrap[ind][:, i, j], linestyle='--')
             #ax[i].fill_between(ells[type], np.ones(len(ells[type]))+err_prop, np.ones(len(ells[type]))-err_prop, color='tab:pink', alpha=0.1)
-            ax[i].legend(loc='lower left', title_fontsize=10, title='bin ' + str(i + 1) + '-' + str(j + 1))
     for i in range(nbin):
         j=i
+        ax[i].loglog(ells[type], cls[type][-1][:, i, j], label="chain-breaker" if i==0 else "", color='tab:red')
         #err_prop = errs[type][:, i, j]*cls[type][1][:, i, j]/cls[type][0][:, i, j]*(1./cls[type][ind][:, i, j])
         #ax[i].fill_between(ells[type], np.ones(len(ells[type]))+err_prop, np.ones(len(ells[type]))-err_prop, color='tab:pink', alpha=0.3)
         #ax[i].semilogx(ells[type], cls[type][0][:, i, j]/cls[type][0][:, i, j], color='k')
         ax[i].set_xlabel('$\ell$')
         #ax[i].set_ylim(-10., 10.)
         ax[i].axvspan(xmin=lmax_ij[type][i, j], xmax=lmax[type], color='grey', alpha=0.3)
+        ax[i].legend(loc='lower left', title_fontsize=10, title='bin ' + str(i + 1) + '-' + str(j + 1))
     ax[0].set_ylabel('$C^{\\rm ' + types[type] + '}_{\ell}$ ratio')
-    #plt.tight_layout()
+    plt.tight_layout()
     plt.show() if show else plt.savefig('figs/modelling/c_ell/baryons/c_ells_' + types[type] + '_' + MGL.Survey.survey_name  + '_heftextrap.pdf', bbox_inches='tight')
 
 
@@ -157,8 +158,9 @@ dic_chain = {1: {'sigma8_cb': array(0.75158667), 'b1L_1': array(1.4204324), 'b1L
 2: {'sigma8_cb': array(0.8157392), 'b1L_1': array(0.88110474), 'b1L_2': array(0.50743258), 'b1L_3': array(0.67104359), 'b1L_4': array(0.34854277), 'b1L_5': array(0.53201865), 'b2L_1': array(0.14258059), 'b2L_2': array(1.41303339), 'b2L_3': array(1.7898494), 'b2L_4': array(0.23250804), 'b2L_5': array(0.68605245), 'bs2L_1': array(0.88746551), 'bs2L_2': array(1.98819247), 'bs2L_3': array(0.3455334), 'bs2L_4': array(-1.2339117), 'bs2L_5': array(-1.22533472), 'blaplL_1': array(1.13986773), 'blaplL_2': array(1.55075696), 'blaplL_3': array(-1.64024556), 'blaplL_4': array(-2.7260251), 'blaplL_5': array(2.06980876)},
 3: {'sigma8_cb': array(0.75163809), 'b1L_1': array(0.62192446), 'b1L_2': array(0.05222978), 'b1L_3': array(1.65391816), 'b1L_4': array(1.86393378), 'b1L_5': array(1.67251058), 'b2L_1': array(0.54619858), 'b2L_2': array(0.25123856), 'b2L_3': array(1.04329668), 'b2L_4': array(0.7250786), 'b2L_5': array(0.14166094), 'bs2L_1': array(1.04436402), 'bs2L_2': array(-0.1682304), 'bs2L_3': array(-1.23745627), 'bs2L_4': array(-1.85399507), 'bs2L_5': array(-0.57511573), 'blaplL_1': array(0.00866568), 'blaplL_2': array(1.64409929), 'blaplL_3': array(1.73834292), 'blaplL_4': array(-1.44594222), 'blaplL_5': array(0.83159384)},
 4: {'sigma8_cb': array(0.85706924), 'b1L_1': array(0.51557843), 'b1L_2': array(1.89900537), 'b1L_3': array(1.2639658), 'b1L_4': array(1.96969807), 'b1L_5': array(1.40263976), 'b2L_1': array(0.17546532), 'b2L_2': array(0.52064275), 'b2L_3': array(0.79827402), 'b2L_4': array(0.26856086), 'b2L_5': array(1.72246076), 'bs2L_1': array(-1.24604264), 'bs2L_2': array(1.63017568), 'bs2L_3': array(0.92908943), 'bs2L_4': array(-0.20059683), 'bs2L_5': array(-1.17711128), 'blaplL_1': array(0.86883157), 'blaplL_2': array(0.63523221), 'blaplL_3': array(0.49228919), 'blaplL_4': array(-0.33442824), 'blaplL_5': array(-0.68624083)},
+5: {'sigma8_cb': array(0.73312383), 'b1L_1': array(0.43744311), 'b1L_2': array(1.1536681), 'b1L_3': array(0.35764457), 'b1L_4': array(0.91031508), 'b1L_5': array(0.14932075), 'b2L_1': array(-0.9902653), 'b2L_2': array(1.89699217), 'b2L_3': array(-0.25573775), 'b2L_4': array(-1.72634931), 'b2L_5': array(-0.28628294), 'bs2L_1': array(-0.6763561), 'bs2L_2': array(-0.96775029), 'bs2L_3': array(-0.33880783), 'bs2L_4': array(1.55526373), 'bs2L_5': array(-0.5608721), 'blaplL_1': array(1.72486442), 'blaplL_2': array(-1.63392224), 'blaplL_3': array(-1.9114334), 'blaplL_4': array(-2.0310951), 'blaplL_5': array(1.73162285)}, 
 }
-for i in range(4):
+for i in range(5):
     params_new = params.copy()
     for par_i in dic_chain[i+1]:
         params_new[par_i] = dic_chain[i+1][par_i]

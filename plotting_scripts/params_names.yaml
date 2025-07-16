@@ -7,7 +7,9 @@ Omega_b: '\Omega_{\rm b}'
 Ombh2: '\omega_{\rm b}'
 h: 'h'
 log10As: '\log{10^{10}A_{\rm s}}'
+10As: '10^{9}A_{\rm s}'
 sigma8_cb: '\sigma_8'
+sigma8: '\sigma_8'
 ns: 'n_{\rm s}'
 Mnu: 'M_\nu'
 w0: 'w_0'
@@ -15,6 +17,7 @@ wa: 'w_a'
 log10T_AGN: '\log{T_{\rm agn}}'
 mu0: '\mu_0'
 q1: 'q_1'
+S8: 'S_8'
 ################################################
 #               Nuisances                      #
 ################################################

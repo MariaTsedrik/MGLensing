@@ -20,11 +20,16 @@ specs:
   scale_cuts:
     type: 'lmax'
     max_WL: #[4900]
-            [2800, 2800, 2800, 2800, 2800, 
-                   3000, 3000, 3000, 3000, 
-                         3000, 3000, 3000, 
-                               3000, 3000,
-                                     3000] #always a list, same length as nbin*(nbin+1)/2 or just 1 for const_lmax
+            #[2800, 2800, 2800, 2800, 2800, 
+            #       3000, 3000, 3000, 3000, 
+            #             3000, 3000, 3000, 
+            #                   3000, 3000,
+            #                         3000] #always a list, same length as nbin*(nbin+1)/2 or just 1 for const_lmax
+            [2000, 2000, 2000, 2000, 2000, 
+                   2000, 2000, 2000, 2000, 
+                         2000, 2000, 2000, 
+                               2000, 2000,
+                                     2000] #always a list, same length as nbin*(nbin+1)/2 or just 1 for const_lmax
             #[5., 3., 3., 2., 2.]
     max_GC: #[1000]
             [478, 478, 478, 478, 478, 
@@ -78,8 +83,8 @@ data:
   # Intrinsic alignment model
   #     0 -> zNLA
   #     1 -> TATT
-  baryon_model: 0
-  cross_sqrt_baryon: False
+  baryon_model: 3
+  cross_sqrt_baryon: True
   # Baryonic flag
   #     0 -> no baryons
   #     1 -> Tagn HMcode
@@ -90,7 +95,7 @@ data:
   #     0 -> no photo-z error
   #     1 -> additive mode, n(z') = n(z + dz)
   #     2 -> multiplicative mode, n(z') = n(z(1 + dz))
-  params: ./params_data.yaml
+  params: ./params_data_zennaro.yaml
 
 theory:
   add_noise: False
@@ -116,8 +121,8 @@ theory:
   # Intrinsic alignment model
   #     0 -> zNLA
   #     1 -> TATT
-  baryon_model: 0
-  cross_sqrt_baryon: False
+  baryon_model: 3
+  cross_sqrt_baryon: True
   # Baryonic flag
   #     0 -> no baryons
   #     1 -> Tagn HMcode
@@ -131,13 +136,13 @@ theory:
   params: ./params_bacco_test.yaml #./params_model_hmcode.yaml   
 
 output: 
-  chain_name: lsst_y1_test_extrap
+  chain_name: lsst_y1_fix_cosmo_zennaro_data_positiv_b2_zennaro_model
 sampler: 
   mcmc:
     verbose: True
     n_eff: 5000
     n_live: 1000
-    pool: 10 #20
-    resume: False
-    hdf5_name:  lsst_y1_test_extrap
+    pool: 20
+    resume: True
+    hdf5_name:  lsst_y1_fix_cosmo_zennaro_data_positiv_b2_zennaro_model
     

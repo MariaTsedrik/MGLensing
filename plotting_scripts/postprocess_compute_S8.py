@@ -5,7 +5,8 @@ import numpy as np
 import MGLensing
 
 
-MGLtest = MGLensing.MGL("config.yaml")
+#MGLtest = MGLensing.MGL("config.yaml")
+MGLtest = MGLensing.MGL("ini_files/pca/config_muSigma_lin.yaml")
 head = []
 def read_last_header_line(file_path):
     last_header = None
@@ -21,7 +22,7 @@ def read_last_header_line(file_path):
     else:
         return []
 # read the file
-file_name = 'chains/chaintest_hmcode_3x2pt_b1b2_nobar'
+file_name = 'chains/chain_lsst_y1_test_muSigma_linps_purelincuts'
 file_path = file_name+'.txt'
 chain = np.genfromtxt(file_path)
 chain = np.delete(chain, np.where(chain[:, -1]==-np.inf), axis=0)
@@ -37,6 +38,8 @@ for i in range(len(chain_pars)):
 # check that all required parameters are present
 # for sigma8-emulator we need 'omega_baryon', 'omega_cdm', 'neutrino_mass', 'w0',  'wa'   
 # 'ns',  'As', and 'h'.   
+chain_info['Ombh2'] = 0.0222383*np.ones(len_chain)
+chain_info['ns'] = 0.9626*np.ones(len_chain)
 pars = {
         'Omega_m': chain_info['Omega_m'],
         'Omega_c': chain_info['Omega_m']-chain_info['Ombh2']/chain_info['h']**2,
@@ -46,10 +49,10 @@ pars = {
         'ns':chain_info['ns'],
         'Mnu': np.zeros(len_chain),
         'w0': np.full(len_chain, -1.),
-        'wa': np.zeros(len_chain)
+        'wa': np.zeros(len_chain),
         # modified gravity and dark energy parameters
         # insert: 
-        # ...
+        'mu0': chain_info['mu0'],
         }
 #get sigma8
 sigma8 = MGLtest.get_sigma8_from_a_s_from_chain(pars, nl_model=0)

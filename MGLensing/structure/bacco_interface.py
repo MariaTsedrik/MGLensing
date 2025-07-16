@@ -486,7 +486,6 @@ class BaccoEmu:
                 (bL2[None,None, None, :] * blapl[None,None, :,None] + bL2[None,None, :,None] * blapl[None,None, None, :]) * p_d2k2[:,:,None,None] +
                 (bs2[None,None, None, :] * blapl[None,None, :,None] + bs2[None,None, :,None] * blapl[None,None, None, :]) * p_s2k2[:,:,None,None] +
                 (blapl[None,None, :,None] * blapl[None,None, None, :]) * p_k2k2[:,:,None,None])
-        
         # extrapolation with linear power spectrum for k<0.01 h/Mpc and z>1.5
         params_bacco_l = params_bacco
         params_bacco_l['expfactor'] = self.aa_all
@@ -503,6 +502,10 @@ class BaccoEmu:
                 pgg_k  = np.concatenate((pgg_lin_left, pgg[:, :, i, j], pgg_right),axis=1)
                 pggl_highz = (1.+bL1[i])*(1.+bL1[j])*plin_bacco[self.aa_all<self.aa_nl[0], :]
                 pgg_tot  = np.concatenate((pggl_highz, pgg_k),axis=0)
+                #if pgg_tot.any()<0:
+                #    raise ValueError('WARNING: negative power spectrum in the HEFT Pgg!')
+                #else:
+                #    print('HEFT Pgg ok!')
                 # interpolate
                 pgg_interp = RectBivariateSpline(self.zz_all_bacco, 
                                             self.kh_heft_tot,
@@ -548,6 +551,7 @@ class BaccoEmu:
                 bL2[None,None,:] * p_dmd2[:,:,None] +
                 bs2[None,None,:] * p_dms2[:,:,None] +
                 blapl[None,None,:] * p_dmk2[:,:,None])   
+
         # extrapolation with linear power spectrum for k<0.01 h/Mpc and z>1.5
         params_bacco_l = params_bacco
         params_bacco_l['expfactor'] = self.aa_all
@@ -563,6 +567,10 @@ class BaccoEmu:
             pgm_k  = np.concatenate((pgm_lin_left, pgm[:, :, i], pgm_right),axis=1)
             pgml_highz = (1.+bL1[i])*plin_bacco[self.aa_all<self.aa_nl[0], :]
             pgm_tot  = np.concatenate((pgml_highz, pgm_k),axis=0)
+            #if pgm_tot.any()<0:
+            #    raise ValueError('WARNING: negative power spectrum in the HEFT Pgg!')
+            #else:
+            #    print('HEFT Pgm ok!')
             # interpolate
             pgm_interp = RectBivariateSpline(self.zz_all_bacco, 
                                         self.kh_heft_tot,

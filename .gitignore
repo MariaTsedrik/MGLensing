@@ -10,8 +10,10 @@ __pycache__/
 # Chains
 chains/euclid/
 chains/lsst/
-chains/
 chains/mg/
+chains/hdf5/
+chains/bar_vs_bias/
+chains/
 
 # Test plots
 figs/posteriors/unofficial/

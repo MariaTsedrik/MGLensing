@@ -177,7 +177,7 @@ class Theory:
         #    self.Survey.noise['LL'] = 0.
         #    self.Survey.noise['GG'] = 0.
 
-
+        self.flag_nan = False
         # assign baryonic prescription
         baryon_models = {
             BARYONS_HMCODE: HMcode2020,
@@ -190,8 +190,14 @@ class Theory:
             check_zmax(self.Survey.zmax, self.BaryonsEmu)
         if 'cross_sqrt_baryon' in model:    
             self.flag_cross_sqrt_bar_boost = (model['cross_sqrt_baryon'] == True)
+            print('Zannero 2024 cross-sqrt-bar boost is applied!')
         else:
             self.flag_cross_sqrt_bar_boost = False    
+
+        if self.flag_cross_sqrt_bar_boost and (model['bias_model'] == BIAS_HEFT_PNL_BAR):
+            print('WARNING: cross-sqrt-bar boost and HEFT PNL BAR bias model are applied simultaneously!')    
+
+
         # assign intrinsic alignment     
         ia_models = {
             IA_NLA: (self.get_pk_nla, self.get_pk_cross_nla),
@@ -213,6 +219,8 @@ class Theory:
         # assign galaxy bias
         self.flag_heft = (model['bias_model'] == BIAS_HEFT) or (model['bias_model'] == BIAS_HEFT_PNL) or (model['bias_model'] == BIAS_HEFT_PNL_BAR)
         self.flag_heft_pnl_bar = (model['bias_model'] == BIAS_HEFT_PNL_BAR)
+        if self.flag_heft_pnl_bar:
+            print('A hybrid model HEFT+Pnl S is applied!')
         self.flag_heft_pnl = (model['bias_model'] == BIAS_HEFT_PNL)
         self.flag_sample_blinsigma8 = (model['bias_model'] == BIAS_LIN_SIGMA8)
         self.flag_sample_bheftsigma8 = (model['bias_model'] == BIAS_HEFT_SIGMA8)
@@ -1235,6 +1243,11 @@ class Theory:
             if self.flag_sample_blinsigma8:
                 self.pmm /= params_dic['sigma8_cb']**2
             self.pgg = self.get_pgg(params_dic)
+        # for heft check that no NaN-values are present due to negative values in b2
+        self.flag_nan = False
+        if np.isnan(self.pgg).any():
+            #print('WARNING: NaN-values in pgg for bias parameters: ', {k: v for k, v in params_dic.items() if k.startswith('b')})
+            self.flag_nan = True
         self.w_g = self.get_gg_kernel(params_dic)
         # compute photometric galaxy clustring angular power spectra cl_gg(l, bin_i, bin_j)
         # window function w_g(l,z,bin) in units of h/Mpc
@@ -1292,7 +1305,13 @@ class Theory:
             self.pgm = self.get_pgm(params_dic)*np.sqrt(bar_boost[:, :, None])                 
         else:        
             self.pgm = self.get_pgm(params_dic)     
-        self.pgg = self.get_pgg(params_dic)    
+        self.pgg = self.get_pgg(params_dic) 
+        
+        self.flag_nan = False
+        if np.isnan(self.pgg).any() or np.isnan(self.pgm).any():
+            #print('WARNING: NaN-values in pgg or pgm for bias parameters: ', {k: v for k, v in params_dic.items() if k.startswith('b')})
+            self.flag_nan = True   
+
         # compute properties used in various calculations just once:
         self.w_gamma = self.get_wl_kernel(params_dic)
         self.w_ia = self.get_ia_kernel(params_dic)
