@@ -5,7 +5,7 @@ We compare theoretical prediction for LSST Y1 setup between MGL and `CCL <https:
 We pick some fiducial :math:`\Lambda \mathrm{CDM}` cosmology, linear bias constant within a bin, 
 nonlinear intrinsic alignment and `BACCO-emulator <https://baccoemu.readthedocs.io/en/latest/>`_ for nonlinear prescription.
 Despite different extrapolation routines between MGL and CCL for high wave-numbers and
-redshifts outside of BACCO's range, we reach a very good agreement:
+redshifts outside of BACCO's range, we reach a very good agreement on all scales in our analysis:
 
 
 .. image:: cls_mgl_vs_cll_shear_abs.png
@@ -33,4 +33,5 @@ while MGL either uses HMcode2020 or linear power spectrum from BACCO.
    :width: 100 %
    :align: center
 
-One can perform further comparison test by modifying and running ``plotting_scripts/compare_mgl_vs_ccl.py``.
+One can perform further comparison test by modifying and running ``plotting_scripts/compare_mgl_vs_ccl.py``. Additionally, we provide a Jupyter notebook 
+``mgl_vs_ccl_notebook.ipynb`` with the same functionality.

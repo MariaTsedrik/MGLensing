@@ -39,14 +39,14 @@ def plot_cl_mgl_vs_ccl(ell, lmax, cl_mgl, cl_mgl_lin, cl_ccl, cl_ccl_lin, err_cl
     for i in range(nbin):
         for j in range(nbin):
             if i >= j:
-                #ax[i,j].loglog(ell, abs((cl_mgl[:,i,j]-cl_ccl[i, j, :])/err_cl[:, i, j]), linewidth=2)
-                #ax[i,j].loglog(ell, abs((cl_mgl_lin[:,i,j]-cl_ccl_lin[i, j, :])/err_cl[:, i, j]), linewidth=2)
+                ax[i,j].loglog(ell, abs((cl_mgl[:,i,j]-cl_ccl[i, j, :])/err_cl[:, i, j]), linewidth=2)
+                ax[i,j].loglog(ell, abs((cl_mgl_lin[:,i,j]-cl_ccl_lin[i, j, :])/err_cl[:, i, j]), linewidth=2)
                 #ax[i, j].set_ylim(1e-4, 5.)
-                ax[i,j].semilogx(ell, cl_mgl[:,i,j]/cl_ccl[i, j, :], linewidth=2)
-                ax[i,j].semilogx(ell, cl_mgl_lin[:,i,j]/cl_ccl_lin[i, j, :], linewidth=2)
-                ax[i, j].set_ylim(0.98, 1.02)
+                #ax[i,j].semilogx(ell, cl_mgl[:,i,j]/cl_ccl[i, j, :], linewidth=2)
+                #ax[i,j].semilogx(ell, cl_mgl_lin[:,i,j]/cl_ccl_lin[i, j, :], linewidth=2)
+                #ax[i, j].set_ylim(0.98, 1.02)
                 ax[i,j].text(.4, .7, 'bin %s, %s'%(str(i+1),(j+1)), fontsize="medium", horizontalalignment='center', transform=ax[i,j].transAxes)  if i<2 else ax[i,j].text(.4, .2, 'bin %s, %s'%(str(i+1),(j+1)), fontsize="medium", horizontalalignment='center', transform=ax[i,j].transAxes)
-                ax[i, j].axhline(y=1, linestyle='-.', linewidth=2, color='k')
+                ax[i, j].axhline(y=0.1, linestyle='-.', linewidth=2, color='k')
                 #ax[i,j].semilogx(ell, (cl_mgl[:,i,j]-cl_ccl[i, j, :])/err_cl[:, i, j], linewidth=2)
                 #ax[i,j].semilogx(ell, (cl_mgl_lin[:,i,j]-cl_ccl_lin[i, j, :])/err_cl[:, i, j], linewidth=2)
                 #ax[i, j].fill_between(ell, 1, -1, color='tab:pink', alpha=0.1)
@@ -59,7 +59,7 @@ def plot_cl_mgl_vs_ccl(ell, lmax, cl_mgl, cl_mgl_lin, cl_ccl, cl_ccl_lin, err_cl
     fig.text(0.06, 0.5, r'$\Delta C_\ell/\sigma_\ell$', ha='center', va='center', rotation='vertical', fontsize=20)
     fig.text(0.5, 0.04, r'$\ell$', ha='center', va='center', fontsize=20)   
     fig.suptitle(MGL.Survey.survey_name + ' - ' + title, fontsize=20)
-    fig.legend(['MGL-CCL nonlinear', 'MGL-CCL linear'], loc='upper right', ncol=1, bbox_to_anchor=(1, 0.93), bbox_transform=fig.transFigure, fontsize=20, frameon=False)
+    fig.legend(['MGL-CCL nonlinear', 'MGL-CCL linear', '$0.1\sigma$'], loc='upper right', ncol=1, bbox_to_anchor=(1, 0.93), bbox_transform=fig.transFigure, fontsize=20, frameon=False)
     fig.text(0.8, 0.65, annotation_text, ha='center', va='center', fontsize=12)   
     plt.show() if show else plt.savefig(f'figs/modelling/cls_{filename}.png')
                 
@@ -110,7 +110,7 @@ f_inv_arr = [ell2k, ell2k1, ell2k2]
 # ------------------------- #
 # MGL initialization 
 # ------------------------- #
-MGL = MGLensing.MGL("config.yaml")
+MGL = MGLensing.MGL("config_ccl_comparison.yaml")
 zz = MGL.Survey.zz_integr
 nbin = MGL.Survey.nbin
 
@@ -130,8 +130,8 @@ params = {
     'Mnu'     :  0.0,
     'w0'      :  -1.0,
     'wa'      :  0.0,
-    'a1_IA': 0.16,
-    'eta1_IA': 1.66,
+    'a1_IA':  0., #0.16,
+    'eta1_IA': 0., #1.66,
     'beta_IA': 0.,
 }
 _, rcom = MGL.get_expansion_and_rcom(params)
@@ -193,7 +193,7 @@ for i in range(3):
 # ---- # 
 # plot
 # ---- #        
-#plot_pmm(z_int_pick, pmm_mgl, pmm_mgl_zlin, pmm_ccl, pnl_bacco, show=False, name="mgl_vs_ccl_highz")
+#plot_pmm(z_int_pick, pmm_mgl, pmm_mgl_zlin, pmm_ccl, pnl_bacco, show=True, name="mgl_vs_ccl_highz")
 
 
 err_cl_ll, err_cl_gg, err_cl_lg  = MGL.get_errorbars(params)
@@ -245,7 +245,7 @@ for i in range(nbin):
 # plot
 # ---- #
 print('C_LL plotting...')
-plot_cl_mgl_vs_ccl(l_wl, l_wl_max, cl_ll_mgl, cl_ll_mgl_lin, cl_ll_ccl_nl, cl_ll_ccl_lin, err_cl_ll, title='$C^{\\rm LL}_\ell$ Shear-Shear', show=True, filename='mgl_vs_cll_shear')
-#plot_cl_mgl_vs_ccl(l_gc, l_gc_max, cl_gg_mgl, cl_gg_mgl_lin, cl_gg_ccl_nl, cl_gg_ccl_lin, err_cl_gg, title='$C^{\\rm GG}_\ell$ Galaxy-Galaxy', show=False, filename='mgl_vs_cll_galclust_abs')
-#plot_cl_mgl_vs_ccl(l_xc, l_gc_max, cl_lg_mgl, cl_lg_mgl_lin, cl_lg_ccl_nl, cl_lg_ccl_lin, err_cl_lg, title='$C^{\\rm LG}_\ell$ Shear-Galaxy', show=False, filename='mgl_vs_cll_crosscorr_abs')
+plot_cl_mgl_vs_ccl(l_wl, l_wl_max, cl_ll_mgl, cl_ll_mgl_lin, cl_ll_ccl_nl, cl_ll_ccl_lin, err_cl_ll, title='$C^{\\rm LL}_\ell$ Shear-Shear', show=False, filename='mgl_vs_cll_shear_abs_new')
+plot_cl_mgl_vs_ccl(l_gc, l_gc_max, cl_gg_mgl, cl_gg_mgl_lin, cl_gg_ccl_nl, cl_gg_ccl_lin, err_cl_gg, title='$C^{\\rm GG}_\ell$ Galaxy-Galaxy', show=False, filename='mgl_vs_cll_galclust_abs_new')
+plot_cl_mgl_vs_ccl(l_xc, l_gc_max, cl_lg_mgl, cl_lg_mgl_lin, cl_lg_ccl_nl, cl_lg_ccl_lin, err_cl_lg, title='$C^{\\rm LG}_\ell$ Shear-Galaxy', show=False, filename='mgl_vs_cll_crosscorr_abs_new')
 
