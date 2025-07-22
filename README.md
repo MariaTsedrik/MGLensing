@@ -66,12 +66,3 @@ Following files provide examples of using MGL:
 The documentation can be found at [mglensing.readthedocs.io](https://mglensing.readthedocs.io/en/latest/index.html).
 
 
-## To-do list for Maria
-* unit-tests and workflows
-* polychord
-* jax + HMC
-
-
-## To-do list for Ottavia
-* add reading data and covariance from a file
-* documentation
