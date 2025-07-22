@@ -267,10 +267,11 @@ class MGL():
         # save values of parameters (cosmological and nuisances)
         with open(self.config_dic['theory']['params'], "r", encoding="utf-8") as file_in:
             params_dic = yaml.safe_load(file_in)
-        # if sampling in bias*sigma8 change values of bias as bias = bias*sigma8 THIS WORKS ONLY IN THE THEORY NOT IN THE FIDUCIALS IN params_data => FIX THIS!!!
+        
+        # if sampling in bias*sigma8 change values of bias as bias = bias*sigma8 
         if self.theo_model_dic['bias_model'] == 5:
             for i in range(1, 6):
-                # change fiducials
+                # change fiducials for test-runs
                 params_dic['b1_'+str(i)]['p0'] = params_dic['b1_'+str(i)]['p0']*params_dic['sigma8_cb']['p0']
                 # change prior ranges
                 if params_dic['b1_'+str(i)]['type'] == 'U':
@@ -278,7 +279,7 @@ class MGL():
                     params_dic['b1_'+str(i)]['p2'] = params_dic['b1_'+str(i)]['p2']*params_dic['sigma8_cb']['p2']
         if self.theo_model_dic['bias_model'] == 6:
             for i in range(1, 6):
-                # change fiducials
+                # change fiducials for test-runs
                 params_dic['b1L_'+str(i)]['p0'] = params_dic['b1L_'+str(i)]['p0']*params_dic['sigma8_cb']['p0']
                 params_dic['b2L_'+str(i)]['p0'] = params_dic['b2L_'+str(i)]['p0']*params_dic['sigma8_cb']['p0']
                 params_dic['bs2L_'+str(i)]['p0'] = params_dic['bs2L_'+str(i)]['p0']*params_dic['sigma8_cb']['p0']
@@ -384,6 +385,39 @@ class MGL():
         ez, rz, _ = self.TheoryModel.get_ez_rz_k(params)
         return ez, rz
     
+    def get_windows(self, params, theo_model):
+        """
+        Compute the kernels (W) for different components based on the theoretical model and parameters provided.
+
+        Parameters:
+        ----------
+        params : dict
+            Dictionary containing the parameters required for the theoretical model.
+        theo_model : dict
+            Dictionary specifying the theoretical model to be used, including non-linear model and other configurations.
+
+        """
+        NewModel = Theory(self.Survey, theo_model)  
+        print('Theo model: ', theo_model)
+        if theo_model['nl_model'] == NL_MODEL_BACCO and 'sigma8_cb' not in params:
+            params['sigma8_cb'] = NewModel.StructureEmu.get_sigma8_cb(params) 
+        NewModel.ez, NewModel.rz, NewModel.k = NewModel.get_ez_rz_k(params)
+        NewModel.dz, _ = NewModel.StructureEmu.get_growth(params, self.Survey.zz_integr)
+        NewModel.deltaz_s, NewModel.deltaz_l = NewModel.get_deltaz(params)
+        NewModel.pmm, bar_boost = NewModel.get_pmm(params)
+        NewModel.pmm_no_barboost = NewModel.pmm/bar_boost
+        if NewModel.flag_cross_sqrt_bar_boost:
+            NewModel.pgm = NewModel.get_pgm(params)*np.sqrt(bar_boost[:, :, None])                 
+        else:        
+            NewModel.pgm = NewModel.get_pgm(params)     
+        NewModel.pgg = NewModel.get_pgg(params)    
+        NewModel.w_gamma = NewModel.get_wl_kernel(params)
+        NewModel.w_ia = NewModel.get_ia_kernel(params)
+        NewModel.pk_delta_ia, NewModel.pk_iaia = NewModel.get_pk_ia(params)
+        NewModel.w_g = NewModel.get_gg_kernel(params)
+        return NewModel.w_gamma, NewModel.w_ia, NewModel.w_g  
+    
+
     
     def get_c_ells(self, params, theo_model):
         """

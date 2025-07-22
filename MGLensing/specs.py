@@ -12,7 +12,7 @@ DEG2_IN_SPHERE = 4 * np.pi * (180 / np.pi)**2
 dirname = os.path.split(__file__)[0]
 print(dirname)
 H0_h_c = 1./2997.92458 #=100/c in Mpc/h
-z_bins_for_integration = 512
+z_bins_for_integration = 256 #512 
 
 def get_luminosity_func(file_name):
     """
@@ -461,6 +461,9 @@ class LSSTSetUp:
         # redshift setup 
         self.zmin = 0.01 
         self.zmax = 3.0 #actually 4.0,  but changed because of linear bacco-emu 
+        self.zbin_integr = z_bins_for_integration 
+        self.zz_integr = np.linspace(self.zmin, self.zmax, num=self.zbin_integr, endpoint=True)
+        
         if survey_info == 'LSST_Y1':
             self.fsky = 0.43 #0.5
             self.gal_per_sqarcmn = 20.0
@@ -532,23 +535,38 @@ class LSSTSetUp:
         lens_z = []
         z_arr = s.tracers['src0'].z
         # reduce redshift range
-        indx_min = np.where(z_arr==self.zmin)[0][0]
-        indx_max = np.where(z_arr==self.zmax)[0][0]
-        z_arr = z_arr[indx_min:indx_max]
+        #indx_min = np.where(z_arr==self.zmin)[0][0]
+        #indx_max = np.where(z_arr==self.zmax)[0][0]
+        #z_arr = z_arr[indx_min:indx_max]
         # read sources and lenses distributions for each bin
         for i in range(self.nbin):
-            dndz_z.append(s.tracers['src'+str(i)].nz[indx_min:indx_max]) 
-            lens_z.append(s.tracers['lens'+str(i)].nz[indx_min:indx_max])
+            dndz_z_i = s.tracers['src'+str(i)].nz
+            dndz_z.append(np.interp(self.zz_integr, z_arr, dndz_z_i))
+            lens_z_i = s.tracers['lens'+str(i)].nz
+            lens_z.append(np.interp(self.zz_integr, z_arr, lens_z_i))
+            #dndz_z.append(s.tracers['src'+str(i)].nz[indx_min:indx_max]) 
+            #lens_z.append(s.tracers['lens'+str(i)].nz[indx_min:indx_max])
             # reduce array size
-            dndz_z[i] = reduce_len_by_averaging(dndz_z[i], target_len=z_bins_for_integration)
-            lens_z[i] = reduce_len_by_averaging(lens_z[i], target_len=z_bins_for_integration)
+            #dndz_z[i] = reduce_len_by_averaging(dndz_z[i], target_len=z_bins_for_integration)
+            #lens_z[i] = reduce_len_by_averaging(lens_z[i], target_len=z_bins_for_integration)
         # reduce z array size
-        z_arr = reduce_len_by_averaging(z_arr, target_len=z_bins_for_integration)
-        self.zz_integr = z_arr
-        self.zbin_integr = len(z_arr)
+        #z_arr = reduce_len_by_averaging(z_arr, target_len=z_bins_for_integration)
+        #self.zz_integr = z_arr
+        #self.zbin_integr = len(z_arr)
+
         
         norm_nz_s = np.array(dndz_z).T
         norm_nz_l = np.array(lens_z).T
+        
+        # check if normalized galaxy distribution integrates to 1
+        for Bin in range(self.nbin):
+            check_nz_s_i = trapezoid(norm_nz_s[:,Bin],self.zz_integr[:]) 
+            check_nz_l_i= trapezoid(norm_nz_l[:,Bin],self.zz_integr[:]) 
+            print('Source galaxy distribution for bin ', Bin, ' integrates to ', check_nz_s_i)
+            print('Lens galaxy distribution for bin ', Bin, ' integrates to ', check_nz_l_i)
+            norm_nz_s[:,Bin] = norm_nz_s[:,Bin] / check_nz_s_i
+            norm_nz_l[:,Bin] = norm_nz_l[:,Bin] / check_nz_l_i
+        
         
         return norm_nz_s, norm_nz_l     
     

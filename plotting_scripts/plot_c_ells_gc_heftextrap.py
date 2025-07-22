@@ -57,12 +57,12 @@ print('l_gc_max: ', l_gc_max)
 import matplotlib as mpl
 import seaborn as sns
 palette = sns.color_palette("viridis", as_cmap=True)
-def plot_cells_diag(type,  cl_gg_list, show=True):
-    types = ['GG']
-    ells = [l_gc]
-    lmax = [l_gc[-1]]
-    lmax_ij = [l_gc_max]
-    cls = [cl_gg_list]
+def plot_cells_diag(type,  cl_gg_list, cl_xc_list, show=True):
+    types = ['GG', 'XC']
+    ells = [l_gc, l_xc]
+    lmax = [l_gc[-1], l_xc[-1]]
+    lmax_ij = [l_gc_max, l_gc_max]
+    cls = [cl_gg_list, cl_xc_list]
     errs = [err_cl_gg]
     
     c = [-0.5, 0., 0.5]
@@ -88,10 +88,46 @@ def plot_cells_diag(type,  cl_gg_list, show=True):
         ax[i].set_xlabel('$\ell$')
         #ax[i].set_ylim(-10., 10.)
         ax[i].axvspan(xmin=lmax_ij[type][i, j], xmax=lmax[type], color='grey', alpha=0.3)
-        ax[i].legend(loc='lower left', title_fontsize=10, title='bin ' + str(i + 1) + '-' + str(j + 1))
+        ax[i].legend(loc='lower left', title_fontsize=16, title='bin ' + str(i + 1) + '-' + str(j + 1))
     ax[0].set_ylabel('$C^{\\rm ' + types[type] + '}_{\ell}$ ratio')
     plt.tight_layout()
-    plt.show() if show else plt.savefig('figs/modelling/c_ell/baryons/c_ells_' + types[type] + '_' + MGL.Survey.survey_name  + '_heftextrap.pdf', bbox_inches='tight')
+    plt.show() if show else plt.savefig('figs/modelling/c_ell/debug/c_ells_' + types[type] + '_' + MGL.Survey.survey_name  + '_heftextrap_diag.png', bbox_inches='tight')
+
+def plot_cells(type,  cl_gg_list, cl_xc_list, show=True):
+    types = ['GG', 'XC']
+    ells = [l_gc, l_xc]
+    lmax = [l_gc[-1], l_xc[-1]]
+    lmax_ij = [l_gc_max, l_gc_max]
+    cls = [cl_gg_list, cl_xc_list]
+    errs = [err_cl_gg]
+    
+    c = [-0.5, 0., 0.5]
+    
+    fig, ax = plt.subplots(figsize=(8, 8), nrows=nbin, ncols=nbin, sharex=True, facecolor='w')
+    
+    for ind in range(len(cls[type])-1):
+        for i in range(nbin):
+            for j in range(nbin):
+                if i < j:
+                    ax[i, j].axis('off')
+                else:    
+                    ax[i, j].loglog(ells[type], cls[type][ind][:, i, j])
+                    ax[i, j].loglog(ells[type], cls_heft_extrap[ind][:, i, j], linestyle='--')
+    
+    for i in range(nbin):
+        for j in range(nbin):
+                if i < j:
+                    ax[i, j].axis('off')
+                else:
+                    ax[i, j].loglog(ells[type], cls[type][-1][:, i, j], color='tab:red')
+                    ax[i, j].axvspan(xmin=lmax_ij[type][i, j], xmax=lmax[type], color='grey', alpha=0.3)
+                    #ax[i, j].legend(loc='lower left', title_fontsize=10, title='bin ' + str(i + 1) + '-' + str(j + 1))
+                    ax[-1, i].set_xlabel('$\ell$')
+    for i in range(nbin):
+        ax[nbin - 1][i].set_xlabel('$\ell$')
+    ax[int(nbin / 2)][0].set_ylabel('$C^{\\rm ' + types[type] + '}_{\ell}$')
+    plt.tight_layout()
+    plt.show() if show else plt.savefig('figs/modelling/c_ell/debug/c_ells_' + types[type] + '_' + MGL.Survey.survey_name  + '_heftextrap.png', bbox_inches='tight')
 
 
 
@@ -146,12 +182,17 @@ for bin_i in range(nbin):
 err_cl_ll, err_cl_gg, err_cl_lg  = MGL.get_errorbars(params)
 
 model={
-    'bacco_nobar_heft': {'nl_model': NL_MODEL_BACCO, 'bias_model': 2, 'ia_model': 0, 'baryon_model': NO_BARYONS, 'photoz_err_model': 0.}
+    'bacco_nobar_heft': {'nl_model': NL_MODEL_BACCO, 'bias_model': 2, 'ia_model': 0, 'baryon_model': NO_BARYONS, 'photoz_err_model': 0.},
+    'bacco_nobar_heft_const': {'nl_model': NL_MODEL_BACCO, 'bias_model': 2, 'heft_extrap_k_const':True, 'ia_model': 0, 'baryon_model': NO_BARYONS, 'photoz_err_model': 0.},
     }
 
-cls_fid = MGL.get_c_ells(params, model['bacco_nobar_heft'])[1]
+_, gg, xc, _ = MGL.get_c_ells(params, model['bacco_nobar_heft'])
+cls_fid = gg
+cls_xc_fid = xc
 cls_list = []
 cls_list.append(cls_fid)
+cls_xc_list = []
+cls_xc_list.append(cls_xc_fid)
 n_points = 30
 
 dic_chain = {1: {'sigma8_cb': array(0.75158667), 'b1L_1': array(1.4204324), 'b1L_2': array(0.69431766), 'b1L_3': array(1.93543141), 'b1L_4': array(0.86214115), 'b1L_5': array(0.71999603), 'b2L_1': array(1.18935584), 'b2L_2': array(1.89727849), 'b2L_3': array(1.4566858), 'b2L_4': array(1.94297669), 'b2L_5': array(0.99156927), 'bs2L_1': array(-0.72449865), 'bs2L_2': array(-0.220814), 'bs2L_3': array(0.47991525), 'bs2L_4': array(-0.67869858), 'bs2L_5': array(-1.60589988), 'blaplL_1': array(-0.04573221), 'blaplL_2': array(-0.09292113), 'blaplL_3': array(-0.05539138), 'blaplL_4': array(-2.46917485), 'blaplL_5': array(-0.39294152)},
@@ -160,13 +201,41 @@ dic_chain = {1: {'sigma8_cb': array(0.75158667), 'b1L_1': array(1.4204324), 'b1L
 4: {'sigma8_cb': array(0.85706924), 'b1L_1': array(0.51557843), 'b1L_2': array(1.89900537), 'b1L_3': array(1.2639658), 'b1L_4': array(1.96969807), 'b1L_5': array(1.40263976), 'b2L_1': array(0.17546532), 'b2L_2': array(0.52064275), 'b2L_3': array(0.79827402), 'b2L_4': array(0.26856086), 'b2L_5': array(1.72246076), 'bs2L_1': array(-1.24604264), 'bs2L_2': array(1.63017568), 'bs2L_3': array(0.92908943), 'bs2L_4': array(-0.20059683), 'bs2L_5': array(-1.17711128), 'blaplL_1': array(0.86883157), 'blaplL_2': array(0.63523221), 'blaplL_3': array(0.49228919), 'blaplL_4': array(-0.33442824), 'blaplL_5': array(-0.68624083)},
 5: {'sigma8_cb': array(0.73312383), 'b1L_1': array(0.43744311), 'b1L_2': array(1.1536681), 'b1L_3': array(0.35764457), 'b1L_4': array(0.91031508), 'b1L_5': array(0.14932075), 'b2L_1': array(-0.9902653), 'b2L_2': array(1.89699217), 'b2L_3': array(-0.25573775), 'b2L_4': array(-1.72634931), 'b2L_5': array(-0.28628294), 'bs2L_1': array(-0.6763561), 'bs2L_2': array(-0.96775029), 'bs2L_3': array(-0.33880783), 'bs2L_4': array(1.55526373), 'bs2L_5': array(-0.5608721), 'blaplL_1': array(1.72486442), 'blaplL_2': array(-1.63392224), 'blaplL_3': array(-1.9114334), 'blaplL_4': array(-2.0310951), 'blaplL_5': array(1.73162285)}, 
 }
-for i in range(5):
+
+
+for i in range(len(dic_chain)):
     params_new = params.copy()
     for par_i in dic_chain[i+1]:
         params_new[par_i] = dic_chain[i+1][par_i]
     print('params_new: ', params_new)
-    cls_list.append(MGL.get_c_ells(params_new, model['bacco_nobar_heft'])[1])
+    _, gg, xc, _ = MGL.get_c_ells(params_new, model['bacco_nobar_heft'])
+    print('xc: ', xc)
+    cls_list.append(gg)
+    cls_xc_list.append(xc)
 
-#np.savez('cls_heft_extrap.npz', cls_list=cls_list)
-cls_heft_extrap = np.load('cls_heft_extrap.npz')['cls_list']
-plot_cells_diag(0, cls_list, True)
+_, gg, xc, _ = MGL.get_c_ells(params, model['bacco_nobar_heft_const'])
+cls_fid_const = gg
+cls_xc_fid_const = xc
+cls_list_const = []
+cls_list_const.append(cls_fid_const)
+cls_xc_list_const = []
+cls_xc_list_const.append(cls_xc_fid_const)
+for i in range(len(dic_chain)):
+    params_new = params.copy()
+    for par_i in dic_chain[i+1]:
+        params_new[par_i] = dic_chain[i+1][par_i]
+    print('params_new: ', params_new)
+    _, gg, xc, _ = MGL.get_c_ells(params_new, model['bacco_nobar_heft_const'])
+    cls_list_const.append(gg)
+    cls_xc_list_const.append(xc)
+
+cls_heft_extrap = cls_list_const
+#plot_cells_diag(0, cls_list, cls_xc_list, True)
+plot_cells(0, cls_list, cls_xc_list, False)
+
+#cls_heft_extrap = cls_xc_list_const
+#plot_cells_diag(1, cls_list, cls_xc_list, True)
+#plot_cells(1, cls_list, cls_xc_list, False)
+
+#print(np.array(cls_xc_list).shape)
+#print(cls_xc_list)

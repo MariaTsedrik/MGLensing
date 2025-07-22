@@ -1,6 +1,6 @@
 import numpy as np
 import MGrowth as mg
-from scipy.integrate import trapezoid, quad
+from scipy.integrate import simpson, trapezoid, quad
 from scipy import interpolate as itp
 from .structure.hmcode2020_interface import HMcode2020
 from .structure.bacco_interface import BaccoEmu
@@ -12,7 +12,8 @@ from .structure.react_ide_interface import DarkScatteringReACT
 from .structure.react_fr_interface import FofRReACT
 from math import sqrt, log, exp, pow, log10
 import os
-import fastpt as fpt
+try: import fastpt as fpt
+except: print('fastpt not installed! TATT will not be available!')
 from scipy.interpolate import interp1d
 
 os.environ['TF_CPP_MIN_LOG_LEVEL'] = '3'  
@@ -157,6 +158,7 @@ class Theory:
             NL_MODEL_DS: DarkScatteringReACT,
             NL_MODEL_FOFR: FofRReACT
         }
+        print('model["nl_model"] = ', model['nl_model'])
         try:
             if model['nl_model'] == NL_MODEL_BACCO:
                 option = model['bacco_option'] if 'bacco_option' in model else 'z_extrap_linear'
@@ -190,7 +192,7 @@ class Theory:
             check_zmax(self.Survey.zmax, self.BaryonsEmu)
         if 'cross_sqrt_baryon' in model:    
             self.flag_cross_sqrt_bar_boost = (model['cross_sqrt_baryon'] == True)
-            print('Zannero 2024 cross-sqrt-bar boost is applied!')
+            print('Zennaro 2024 cross-sqrt-bar boost is applied with self.flag_cross_sqrt_bar_boost: ', self.flag_cross_sqrt_bar_boost)
         else:
             self.flag_cross_sqrt_bar_boost = False    
 
@@ -220,8 +222,9 @@ class Theory:
         self.flag_heft = (model['bias_model'] == BIAS_HEFT) or (model['bias_model'] == BIAS_HEFT_PNL) or (model['bias_model'] == BIAS_HEFT_PNL_BAR)
         self.flag_heft_pnl_bar = (model['bias_model'] == BIAS_HEFT_PNL_BAR)
         if self.flag_heft_pnl_bar:
-            print('A hybrid model HEFT+Pnl S is applied!')
+            print('A hybrid model HEFT+PnlxS is applied!')
         self.flag_heft_pnl = (model['bias_model'] == BIAS_HEFT_PNL)
+        self.flag_extrap_k_const = model['heft_extrap_k_const'] if 'heft_extrap_k_const' in model else False
         self.flag_sample_blinsigma8 = (model['bias_model'] == BIAS_LIN_SIGMA8)
         self.flag_sample_bheftsigma8 = (model['bias_model'] == BIAS_HEFT_SIGMA8)
         bias_models = {
@@ -748,11 +751,11 @@ class Theory:
         # can be later changed 
         #deltas = np.array([params_dic['deltaz_'+str(i+1)] for i in range(self.Survey.nbin)])
         eta_z_s =  self.get_n_of_z(self.Survey.eta_z_s, self.deltaz_s)
-
+        
         # in the integrand dimensions are (bin_i, zz_integr, zz_integr)
         integrand = 3./2.*H0_h_c**2. * omega_m * self.rz[None,:,None]*(1.+self.Survey.zz_integr[None,:,None])*eta_z_s.T[:,None,:]*(1.-self.rz[None,:,None]/self.rz[None,None,:])
         # integrate along the third dimension in zz_integr
-        w_gamma  = trapezoid(np.triu(integrand), self.Survey.zz_integr,axis=-1).T
+        w_gamma  = simpson(np.triu(integrand), self.Survey.zz_integr,axis=-1).T #trapezoid(np.triu(integrand), self.Survey.zz_integr,axis=-1).T
         # add an extra dimension to w_gamma as we might have ell-dependence in the IA-kernel due to the scale-dependent linear growth
         w_gamma = w_gamma[None,:,:]
         return w_gamma
@@ -806,13 +809,18 @@ class Theory:
         cl_ll : numpy.ndarray
             Weak lensing power spectrum (C_ell) for different redshift bins.
         """
+        # new implementation
         kernel_delta_ia = (self.w_gamma[:, :, :, None]*self.w_ia[:, :, None, :] + self.w_gamma[:, :, None, :]*self.w_ia[:, :, :, None]) * self.pk_delta_ia[:, :, None, None]
         kernel_iaia = self.w_ia[:, :, :, None]*self.w_ia[:, :, None, :]  * self.pk_iaia[:, :, None, None]
         kernel_wl = self.w_gamma[:, :, :, None]*self.w_gamma[:, :, None, :]  * self.pmm[:, :, None, None]
         # compute the integrand with dimensions (ell, z_integr, bin_i, bin_j)
         cl_ll_int = (kernel_wl + kernel_delta_ia + kernel_iaia) / self.ez[None,:,None,None] / self.rz[None,:,None,None] / self.rz[None,:,None,None] / H0_h_c
+
+        # old implementation
+        #W_L = self.w_gamma + self.factor_nla[:, :, None] *self.w_ia # ell, zz_integr, bin_i
+        #cl_ll_int = W_L[:,:,:,None] * W_L[:,:,None,:] * self.pmm[:, :, None, None] / self.ez[None,:,None,None] / self.rz[None,:,None,None] / self.rz[None,:,None,None] / H0_h_c
         # integrate along the z_integr-direction
-        cl_ll = trapezoid(cl_ll_int, self.Survey.zz_integr, axis=1)[:self.Survey.nell_wl, :, :]
+        cl_ll = simpson(cl_ll_int, self.Survey.zz_integr, axis=1)[:self.Survey.nell_wl, :, :] #trapezoid(cl_ll_int, self.Survey.zz_integr, axis=1)[:self.Survey.nell_wl, :, :]
         # add noise to the auto-correlated bins
         for i in range(self.Survey.nbin):
             cl_ll[:, i, i] += self.Survey.noise['LL']
@@ -974,7 +982,8 @@ class Theory:
         pgg : numpy.ndarray
             The galaxy-galaxy power spectrum.
         """
-        pgg = self.BaccoEmuClass.get_heft_pgg_zextr_lin(params_dic, self.k, self.Survey.lbin, self.Survey.zz_integr, self.Survey.nbin, self.flag_sample_bheftsigma8)
+        pgg = self.BaccoEmuClass.get_heft_pgg_zextr_lin(params_dic, self.k, self.Survey.lbin, self.Survey.zz_integr, self.Survey.nbin, 
+                                                        self.flag_sample_bheftsigma8, self.flag_extrap_k_const)
         # return dimension (lbin, z_integr, bin_i, bin_j)
         return pgg
     
@@ -992,7 +1001,8 @@ class Theory:
         pgg : numpy.ndarray
             The galaxy-galaxy power spectrum.
         """
-        pgg = self.BaccoEmuClass.get_heft_nl_pgg_zextr_lin(params_dic, self.k, self.Survey.lbin, self.Survey.zz_integr, self.Survey.nbin, self.flag_heft_pnl_bar, self.flag_sample_bheftsigma8)
+        pgg = self.BaccoEmuClass.get_heft_nl_pgg_zextr_lin(params_dic, self.k, self.Survey.lbin, self.Survey.zz_integr, self.Survey.nbin, 
+                                                           self.flag_heft_pnl_bar, self.flag_sample_bheftsigma8, self.flag_extrap_k_const)
         # return dimension (lbin, z_integr, bin_i, bin_j)
         return pgg
     
@@ -1010,7 +1020,8 @@ class Theory:
         pgm : numpy.ndarray
             The matter-galaxy power spectrum.
         """
-        pgm = self.BaccoEmuClass.get_heft_pgm_zextr_lin(params_dic, self.k, self.Survey.lbin, self.Survey.zz_integr, self.Survey.nbin)
+        pgm = self.BaccoEmuClass.get_heft_pgm_zextr_lin(params_dic, self.k, self.Survey.lbin, self.Survey.zz_integr, self.Survey.nbin,
+                                                        self.flag_sample_bheftsigma8, self.flag_extrap_k_const)
         # return dimension (lbin, z_integr, bin_i)
         return pgm
     
@@ -1028,7 +1039,8 @@ class Theory:
         pgm : numpy.ndarray
             The matter-galaxy power spectrum.
         """
-        pgm = self.BaccoEmuClass.get_heft_nl_pgm_zextr_lin(params_dic, self.k, self.Survey.lbin, self.Survey.zz_integr, self.Survey.nbin, self.flag_heft_pnl_bar)
+        pgm = self.BaccoEmuClass.get_heft_nl_pgm_zextr_lin(params_dic, self.k, self.Survey.lbin, self.Survey.zz_integr, self.Survey.nbin, 
+                                                           self.flag_heft_pnl_bar, self.flag_sample_bheftsigma8, self.flag_extrap_k_const)
         # return dimension (lbin, z_integr, bin_i)
         return pgm
         
@@ -1080,7 +1092,7 @@ class Theory:
         # compute integrand with the dimensions of (ell, z_integr, bin_i, bin_j)
         cl_gg_int = self.w_g[:,:,:,None] *self. w_g[:,: , None, :] * self.pgg / self.ez[None,:,None,None] / self.rz[None,:,None,None] / self.rz[None,:,None,None] / H0_h_c    
         # integrate along the z_integr direction
-        cl_gg = trapezoid(cl_gg_int, self.Survey.zz_integr, axis=1)[:self.Survey.nell_gc, :, :]
+        cl_gg = simpson(cl_gg_int, self.Survey.zz_integr, axis=1)[:self.Survey.nell_gc, :, :] #trapezoid(cl_gg_int, self.Survey.zz_integr, axis=1)[:self.Survey.nell_gc, :, :]
         # add noise
         for i in range(self.Survey.nbin):
             cl_gg[:, i, i] += self.Survey.noise['GG']
@@ -1159,13 +1171,19 @@ class Theory:
         cl_gl : numpy.ndarray
             The galaxy-lensing angular power spectrum with dimensions (ell, bin_i, bin_j).
         """
+        # new implementation
         # compute components of the integrand
         kernel_ia_gal = self.w_ia[:, :, :, None] * self.pk_gal_ia
         kernel_wl_gal = self.w_gamma[:, :, :, None] * self.pgm[:,:,None,:]
         # compute integrand with dimensions (ell, z_integr, bin_i, bin_j)
         cl_lg_int = (kernel_wl_gal + kernel_ia_gal) * self.w_g[:, :, None, :] / self.ez[None,:,None,None] / self.rz[None,:,None,None] / self.rz[None,:,None,None] / H0_h_c
+        # old implementation
+        #W_L = self.w_gamma + self.factor_nla[:, :, None] *self.w_ia # ell, zz_integr, bin_i
+        #W_G = self.w_g[:, :, None, :]
+        #cl_lg_int = W_L[:, :, :, None] * W_G * self.pgm[:,:,None,:] / self.ez[None,:,None,None] / self.rz[None,:,None,None] / self.rz[None,:,None,None] / H0_h_c
+
         # integrate along the z-integr direction
-        cl_lg = trapezoid(cl_lg_int, self.Survey.zz_integr, axis=1)[:self.Survey.nell_xc,:,:]
+        cl_lg = simpson(cl_lg_int, self.Survey.zz_integr, axis=1)[:self.Survey.nell_xc,:,:] #trapezoid(cl_lg_int, self.Survey.zz_integr, axis=1)[:self.Survey.nell_xc,:,:]
         # transpose LG to get GL
         cl_gl = np.transpose(cl_lg, (0, 2, 1))  
         return cl_lg, cl_gl
@@ -1221,21 +1239,6 @@ class Theory:
         self.dz, _ = self.StructureEmu.get_growth(params_dic, self.Survey.zz_integr)
         # get redshift uncertainties
         self.deltaz_s, self.deltaz_l = self.get_deltaz(params_dic)
-        #if flag_test_heft_new_extrap:
-        #    print('compute with flag_test_heft_new_extrap')
-        #    self.pgg = self.BaccoEmuClass.get_heft_pgg_zextr_lin(params_dic, self.k, self.Survey.lbin, self.Survey.zz_integr, self.Survey.nbin)
-        #else:    
-        #    if self.flag_heft or self.flag_sample_bheftsigma8:
-        #        self.pk_exp, self.pk_exp_extr = self.get_heft_pk_exp(params_dic)
-        #        if self.flag_heft_pnl_bar or self.flag_heft_pnl:
-        #            self.pmm, bar_boost = self.get_pmm(params_dic)
-        #            self.pmm_no_barboost = self.pmm/bar_boost 
-        #    elif self.flag_sample_blinsigma8:
-        #        self.pmm, _, _ = self.get_pmm(params_dic)
-        #        self.pmm /= params_dic['sigma8_cb']**2
-        #    else:
-        #        self.pmm, _ = self.get_pmm(params_dic)              
-        #    self.pgg = self.get_pgg(params_dic)
         if self.flag_heft:
             self.pgg = self.get_pgg(params_dic)
         else:    
@@ -1285,22 +1288,6 @@ class Theory:
         # compute matter-matter power spectrum
         self.pmm, bar_boost = self.get_pmm(params_dic)
         self.pmm_no_barboost = self.pmm/bar_boost
-        #if flag_test_heft_new_extrap:
-        #    print('compute with flag_test_heft_new_extrap')
-        #    self.pgg = self.BaccoEmuClass.get_heft_pgg_zextr_lin(params_dic, self.k, self.Survey.lbin, self.Survey.zz_integr, self.Survey.nbin)
-        #    self.pgm = self.BaccoEmuClass.get_heft_pgm_zextr_lin(params_dic, self.k, self.Survey.lbin, self.Survey.zz_integr, self.Survey.nbin)
-        #else:
-            # compute galaxy-matter power spectrum
-            #if self.flag_heft or self.flag_sample_bheftsigma8:
-            #    self.pk_exp, self.pk_exp_extr = self.get_heft_pk_exp(params_dic)
-            #    if self.flag_heft_pnl_bar:
-            #        self.pgm = self.get_pgm(params_dic)
-            #    else:
-            #        self.pgm = self.get_pgm(params_dic)*np.sqrt(bar_boost[:, :, None])                 
-            #else:
-            #    self.pgm = self.get_pgm(params_dic)  
-            # compute galaxy-galaxy power spectrum     
-            #self.pgg = self.get_pgg(params_dic)
         if self.flag_cross_sqrt_bar_boost:
             self.pgm = self.get_pgm(params_dic)*np.sqrt(bar_boost[:, :, None])                 
         else:        

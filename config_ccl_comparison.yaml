@@ -48,7 +48,7 @@ specs:
   #     LSST: LSST_Y1 or LSST_Y10 
   #----- not implemented yet:  
   #     Custom: analytical n(z) or from file
-  survey_info: 'LSST_Y1' #'Euclid_Y1' #'Euclid_5bins'
+  survey_info: 'LSST_Y1' #'Euclid_5bins' #'Euclid_Y1' #'Euclid_5bins'
   custom_survey_path: 
 
 
@@ -61,26 +61,16 @@ data:
   #     1 -> read from a file
   data_file: 
 
-  nl_model: 1
-  #Options for bacco extrapolation in redshift: 
-  #               'z_extrap_hmcode' (nonlinear power spectrum in shear for z>1.5 is extrapolated with HMcode2020) 
-  #               or 'linear' (pmm is linear at all redshifts) 
-  #               or 'z_extrap_linear' (default: nonlinear power spectrum in shear for z>1.5 is extrapolated with bacco's linear power spectrum )
-  bacco_option: 'z_extrap_linear'
-  #Options for power spectrum specifics in extended models:
-  #     'linear' (use MG or DE linear spectrum) or 'pseudo' (use MG or DE pseudo spectrum) or 'nonlinear' (default option)
-  #option: 'linear' 
+  nl_model: 0
+  #bacco_option: 'z_extrap_hmcode'
   #Nonlinear power spectrum
   #     0 -> HMcode
   #     1 -> bacco
-  #     2 -> nDGP with ReACT
-  #     3 -> gLEMURS with ReACT
-  #     4 -> μ-Σ (Σ is not properly implemented in Cls yet) with ReACT
-  #     5 -> Dark Scattering (Interacting Dark Energy) with ReACT
-  #     6 -> f(R) with ReACT
-  bias_model: 2
-  # Options for extrapolation in k for HEFT-bias expansion with bacco: False (default, power law extrapolation) or True (constant extrapolation)
-  heft_extrap_k_const: False
+  #     2 -> nDGP
+  #     3 -> gLEMURS
+  #     4 -> μ-Σ (Σ is not properly implemented in Cls yet)
+  #     5 -> Dark Scattering (Interacting Dark Energy)
+  bias_model: 0
   # Photometric galaxy bias model (redshift dependence)
   #     0 -> constant linear bias within bins
   #     1 -> (b1, b2) constant within bins
@@ -93,9 +83,8 @@ data:
   # Intrinsic alignment model
   #     0 -> zNLA
   #     1 -> TATT
-  baryon_model: 3
-  # Cross-correlation include/exclude the square root of the baryonic suppression [Zennaro et al. 2024] (default: False)
-  cross_sqrt_baryon: True
+  baryon_model: 0
+  cross_sqrt_baryon: False
   # Baryonic flag
   #     0 -> no baryons
   #     1 -> Tagn HMcode
@@ -106,30 +95,20 @@ data:
   #     0 -> no photo-z error
   #     1 -> additive mode, n(z') = n(z + dz)
   #     2 -> multiplicative mode, n(z') = n(z(1 + dz))
-  params: ./params_data_zennaro.yaml
+  params: ./params_data_hmcode.yaml
 
 theory:
   add_noise: False
-  nl_model: 1
-  #Options for bacco extrapolation: 
-  #               'z_extrap_hmcode' (nonlinear power spectrum in shear for z>1.5 is extrapolated with HMcode2020) 
-  #               or 'linear' (pmm is linear at all redshifts) 
-  #               or 'z_extrap_linear' (default: nonlinear power spectrum in shear for z>1.5 is extrapolated with bacco's linear power spectrum )
+  nl_model: 0
   #bacco_option: 'z_extrap_hmcode'
-  #Options for power spectrum specifics in extended models:
-  #     'linear' (use MG or DE linear spectrum) or 'pseudo' (use MG or DE pseudo spectrum) or 'nonlinear' (default option)
-  #option: 'linear' 
   #Nonlinear power spectrum
   #     0 -> HMcode
   #     1 -> bacco
-  #     2 -> nDGP with ReACT
-  #     3 -> gLEMURS with ReACT
-  #     4 -> μ-Σ (Σ is not properly implemented in Cls yet) with ReACT
-  #     5 -> Dark Scattering (Interacting Dark Energy) with ReACT
-  #     6 -> f(R) with ReACT
-  bias_model: 2
-  # Options for extrapolation in k for HEFT-bias expansion with bacco: False (default, power law extrapolation) or True (constant extrapolation)
-  heft_extrap_k_const: False
+  #     2 -> nDGP
+  #     3 -> gLEMURS
+  #     4 -> μ-Σ (Σ is not properly implemented in Cls yet)
+  #     5 -> Dark Scattering (Interacting Dark Energy)
+  bias_model: 0
   # Photometric galaxy bias model (redshift dependence)
   #     0 -> linear interpolation
   #     1 -> constant within bins
@@ -143,7 +122,6 @@ theory:
   #     0 -> zNLA
   #     1 -> TATT
   baryon_model: 0
-  # Cross-correlation include/exclude the square root of the baryonic suppression [Zennaro et al. 2024] (default: False)
   cross_sqrt_baryon: False
   # Baryonic flag
   #     0 -> no baryons
@@ -155,10 +133,10 @@ theory:
   #     0 -> no photo-z error
   #     1 -> additive mode, n(z') = n(z + dz)
   #     2 -> multiplicative mode, n(z') = n(z(1 + dz))
-  params: ./params_bacco_test.yaml #./params_model_hmcode.yaml   
+  params: ./params_model_hmcode.yaml   
 
 output: 
-  chain_name: lsst_y1_fix_cosmo_zennaro_data_zennaro_model_test
+  chain_name: lsst_y1_ccl_comparison
 sampler: 
   mcmc:
     verbose: True
@@ -166,5 +144,5 @@ sampler:
     n_live: 1000
     pool: 20
     resume: True
-    hdf5_name:  lsst_y1_fix_cosmo_zennaro_data_zennaro_model_test
+    hdf5_name:  lsst_y1_ccl_comparison
     

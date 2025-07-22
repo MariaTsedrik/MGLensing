@@ -1,10 +1,10 @@
+import sys
+import os
+sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
 import MGLensing
 import numpy as np
 import matplotlib.pyplot as plt
 import scipy.interpolate as itp
-import sys
-import os
-sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
 
 def for_plots(nell, n, flat_array):
     matrix_errs = np.zeros((nell, n, n))
@@ -16,7 +16,7 @@ def for_plots(nell, n, flat_array):
             idx_start += 1
     return matrix_errs
 
-MGL = MGLensing.MGL("config.yaml")
+MGL = MGLensing.MGL("config_ccl_comparison.yaml")
 data_vector = MGL.Data.data_vector
 
 
@@ -29,8 +29,8 @@ lmax_ij = [l_wl_max, l_gc_max, l_gc_max]
 nbin= 5 
 start_lg = 15*len(l_wl)
 start_gc = start_lg + 25*len(l_wl)
-cell_wl = for_plots(len(l_wl), nbin, data_vector[:start_lg])
-cell_gc = for_plots(len(l_wl), nbin, data_vector[start_gc:])
+#cell_wl = for_plots(len(l_wl), nbin, data_vector[:240])
+#cell_gc = for_plots(len(l_wl), nbin, data_vector[-178:])
 
 l_wl_cosmosis = np.genfromtxt('../../Work/cosmosis_stuff/cosmosis-standard-library/lsst1/shear_cl/ell.txt')
 l_gc_cosmosis = np.genfromtxt('../../Work/cosmosis_stuff/cosmosis-standard-library/lsst1/galaxy_cl/ell.txt')
@@ -53,7 +53,7 @@ def plot_cells_ratio(type, show=True, names="", annotation=""):
                 cls_cosmosis = cls_cosmosis_itp(l_gc)+MGL.Survey.noise['GG'] if i==j else  cls_cosmosis_itp(l_gc)
                 #ax[i, j].semilogx(l_gc, cell_gc[:, i, j]/cls_cosmosis)
                 #ax[i, j].set_ylim(0.98, 1.02) 
-                ax[i, j].loglog(l_gc, cell_gc[:, i, j], label='MGL' if i == 0 and j == 0 else "")
+                #ax[i, j].loglog(l_gc, cell_gc[:, i, j], label='MGL' if i == 0 and j == 0 else "")
                 ax[i, j].loglog(l_gc, cls_cosmosis, label='cosmosis' if i == 0 and j == 0 else "")
                 ax[i, j].axvspan(xmin=lmax_ij[type][i, j], xmax=lmax[type], color='grey', alpha=0.1)
                 ax[i, j].legend(loc='upper left', title_fontsize=10, title='bin ' + str(i + 1) + '-' + str(j + 1))

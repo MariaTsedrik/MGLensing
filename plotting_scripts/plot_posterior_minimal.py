@@ -26,18 +26,20 @@ def read_last_header_line(file_path):
     else:
         return []
 
-file_paths = [ 'chains/chain_lsst_y1_fix_cosmo_zennaro_data_zennaro_model.txt',  
-              'chains/chain_lsst_y1_fix_cosmo_zennaro_data_heft_model.txt',
-              'chains/chain_lsst_y1_fix_cosmo_zennaro_data_des_model.txt',
-              
+file_paths = [ #'chains/chain_lsst_y1_fix_cosmo_zennaro_data_zennaro_model.txt',  
+              #'chains/chain_lsst_y1_fix_cosmo_zennaro_data_heft_model.txt',
+              #'chains/chain_lsst_y1_fix_cosmo_zennaro_data_des_model.txt',
+              'chains/chain_lsst_y1_fix_cosmo_zennaro_data_positiv_b2_zennaro_model.txt',
+              'chains/chain_lsst_y1_fix_cosmo_zennaro_data_positiv_b2_zennaro_model_nobar.txt'
 
  ]  
 
-file_name = 'fixcosmo_bias_vs_baryons_lsst_3x2pt'
+file_name = 'fixcosmo_bias_b2_lsst_3x2pt'
 legend_labels = [
-'model: Zennaro',
-'model: heft',
-'model: DES-like'
+'with baryons fixed',
+'no baryons'
+#'model: heft',
+#'model: DES-like'
 
 ]
 #annotation_text = 'LSST Y1 data \n 3x2pt-analysis\n data: GR\n fixed $\Sigma_0=0$, $\Omega_{\\rm b}$, $n_{\\rm s}$'

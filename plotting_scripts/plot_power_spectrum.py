@@ -138,7 +138,7 @@ for bin_i in range(nbin):
 
 _, rcom = MGL.get_expansion_and_rcom(params)
 # pick 3 redshifts
-z_int_pick = [60, 100, 140] #goes from 0 to 199
+z_int_pick = [20, 80, 140] #goes from 0 to 255
 def k2ell(x, ind=z_int_pick[0]):
     return x*rcom[ind]-0.5
 def ell2k(x, ind=z_int_pick[0]):
@@ -158,13 +158,13 @@ bin_i=2
 bin_j=3
 
 models = {
-    'heft_b1': {'nl_model': NL_MODEL_BACCO, 'bias_model': BIAS_HEFT, 'ia_model': 0, 'baryon_model': NO_BARYONS, 'photoz_err_model': 0.},
-    'heft_b1b2': {'nl_model': NL_MODEL_BACCO, 'bias_model': BIAS_HEFT, 'ia_model': 0, 'baryon_model': NO_BARYONS, 'photoz_err_model': 0.},
-    'heft_full': {'nl_model': NL_MODEL_BACCO, 'bias_model': BIAS_HEFT, 'ia_model': 0, 'baryon_model': NO_BARYONS, 'photoz_err_model': 0.},
-    'heft_full_nl': {'nl_model': NL_MODEL_BACCO, 'bias_model': BIAS_HEFT_PNL, 'ia_model': 0, 'baryon_model': NO_BARYONS, 'photoz_err_model': 0.},
-    'heft_full_nl_bar': {'nl_model': NL_MODEL_BACCO, 'bias_model': BIAS_HEFT_PNL_BAR, 'ia_model': 0, 'baryon_model': NO_BARYONS, 'photoz_err_model': 0.},
-    'heft_b1_nl': {'nl_model': NL_MODEL_BACCO, 'bias_model': BIAS_HEFT_PNL, 'ia_model': 0, 'baryon_model': NO_BARYONS, 'photoz_err_model': 0.},
-    'bacco_b1_nl': {'nl_model': NL_MODEL_BACCO, 'bias_model': BIAS_LIN, 'ia_model': 0, 'baryon_model': NO_BARYONS, 'photoz_err_model': 0.}
+    'heft_b1': {'nl_model': NL_MODEL_BACCO, 'bias_model': BIAS_HEFT, 'ia_model': 0, 'baryon_model': NO_BARYONS, 'photoz_err_model': 0., 'heft_extrap_k_const': False},
+    'heft_b1b2': {'nl_model': NL_MODEL_BACCO, 'bias_model': BIAS_HEFT, 'ia_model': 0, 'baryon_model': NO_BARYONS, 'photoz_err_model': 0., 'heft_extrap_k_const': False},
+    'heft_full': {'nl_model': NL_MODEL_BACCO, 'bias_model': BIAS_HEFT, 'ia_model': 0, 'baryon_model': NO_BARYONS, 'photoz_err_model': 0., 'heft_extrap_k_const': False},
+    'heft_full_nl': {'nl_model': NL_MODEL_BACCO, 'bias_model': BIAS_HEFT_PNL, 'ia_model': 0, 'baryon_model': NO_BARYONS, 'photoz_err_model': 0., 'heft_extrap_k_const': False},
+    'heft_full_nl_bar': {'nl_model': NL_MODEL_BACCO, 'bias_model': BIAS_HEFT_PNL_BAR, 'ia_model': 0, 'baryon_model': NO_BARYONS, 'photoz_err_model': 0., 'heft_extrap_k_const': False},
+    'heft_b1_nl': {'nl_model': NL_MODEL_BACCO, 'bias_model': BIAS_HEFT_PNL, 'ia_model': 0, 'baryon_model': NO_BARYONS, 'photoz_err_model': 0., 'heft_extrap_k_const': False},
+    'bacco_b1_nl': {'nl_model': NL_MODEL_BACCO, 'bias_model': BIAS_LIN, 'ia_model': 0, 'baryon_model': NO_BARYONS, 'photoz_err_model': 0., 'heft_extrap_k_const': False}
 }
 b2L_rsd_arr = [-0.1322075,
 -0.0345375,
@@ -203,7 +203,7 @@ print(heft_full_nl.shape)
 #plot_pgg(z_int_pick, bin_i, bin_j, [heft_b1, heft_b1b2, heft_full, heft_full_nl, heft_full_nl_bar, heft_b1_nl, bacco_b1_nl], list(models.keys()), show=True, name='')
 plot_pgg(z_int_pick, bin_i, bin_j, [heft_b1, heft_b1_nl, bacco_b1_nl, heft_b1b2, heft_full, heft_full_nl, heft_full_nl_bar], 
          ['heft b1', 'heft b1 nl', 'bacco b1 nl', 'heft b1+b2', 'heft full',
-          'heft full nl', 'heft full nl bar'], show=False, name='heft_b1_b2_full_nl_bar_comparison')
+          'heft full nl', 'heft full nl bar'], show=True, name='heft_b1_b2_full_nl_bar_comparison')
 
 
 '''

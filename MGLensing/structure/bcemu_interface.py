@@ -1,6 +1,7 @@
 from scipy.interpolate import RectBivariateSpline
 import numpy as np
-import BCemu
+try: import BCemu
+except: print("BCemu not installed!")
 import os
 from math import log10, log
 
