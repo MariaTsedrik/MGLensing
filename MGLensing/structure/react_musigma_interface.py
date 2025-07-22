@@ -73,6 +73,7 @@ class MuSigmaReACT():
         self.k_nl_boost_lastlast = self.kh_nl_boost[-2]
         self.log_k = log(self.k_nl_boost_last / self.k_nl_boost_lastlast)
         self.emu_name = 'mu_Sigma_ReACT'
+        print('WARNING: emulator is trained only for w0=-1 and wa=0.!!!')
 
         if option=='linear':
             self.get_pk_nl =  self.get_pk_lin 
@@ -242,6 +243,17 @@ class MuSigmaReACT():
             pk_m_l[index_l, index_z] = pk_l_interp(min(zz_integr[index_z], 2.5), k[index_l,index_z])
         return pk_m_l  
     
+    def sigma_lensing(self, params_dic, k, lbin, zz_integr):
+        omega_m = params_dic['Omega_m']
+        w0 = params_dic['w0']
+        wa = params_dic['wa']
+        omega_lambda = (1.-omega_m)* pow(zz_integr, 3.*(1.+w0+wa)) * np.exp(-3.*wa*(1.-1./(1.+zz_integr)))
+        e2 = omega_m*zz_integr**3+omega_lambda
+        sigma0 = params_dic['sigma0'] 
+        sigma = 1.+sigma0/e2*omega_lambda/(1.-omega_m)
+        #dimensions of (ell, zz_integr, n_bin)
+        return sigma[None, :, None]
+    
     def get_pk_pseudo(self, params_dic, k, lbin, zz_integr):
         pk_lin_interp = self.get_pk_lin_interp(params_dic)
         pklin_k0_mg_z = pk_lin_interp(self.zz_pk, 0.01)
@@ -255,8 +267,9 @@ class MuSigmaReACT():
         pk_m_l  = np.zeros((lbin, len(zz_integr)), 'float64')
         index_pknn = np.array(np.where((k > k_min_h_by_mpc) & (k < k_max_h_by_mpc))).transpose()
         As_orig = params_dic['As']
-        params_dic['As'] = self.d2_mg_lcdm_z * As_orig
-        pk_l_interp = self.get_pk_hmcode_interp(params_dic)
+        params_new = params_dic.copy()
+        params_new['As'] = self.d2_mg_lcdm_z * As_orig
+        pk_l_interp = self.get_pk_hmcode_interp(params_new)
         for index_l, index_z in index_pknn:
             pk_m_l[index_l, index_z] = pk_l_interp(zz_integr[index_z], k[index_l,index_z])
         return pk_m_l 

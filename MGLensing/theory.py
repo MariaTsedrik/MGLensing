@@ -173,7 +173,13 @@ class Theory:
         if model['nl_model'] == NL_MODEL_FOFR:
             self.flag_fofr = True
         else:
-            self.flag_fofr = False    
+            self.flag_fofr = False   
+
+        # check for Sigma, modification of the lensing potential 
+        if hasattr(self.StructureEmu, 'sigma_lensing') and callable(getattr(self.StructureEmu, 'sigma_lensing')):
+            self.Sigma = self.StructureEmu.sigma_lensing
+        else:
+            self.Sigma = lambda *args, **kwargs: 1.0  # Default to no modification if sigma_lensing is not available
 
         #if 'add_noise' in model and not model['add_noise']:
         #    self.Survey.noise['LL'] = 0.
@@ -612,7 +618,7 @@ class Theory:
         """
         omega_m = params['Omega_m']
         # dz is normalise at z=0
-        dz = self.dz[None, :]
+        dz = self.dz if self.flag_fofr else self.dz[None,:] 
         a1_ia = params['a1_IA']
         a2_ia = params['a2_IA']
         b1_ia = params['b1_IA']
@@ -644,7 +650,7 @@ class Theory:
             Power spectrum for the intrinsic alignment-intrinsic alignment.
         """
         c1, c1d, c2 = self.get_tatt_parameters(params_dic)
-        dz = self.dz[None, :]
+        dz = self.dz if self.flag_fofr else self.dz[None,:] 
         # growth factor can be scale-dependent for f(R) in the future potentially
         # fpt terms are computed at redshift 0
         fpt_terms = self.get_fpt_terms(self.StructureEmu.pklin_z0)
@@ -744,7 +750,7 @@ class Theory:
         Returns:
         -------
         w_gamma : numpy.ndarray
-            The weak lensing kernel. The shape of the array is (1, num_bins, num_bins),
+            The weak lensing kernel. The shape of the array is (1, zz_integr, num_bins),
             where num_bins is the number of redshift bins.
         """
         omega_m = params_dic['Omega_m']
@@ -755,9 +761,14 @@ class Theory:
         # in the integrand dimensions are (bin_i, zz_integr, zz_integr)
         integrand = 3./2.*H0_h_c**2. * omega_m * self.rz[None,:,None]*(1.+self.Survey.zz_integr[None,:,None])*eta_z_s.T[:,None,:]*(1.-self.rz[None,:,None]/self.rz[None,None,:])
         # integrate along the third dimension in zz_integr
-        w_gamma  = simpson(np.triu(integrand), self.Survey.zz_integr,axis=-1).T #trapezoid(np.triu(integrand), self.Survey.zz_integr,axis=-1).T
+        w_gamma  = trapezoid(np.triu(integrand), self.Survey.zz_integr,axis=-1).T #simpson(np.triu(integrand), self.Survey.zz_integr,axis=-1).T 
         # add an extra dimension to w_gamma as we might have ell-dependence in the IA-kernel due to the scale-dependent linear growth
         w_gamma = w_gamma[None,:,:]
+        # add modification of the lensing potential
+        # must have the same dimension (ell, zz_integr, n_bin) or be 1
+        # specified in StructureEmu, can be scale-dependent
+        w_gamma *= self.Sigma(params_dic, self.k, self.Survey.lbin, self.Survey.zz_integr)
+        
         return w_gamma
     
     def get_ia_kernel(self, params_dic):
@@ -820,7 +831,7 @@ class Theory:
         #W_L = self.w_gamma + self.factor_nla[:, :, None] *self.w_ia # ell, zz_integr, bin_i
         #cl_ll_int = W_L[:,:,:,None] * W_L[:,:,None,:] * self.pmm[:, :, None, None] / self.ez[None,:,None,None] / self.rz[None,:,None,None] / self.rz[None,:,None,None] / H0_h_c
         # integrate along the z_integr-direction
-        cl_ll = simpson(cl_ll_int, self.Survey.zz_integr, axis=1)[:self.Survey.nell_wl, :, :] #trapezoid(cl_ll_int, self.Survey.zz_integr, axis=1)[:self.Survey.nell_wl, :, :]
+        cl_ll = trapezoid(cl_ll_int, self.Survey.zz_integr, axis=1)[:self.Survey.nell_wl, :, :] #simpson(cl_ll_int, self.Survey.zz_integr, axis=1)[:self.Survey.nell_wl, :, :] 
         # add noise to the auto-correlated bins
         for i in range(self.Survey.nbin):
             cl_ll[:, i, i] += self.Survey.noise['LL']
@@ -930,42 +941,6 @@ class Theory:
         pgm = ( bias1[None, None,:] + bias2[None, None, :] * self.k[:, :, None]**2 ) * self.pmm[:,:,None]
         return pgm
     
-    def get_heft_pk_exp(self, params_dic):
-        """Calculate the HEFT power spectrum with possible rescaling for modified gravity.
-
-        Parameters:
-        ----------
-        params_dic : dict
-            Dictionary containing the parameters for the calculation.
-
-        Returns:
-        -------
-        pk_exp : ndarray
-            The power spectrum perturbative expansion terms within bacco-ranges.
-        pk_exp_extr : ndarray
-            The extrapolated power spectrum. Linear on linear scales and for high redshifts.
-
-        Notes:
-        -----
-        If the emulator name in `StructureEmu` is not 'BACCO', the power spectrum
-        is rescaled for modified gravity using the growth factors from `StructureEmu` and `BaccoEmuClass`.
-        """
-        if self.StructureEmu.emu_name!='BACCO':
-            # re-scale for modified gravity
-            # heft pk dimensions are (15, ell, z_integr)
-            dz, _ = self.StructureEmu.get_growth(params_dic, self.Survey.zz_integr)
-            params_dic['sigma8_cb'] = self.BaccoEmuClass.get_sigma8_cb(params_dic)
-            dz_norm, _ = self.BaccoEmuClass.get_growth(params_dic, self.Survey.zz_integr)
-            dz_rescale = dz/dz_norm
-            pk_exp, pk_exp_extr = self.BaccoEmuClass.get_heft(params_dic, self.k, self.Survey.lbin, self.Survey.zz_integr)
-            # this is wrong, not all terms are re-scaled with D2, loop-correction must have D4
-            pk_exp = pk_exp*dz_rescale[np.newaxis, np.newaxis, :]*dz_rescale[np.newaxis, np.newaxis, :]
-            pk_exp_extr = pk_exp_extr*dz_rescale[np.newaxis, :]*dz_rescale[np.newaxis, :]
-        else:    
-            pk_exp, pk_exp_extr = self.BaccoEmuClass.get_heft(params_dic, self.k, self.Survey.lbin, self.Survey.zz_integr)  
-        self.mask_heft = self.BaccoEmuClass.mask_heft
-        #print('MASK: ', self.mask_heft)
-        return pk_exp, pk_exp_extr
     
 
     def get_pgg_heft_bias(self, params_dic):
@@ -1092,7 +1067,7 @@ class Theory:
         # compute integrand with the dimensions of (ell, z_integr, bin_i, bin_j)
         cl_gg_int = self.w_g[:,:,:,None] *self. w_g[:,: , None, :] * self.pgg / self.ez[None,:,None,None] / self.rz[None,:,None,None] / self.rz[None,:,None,None] / H0_h_c    
         # integrate along the z_integr direction
-        cl_gg = simpson(cl_gg_int, self.Survey.zz_integr, axis=1)[:self.Survey.nell_gc, :, :] #trapezoid(cl_gg_int, self.Survey.zz_integr, axis=1)[:self.Survey.nell_gc, :, :]
+        cl_gg = trapezoid(cl_gg_int, self.Survey.zz_integr, axis=1)[:self.Survey.nell_gc, :, :] #simpson(cl_gg_int, self.Survey.zz_integr, axis=1)[:self.Survey.nell_gc, :, :] 
         # add noise
         for i in range(self.Survey.nbin):
             cl_gg[:, i, i] += self.Survey.noise['GG']
@@ -1183,7 +1158,7 @@ class Theory:
         #cl_lg_int = W_L[:, :, :, None] * W_G * self.pgm[:,:,None,:] / self.ez[None,:,None,None] / self.rz[None,:,None,None] / self.rz[None,:,None,None] / H0_h_c
 
         # integrate along the z-integr direction
-        cl_lg = simpson(cl_lg_int, self.Survey.zz_integr, axis=1)[:self.Survey.nell_xc,:,:] #trapezoid(cl_lg_int, self.Survey.zz_integr, axis=1)[:self.Survey.nell_xc,:,:]
+        cl_lg = trapezoid(cl_lg_int, self.Survey.zz_integr, axis=1)[:self.Survey.nell_xc,:,:] #simpson(cl_lg_int, self.Survey.zz_integr, axis=1)[:self.Survey.nell_xc,:,:] 
         # transpose LG to get GL
         cl_gl = np.transpose(cl_lg, (0, 2, 1))  
         return cl_lg, cl_gl
@@ -1205,7 +1180,7 @@ class Theory:
         # compute background
         self.ez, self.rz, self.k = self.get_ez_rz_k(params_dic)
         # compute normalized growth factor, of size (z_integr)
-        self.dz, _ = self.StructureEmu.get_growth(params_dic, self.Survey.zz_integr)
+        self.dz, _ = self.StructureEmu.get_growth_binned(params_dic, self.k, self.Survey.lbin, self.Survey.zz_integr) if self.flag_fofr else self.StructureEmu.get_growth(params_dic, self.Survey.zz_integr)
         # get redshift uncertainties
         self.deltaz_s, self.deltaz_l = self.get_deltaz(params_dic)
         # compute matter-matter power spectrum
@@ -1236,7 +1211,7 @@ class Theory:
         # compute background
         self.ez, self.rz, self.k = self.get_ez_rz_k(params_dic)
         # compute growth factor
-        self.dz, _ = self.StructureEmu.get_growth(params_dic, self.Survey.zz_integr)
+        self.dz, _ = self.StructureEmu.get_growth_binned(params_dic, self.k, self.Survey.lbin, self.Survey.zz_integr) if self.flag_fofr else self.StructureEmu.get_growth(params_dic, self.Survey.zz_integr)
         # get redshift uncertainties
         self.deltaz_s, self.deltaz_l = self.get_deltaz(params_dic)
         if self.flag_heft:
@@ -1282,7 +1257,7 @@ class Theory:
         # compute background
         self.ez, self.rz, self.k = self.get_ez_rz_k(params_dic)
         # compute growth factor
-        self.dz, _ = self.StructureEmu.get_growth(params_dic, self.Survey.zz_integr)
+        self.dz, _ = self.StructureEmu.get_growth_binned(params_dic, self.k, self.Survey.lbin, self.Survey.zz_integr) if self.flag_fofr else self.StructureEmu.get_growth(params_dic, self.Survey.zz_integr)
         # get redshift uncertainties
         self.deltaz_s, self.deltaz_l = self.get_deltaz(params_dic)
         # compute matter-matter power spectrum

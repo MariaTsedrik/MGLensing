@@ -220,21 +220,22 @@ class DGPReACT():
     
     def get_pk_pseudo(self, params_dic, k, lbin, zz_integr):
         # call to compute self.d2_mg_lcdm and self.d2_mg_lcdm_z
-        #_ = self.get_mg_boost_interp(params_dic)
+        _ = self.get_mg_boost_interp(params_dic)
         # call linear lcdm with original As  
         _ = self.get_pk_hmcode_lin_interp(params_dic)
-        #self.pklin_z0 = self.d2_mg_lcdm * self.pklin_z0_lcdm # later used in tatt 
-        dz_ndgp, dz0_ndgp = self.get_growth(params_dic, self.zz_pk)
-        dz_ndgp_notnorm = dz_ndgp*dz0_ndgp
-        _, dz0_lcdm = self.get_growth_lcdm(params_dic, self.zz_pk)
-        d2_mg_lcdm_z = (dz_ndgp_notnorm/ dz0_lcdm)**2
-        d2_mg_lcdm = (dz0_ndgp / dz0_lcdm)**2
-        self.pklin_z0 = d2_mg_lcdm * self.pklin_z0_lcdm # later used in tatt 
+        self.pklin_z0 = self.d2_mg_lcdm * self.pklin_z0_lcdm # later used in tatt 
+        #dz_ndgp, dz0_ndgp = self.get_growth(params_dic, self.zz_pk)
+        #dz_ndgp_notnorm = dz_ndgp*dz0_ndgp
+        #_, dz0_lcdm = self.get_growth_lcdm(params_dic, self.zz_pk)
+        #d2_mg_lcdm_z = (dz_ndgp_notnorm/ dz0_lcdm)**2
+        #d2_mg_lcdm = (dz0_ndgp / dz0_lcdm)**2
+        self.pklin_z0 = self.d2_mg_lcdm * self.pklin_z0_lcdm # later used in tatt 
         pk_m_l  = np.zeros((lbin, len(zz_integr)), 'float64')
         index_pknn = np.array(np.where((k > k_min_h_by_mpc) & (k < k_max_h_by_mpc))).transpose()
         As_orig = params_dic['As']
-        params_dic['As'] = d2_mg_lcdm_z * As_orig
-        pk_l_interp = self.get_pk_hmcode_interp(params_dic)
+        params_new = params_dic.copy()
+        params_new['As'] = self.d2_mg_lcdm_z * As_orig
+        pk_l_interp = self.get_pk_hmcode_interp(params_new)
         for index_l, index_z in index_pknn:
             pk_m_l[index_l, index_z] = pk_l_interp(zz_integr[index_z], k[index_l,index_z])
         return pk_m_l 
@@ -256,7 +257,7 @@ class DGPReACT():
         pk_m_l  = np.zeros((lbin, len(zz_integr)), 'float64')
         index_pknn = np.array(np.where((k > k_min_h_by_mpc) & (k < k_max_h_by_mpc))).transpose()
         for index_l, index_z in index_pknn:
-            pk_m_l[index_l, index_z] = pk_l_interp(zz_integr[index_z], k[index_l,index_z])*d2_mg_lcdm_z_interp(zz_integr[index_z])
+            pk_m_l[index_l, index_z] = pk_l_interp(0., k[index_l,index_z])*d2_mg_lcdm_z_interp(zz_integr[index_z])
         return pk_m_l  
     
 

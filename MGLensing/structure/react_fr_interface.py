@@ -119,7 +119,7 @@ class FofRReACT():
                 'Omega_b'       :  np.full(self.nz_pk, omega_b),
                 'Omega_m'       :  np.full(self.nz_pk, omega_m),
                 'Omega_nu'      :  np.full(self.nz_pk, omega_nu),
-                'fr0'           :  np.full(self.nz_pk, fr0),
+                'fR0'           :  np.full(self.nz_pk, fr0),
                 'z'             :  self.zz_boost
             }
         mg_boost = self.cp_nl_fofr_model.predictions_np(params_react) #(zz_boost, kh_nl_boost)
@@ -204,8 +204,10 @@ class FofRReACT():
         pk_m_l  = np.zeros((lbin, len(zz_integr)), 'float64')
         index_pknn = np.array(np.where((k > k_min_h_by_mpc) & (k < k_max_h_by_mpc))).transpose()
         pk_l_interp = self.get_pk_hmcode_interp(params_dic)
+        # TO-DO implemenet this propery later
         # d2_mg_lcdm is computed in self.get_mg_boost_interp
-        self.pklin_z0 = self.d2_mg_lcdm * self.pklin_z0_lcdm # later used in tatt 
+        #self.pklin_z0 = self.d2_mg_lcdm * self.pklin_z0_lcdm # later used in tatt 
+        self.pklin_z0 = self.pklin_z0_lcdm # later used in tatt 
         for index_l, index_z in index_pknn:
             pk_m_l[index_l, index_z] = pk_l_interp(zz_integr[index_z], k[index_l,index_z])*mg_boost_l_interp(min(zz_integr[index_z], 2.), k[index_l,index_z])
         return pk_m_l  
@@ -222,20 +224,42 @@ class FofRReACT():
     def get_pk_lin(self, params_dic, k, lbin, zz_integr):
         # call linear lcdm with original As  
         pk_l_interp = self.get_pk_hmcode_lin_interp(params_dic)
+        # TO-DO implemenet this propery later
         self.pklin_z0 = self.pklin_z0_lcdm # later used in tatt 
         pk_m_l  = np.zeros((lbin, len(zz_integr)), 'float64')
         index_pknn = np.array(np.where((k > k_min_h_by_mpc) & (k < k_max_h_by_mpc))).transpose()
         dz_fr0, dz0_fr0 = self.get_growth(params_dic, self.zz_pk)
         dz_fr0_notnorm = dz_fr0*dz0_fr0
         _, dz0_lcdm = self.get_growth_lcdm(params_dic, self.zz_pk)
+        dz_norm = (dz_fr0_notnorm/dz0_lcdm)**2
         d2_mg_lcdm_z_interp  = RectBivariateSpline(
                             self.kh_lin,
                             self.zz_pk,
-                            dz_fr0_notnorm**2/dz0_lcdm[np.newaxis, :]**2,
+                            dz_norm,
                             kx=1, ky=1)    
         for index_l, index_z in index_pknn:
-            pk_m_l[index_l, index_z] = pk_l_interp(zz_integr[index_z], k[index_l,index_z])*d2_mg_lcdm_z_interp(k[index_l,index_z], zz_integr[index_z])
+            pk_m_l[index_l, index_z] = pk_l_interp(0., k[index_l,index_z])*d2_mg_lcdm_z_interp(k[index_l,index_z], zz_integr[index_z])
         return pk_m_l  
+    
+    def get_growth_binned(self, params_dic, k, lbin,  zz_integr):
+        dz_fr0, dz0_fr0 = self.get_growth(params_dic, self.zz_pk)
+        dz_fr0_interp  = RectBivariateSpline(
+                            self.kh_lin,
+                            self.zz_pk,
+                            dz_fr0,
+                            kx=1, ky=1)  
+        dz0_fr0_interp  = interp1d(
+                            self.kh_lin,
+                            dz0_fr0[:, 0])  
+        # ones instead of zeros, because dz is in the denominator 
+        # of the intrinsic alignment signal
+        dz  = np.ones((lbin, len(zz_integr)), 'float64') 
+        dz0  = np.ones((lbin, len(zz_integr)), 'float64') 
+        index_pknn = np.array(np.where((k > k_min_h_by_mpc) & (k < k_max_h_by_mpc))).transpose() 
+        for index_l, index_z in index_pknn:
+            dz[index_l, index_z] = dz_fr0_interp(k[index_l,index_z], zz_integr[index_z])
+            dz0[index_l, index_z] = dz0_fr0_interp(k[index_l,index_z])
+        return dz, dz0
     
 
     def get_growth(self, params_dic, zz_integr):
@@ -254,8 +278,8 @@ class FofRReACT():
         # growth factor should be normalised to z=0
         # return array of k and z
         dz0 = dz[:, 0]
-        dz = dz[:, 1:]/dz0
-        return dz, dz0
+        dz = dz[:, 1:]/dz0[:, None]
+        return dz, dz0[:, None]
     
     def get_growth_lcdm(self, params_dic, zz_integr):
         aa_integr =  np.array(1./(1.+zz_integr[::-1]))
@@ -270,7 +294,7 @@ class FofRReACT():
         da, _ = cosmo.growth_parameters()  
         dz = da[::-1] 
         # growth factor should be normalised to z=0
-        # return array of k and z
+        # return array of z
         dz0 = dz[0]
         dz = dz[1:]/dz0
         return dz, dz0

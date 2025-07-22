@@ -33,7 +33,8 @@ def powerlaw_highk_extrap(pk_or_boost, log_k, k_last, kh_high, zz_num):
 
 class GammaReACT():
     def __init__(self, option=None):
-        self.zz_pk = np.array([0., 0.01,  0.12, 0.24, 0.38, 0.52, 0.68, 0.86, 1.05, 1.27, 1.5, 1.76, 2.04, 2.36, 2.5, 3.0]) # these numers are hand-picked
+        #self.zz_pk = np.array([0., 0.01,  0.12, 0.24, 0.38, 0.52, 0.68, 0.86, 1.05, 1.27, 1.5, 1.76, 2.04, 2.36, 2.5, 3.0]) # these numers are hand-picked
+        self.zz_pk = np.linspace(0., 3., 64, endpoint=True)
         self.aa_pk = np.array(1./(1.+self.zz_pk[::-1])) # should be increasing
         self.nz_pk = len(self.zz_pk)
         self.zz_max = self.zz_pk[-1]
@@ -224,8 +225,9 @@ class GammaReACT():
         pk_m_l  = np.zeros((lbin, len(zz_integr)), 'float64')
         index_pknn = np.array(np.where((k > k_min_h_by_mpc) & (k < k_max_h_by_mpc))).transpose()
         As_orig = params_dic['As']
-        params_dic['As'] = self.d2_mg_lcdm_z * As_orig
-        pk_l_interp = self.get_pk_hmcode_interp(params_dic)
+        params_new = params_dic.copy()
+        params_new['As'] = self.d2_mg_lcdm_z * As_orig
+        pk_l_interp = self.get_pk_hmcode_interp(params_new)
         for index_l, index_z in index_pknn:
             pk_m_l[index_l, index_z] = pk_l_interp(zz_integr[index_z], k[index_l,index_z])
         return pk_m_l 
