@@ -1,0 +1,311 @@
+from scipy.interpolate import RectBivariateSpline, interp1d
+import numpy as np
+try: from emantis import FofrBoost
+except: print("eMANTIS not installed!")
+from cosmopower import cosmopower_NN
+import os
+import MGrowth as mg
+from math import log10, log
+from .hmcode2020_interface import HMcode2020
+
+dirname = os.path.split(__file__)[0]
+
+# extrapolation ranges
+# limits of bacco's linear emulator
+k_min_h_by_mpc = 0.001
+k_max_h_by_mpc = 50.0 
+
+emu_ranges_all = {
+    # for the boost
+        'Omega_m':      {'p1':0.2365,           'p2':0.3941}, 
+        'log10f_R0':{'p1':-7.,            'p2':-4.},
+        'sigma8_lcdm': {'p1':0.6083,            'p2':1.0140},
+    # for hmcode lcdm
+        'Omega_b':      {'p1':0.01,         'p2': 0.1},  
+        'h':            {'p1': 0.4,         'p2': 1.}, 
+        'ns':           {'p1': 0.6,         'p2': 1.2}, 
+        'As':           {'p1': 0.495e-9,    'p2': 5.459e-9},
+        'Mnu':          {'p1': 0.0,         'p2': 0.5},
+        
+}
+
+def powerlaw_highk_extrap(pk_or_boost, log_k, k_last, kh_high, zz_num):
+    last_entry, lastlast_entry = pk_or_boost[:, -1], pk_or_boost[:, -2]
+    m = np.array([log(np.abs(last_entry[i] / lastlast_entry[i])) / log_k for i in range(zz_num)])
+    highk_extrap = last_entry[:, np.newaxis] * (kh_high[np.newaxis, :]/k_last)**m[:, np.newaxis]
+    return highk_extrap 
+
+class FofReMANTIS():
+    def __init__(self, option=None):
+        self.zz_pk = np.linspace(0., 3., 64, endpoint=True)
+        self.aa_pk = np.array(1./(1.+self.zz_pk[::-1])) # should be increasing
+        self.nz_pk = len(self.zz_pk)
+        self.zz_max = self.zz_pk[-1]
+
+        self.cp_nl_hmcode_model = cosmopower_NN(restore=True, 
+                      restore_filename=dirname+'/../../emulators/log10_total_matter_nonlinear_emu',
+                      )
+        self.kh_nl = self.cp_nl_hmcode_model.modes # 0.01..50. h/Mpc    
+        self.cp_lin_model = cosmopower_NN(restore=True, 
+                      restore_filename=dirname+'/../../emulators/log10_total_matter_linear_emu',
+                      )
+        self.kh_lin = self.cp_lin_model.modes # 3.7e-4..50. h/Mpc IMPORTANT LATER USED IN TATT
+        self.kh_lin_left = self.kh_lin[self.kh_lin<self.kh_nl[0]]
+        self.kh_tot = np.concatenate((self.kh_lin_left, self.kh_nl))
+
+        print('initialising f(R) eMANTIS')
+        self.emu_fR = FofrBoost()
+        self.kh_nl_boost = self.emu_fR.kbins # 0.02877598..9.72994883 h/Mpc 
+        self.zz_boost = np.minimum(self.zz_pk, 2.)
+        self.aa_boost = 1. / (1. + self.zz_boost)
+        self.kh_lin_left_boost = self.kh_lin[self.kh_lin<self.kh_nl_boost[0]]
+        self.kh_nl_right_boost = self.kh_nl[self.kh_nl>self.kh_nl_boost[-1]]
+        self.kh_nl_boost_tot = np.concatenate((self.kh_lin_left_boost, self.kh_nl_boost, self.kh_nl_right_boost))
+        self.k_nl_boost_last = self.kh_nl_boost[-1]
+        self.k_nl_boost_lastlast = self.kh_nl_boost[-2]
+        self.log_k = log(self.k_nl_boost_last / self.k_nl_boost_lastlast)
+        self.kh_lin_short = np.logspace(np.log10(3.7e-4), np.log10(50.), 50, endpoint=True)
+        self.emu_name = 'fR_eMANTIS'
+        # load for sigma8 computation 
+        self.HMcodeEmu = HMcode2020()
+
+        if option=='linear':
+            self.get_pk_nl =  self.get_pk_lin 
+        elif option=='pseudo':
+            self.get_pk_nl = self.get_pk_pseudo
+        else:
+            self.get_pk_nl = self.get_pk_nl_
+
+    def check_pars(self, params):
+        # assume that As is provided
+        params['sigma8_lcdm'] = self.HMcodeEmu.get_sigma8_lcdm(params)[0]
+        emu_ranges = emu_ranges_all.copy()
+        eva_pars = emu_ranges.keys()     
+        if not all(emu_ranges[par_i]['p1'] <= params[par_i] <= emu_ranges[par_i]['p2'] for par_i in eva_pars):
+            return False
+        return True
+    
+    
+    def check_pars_ini(self, params):
+        # assume that As is provided
+        params['sigma8_lcdm'] = self.HMcodeEmu.get_sigma8_lcdm(params)[0]
+        emu_ranges = emu_ranges_all.copy()
+        eva_pars = emu_ranges.keys()     
+        # parameters currently available
+        avail_pars = [coo for coo in params.keys()]    
+        # parameters needed for a computation
+        comp_pars = list(set(eva_pars)-set(avail_pars))
+        miss_pars = list(set(comp_pars))
+        # check missing parameters
+        if miss_pars:
+            print(f"eMANTIS f(R) emulator:")
+            print(f"  Please add the parameter(s) {miss_pars}"
+                  f" to your parameters!")
+            raise KeyError(f"eMANTIS f(R) emulator: coordinates need the"
+                           f" following parameter(s): ", miss_pars)
+        pp = [params[p] for p in eva_pars]    
+        for i, par in enumerate(eva_pars):
+                val = pp[i]
+                message = "Parameter {}={} out of bounds [{}, {}]".format(
+                par, val, emu_ranges[par]['p1'],
+                emu_ranges[par]['p2'])
+                assert (np.all(val >= emu_ranges[par]['p1'])
+                    & np.all(val <= emu_ranges[par]['p2'])
+                    ), message
+        # check the w0-wa condition        
+        if params['w0']!=-1. or params['wa']!=0.:
+             raise KeyError("Applicable only for Lambda as dark energy!")        
+        return True          
+    
+    def get_mg_boost_interp(self, params_dic):
+        omega_m = params_dic['Omega_m']
+        sigma8_lcdm = params_dic['sigma8_lcdm']
+        logfR0    = -params_dic['log10f_R0']
+        # dimension (zz_pk, kh_nl_boost)
+        mg_boost = np.array([
+            self.emu_fR.predict_boost(omega_m, sigma8_lcdm, logfR0, a_i)
+            for a_i in self.aa_boost
+        ])
+        #self.d2_mg_lcdm = mg_boost[0, 0] # zz_boost[0] must be 0.!
+        #self.d2_mg_lcdm_z = mg_boost[:, 0]
+        # constant extrapolation for k<0.01 h/Mpc
+        mg_boost_left = np.full((self.nz_pk, len(self.kh_lin_left_boost)), mg_boost[:, [0]])
+        #print('mg_boost: ', mg_boost.shape)
+        #print('mg_boost_left: ', mg_boost_left.shape)
+        # power law extrapolation for k>9 h/Mpc
+        mg_boost_right = powerlaw_highk_extrap(mg_boost, self.log_k, self.k_nl_boost_last, self.kh_nl_right_boost, self.nz_pk)
+        #print('mg_boost_right: ', mg_boost_right.shape)
+        # combine mg_boost at all scales
+        mg_boost_k = np.concatenate((
+            mg_boost_left,
+            mg_boost,
+            mg_boost_right
+        ), axis=1)
+        #print('mg_boost_k: ', mg_boost_k.shape)
+        # interpolate
+        mg_boost_interp = RectBivariateSpline(self.zz_pk,
+                    self.kh_nl_boost_tot,
+                    mg_boost_k,
+                    kx=1, ky=1)
+        return  mg_boost_interp
+    
+    def get_pk_hmcode_lin_interp(self, params_dic):
+        # contrary to react emu, here neutrinos 
+        # are taken into account in the LCDM power spectrum
+        # instead of the boost
+        ns   = params_dic['ns']
+        a_s   = params_dic['As']
+        h    = params_dic['h']
+        omega_b = params_dic['Omega_b']
+        omega_c = params_dic['Omega_c']
+        m_nu  = params_dic['Mnu']
+        params_hmcode = {
+                'ns'            :  np.full(self.nz_pk, ns),
+                'As'            :  np.full(self.nz_pk, a_s),
+                'hubble'        :  np.full(self.nz_pk, h),
+                'omega_baryon'  :  np.full(self.nz_pk, omega_b),
+                'omega_cdm'     :  np.full(self.nz_pk, omega_c),
+                'neutrino_mass' :  np.full(self.nz_pk, m_nu), #np.zeros(self.nz_pk),
+                'w0'            :  np.full(self.nz_pk, -1.),
+                'wa'            :  np.zeros(self.nz_pk),
+                'z'             :  self.zz_pk
+            }
+        plin_cp = self.cp_lin_model.ten_to_predictions_np(params_hmcode)
+        self.pklin_z0_lcdm = plin_cp[0] # zz_pk[0] must be 0.!
+        plin_interp = RectBivariateSpline(self.zz_pk,
+                            self.kh_lin,
+                            plin_cp,
+                            kx=1, ky=1)     
+        return  plin_interp
+    
+
+    def get_pk_hmcode_interp(self, params_dic):
+        # contrary to react emu, here neutrinos 
+        # are taken into account in the LCDM power spectrum
+        # instead of the boost
+        ns   = params_dic['ns']
+        a_s   = params_dic['As']
+        h    = params_dic['h']
+        omega_b = params_dic['Omega_b']
+        omega_c = params_dic['Omega_c']
+        m_nu  = params_dic['Mnu']
+        params_hmcode = {
+            'ns'            :  np.full(self.nz_pk, ns),
+            'As'            :  a_s if isinstance(a_s, np.ndarray) and len(a_s) == self.nz_pk else np.full(self.nz_pk, a_s),
+            'hubble'        :  np.full(self.nz_pk, h),
+            'omega_baryon'  :  np.full(self.nz_pk, omega_b),
+            'omega_cdm'     :  np.full(self.nz_pk, omega_c),
+            'neutrino_mass' :  np.full(self.nz_pk, m_nu), #np.zeros(self.nz_pk),
+            'w0'            :  np.full(self.nz_pk, -1.),
+            'wa'            :  np.zeros(self.nz_pk),
+            'z'             :  self.zz_pk
+            }
+        pnl_cp  = self.cp_nl_hmcode_model.ten_to_predictions_np(params_hmcode)
+        plin_cp = self.cp_lin_model.ten_to_predictions_np(params_hmcode)
+        self.pklin_z0_lcdm = plin_cp[0] # zz_pk[0] must be 0.!
+        plin_left = plin_cp[:, self.kh_lin<self.kh_nl[0]]
+        pnl  = np.concatenate((plin_left, pnl_cp),axis=1)
+        pnl_interp = RectBivariateSpline(self.zz_pk,
+                            self.kh_tot,
+                            pnl,
+                            kx=1, ky=1)     
+        return  pnl_interp
+    
+    def get_pk_boost(self, params_dic, k, lbin, zz_integr, mg_boost_l_interp):
+        pk_m_l  = np.zeros((lbin, len(zz_integr)), 'float64')
+        index_pknn = np.array(np.where((k > k_min_h_by_mpc) & (k < k_max_h_by_mpc))).transpose()
+        pk_l_interp = self.get_pk_hmcode_interp(params_dic)
+        # TO-DO implemenet this propery later
+        # d2_mg_lcdm is computed in self.get_mg_boost_interp
+        #self.pklin_z0 = self.d2_mg_lcdm * self.pklin_z0_lcdm # later used in tatt 
+        self.pklin_z0 = self.pklin_z0_lcdm # later used in tatt 
+        for index_l, index_z in index_pknn:
+            pk_m_l[index_l, index_z] = pk_l_interp(zz_integr[index_z], k[index_l,index_z])*mg_boost_l_interp(min(zz_integr[index_z], 2.), k[index_l,index_z])
+        return pk_m_l  
+
+
+    def get_pk_nl_(self, params_dic, k, lbin, zz_integr):
+        mg_boost_l_interp = self.get_mg_boost_interp(params_dic)
+        pk_m_l = self.get_pk_boost(params_dic, k, lbin, zz_integr, mg_boost_l_interp)
+        return pk_m_l
+    
+    def get_pk_pseudo(self, params_dic, k, lbin, zz_integr):
+        raise NotImplementedError("Pseudo f(R) model is not implemented yet. Use 'linear' or 'nonlinear' options instead.")
+
+    def get_pk_lin(self, params_dic, k, lbin, zz_integr):
+        # call linear lcdm with original As  
+        pk_l_interp = self.get_pk_hmcode_lin_interp(params_dic)
+        # TO-DO implemenet this propery later
+        self.pklin_z0 = self.pklin_z0_lcdm # later used in tatt 
+        pk_m_l  = np.zeros((lbin, len(zz_integr)), 'float64')
+        index_pknn = np.array(np.where((k > k_min_h_by_mpc) & (k < k_max_h_by_mpc))).transpose()
+        dz_fr0, dz0_fr0 = self.get_growth(params_dic, self.zz_pk)
+        dz_fr0_notnorm = dz_fr0*dz0_fr0
+        _, dz0_lcdm = self.get_growth_lcdm(params_dic, self.zz_pk)
+        dz_norm = (dz_fr0_notnorm/dz0_lcdm)**2
+        d2_mg_lcdm_z_interp  = RectBivariateSpline(
+                            self.kh_lin_short,
+                            self.zz_pk,
+                            dz_norm,
+                            kx=1, ky=1)    
+        for index_l, index_z in index_pknn:
+            pk_m_l[index_l, index_z] = pk_l_interp(0., k[index_l,index_z])*d2_mg_lcdm_z_interp(k[index_l,index_z], zz_integr[index_z])
+        return pk_m_l  
+    
+    def get_growth_binned(self, params_dic, k, lbin,  zz_integr):
+        dz_fr0, dz0_fr0 = self.get_growth(params_dic, self.zz_pk)
+        dz_fr0_interp  = RectBivariateSpline(
+                            self.kh_lin_short,
+                            self.zz_pk,
+                            dz_fr0,
+                            kx=1, ky=1)  
+        dz0_fr0_interp  = interp1d(
+                            self.kh_lin_short,
+                            dz0_fr0[:, 0])  
+        # ones instead of zeros, because dz is in the denominator 
+        # of the intrinsic alignment signal
+        dz  = np.ones((lbin, len(zz_integr)), 'float64') 
+        dz0  = np.ones((lbin, len(zz_integr)), 'float64') 
+        index_pknn = np.array(np.where((k > k_min_h_by_mpc) & (k < k_max_h_by_mpc))).transpose() 
+        for index_l, index_z in index_pknn:
+            dz[index_l, index_z] = dz_fr0_interp(k[index_l,index_z], zz_integr[index_z])
+            dz0[index_l, index_z] = dz0_fr0_interp(k[index_l,index_z])
+        return dz, dz0
+    
+
+    def get_growth(self, params_dic, zz_integr):
+        aa_integr =  np.array(1./(1.+zz_integr[::-1]))
+        background ={
+            'Omega_m': params_dic['Omega_m'],
+            'h' : params_dic['h'],
+            'w0': -1.,
+            'wa': 0.,
+            'a_arr': np.hstack((aa_integr, 1.))
+            }
+        cosmo = mg.fR_HS(background)
+        fr0    = 10**params_dic['log10f_R0']
+        da, _ = cosmo.growth_parameters(self.kh_lin_short, fr0)  
+        dz = da[:, ::-1] 
+        # growth factor should be normalised to z=0
+        # return array of k and z
+        dz0 = dz[:, 0]
+        dz = dz[:, 1:]/dz0[:, None]
+        return dz, dz0[:, None]
+    
+    def get_growth_lcdm(self, params_dic, zz_integr):
+        aa_integr =  np.array(1./(1.+zz_integr[::-1]))
+        background ={
+            'Omega_m': params_dic['Omega_m'],
+            'h' : params_dic['h'],
+            'w0': -1.,
+            'wa': 0.,
+            'a_arr': np.hstack((aa_integr, 1.))
+            }
+        cosmo = mg.LCDM(background)
+        da, _ = cosmo.growth_parameters()  
+        dz = da[::-1] 
+        # growth factor should be normalised to z=0
+        # return array of z
+        dz0 = dz[0]
+        dz = dz[1:]/dz0
+        return dz, dz0

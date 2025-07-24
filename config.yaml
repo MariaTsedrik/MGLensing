@@ -78,6 +78,8 @@ data:
   #     4 -> μ-Σ (Σ is not properly implemented in Cls yet) with ReACT
   #     5 -> Dark Scattering (Interacting Dark Energy) with ReACT
   #     6 -> f(R) with ReACT
+  #     7 -> f(R) with eMANTIS
+  #     8 -> nDGP with nDGPemu
   bias_model: 2
   # Options for extrapolation in k for HEFT-bias expansion with bacco: False (default, power law extrapolation) or True (constant extrapolation)
   heft_extrap_k_const: False

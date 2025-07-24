@@ -4,7 +4,8 @@ from cosmopower import cosmopower_NN
 import os
 import MGrowth as mg
 from math import log10, log
-
+try: from nDGPemu import BoostPredictor
+except: print('nDGPemu not installed!')
 dirname = os.path.split(__file__)[0]
 
 # extrapolation ranges
@@ -13,13 +14,13 @@ k_min_h_by_mpc = 0.001
 k_max_h_by_mpc = 50.0 
 
 emu_ranges_all = {
-        'Omega_m':      {'p1':0.27,           'p2':0.34}, 
-        'Omega_b':      {'p1':0.04044,        'p2':0.05686}, 
-        'h':            {'p1':0.62,           'p2':0.74},
+        'Omega_m':      {'p1':0.28,           'p2':0.36}, 
+        'Omega_b':      {'p1':0.04,        'p2':0.06}, 
+        'h':            {'p1':0.61,           'p2':0.73},
         'ns':           {'p1':0.92,           'p2':1.0},
-        'As':           {'p1':1.5e-09,        'p2':2.7e-09},
+        'As':           {'p1':1.7e-09,        'p2':2.5e-09},
         'Mnu':          {'p1':0.,             'p2':0.5},
-        'log10Omega_rc':{'p1':-3.,            'p2':2.},
+        'log10Omega_rc':{'p1':-3.2,            'p2':0.795},
 }
 
 
@@ -29,7 +30,7 @@ def powerlaw_highk_extrap(pk_or_boost, log_k, k_last, kh_high, zz_num):
     highk_extrap = last_entry[:, np.newaxis] * (kh_high[np.newaxis, :]/k_last)**m[:, np.newaxis]
     return highk_extrap 
 
-class DGPReACT():
+class NDGPEmu():
     def __init__(self, option=None):
         #self.zz_pk = np.array([0., 0.01,  0.12, 0.24, 0.38, 0.52, 0.68, 0.86, 1.05, 1.27, 1.5, 1.76, 2.04, 2.36, 2.5, 3.0]) # these numers are hand-picked
         self.zz_pk = np.linspace(0., 3., 64, endpoint=True)
@@ -48,19 +49,17 @@ class DGPReACT():
         self.kh_lin_left = self.kh_lin[self.kh_lin<self.kh_nl[0]]
         self.kh_tot = np.concatenate((self.kh_lin_left, self.kh_nl))
 
-        print('initialising nDGP ReACT')
-        self.cp_nl_ngdp_model = cosmopower_NN(restore=True, 
-                        restore_filename=dirname+'/../../emulators/react_boost_nDGP_emu_v2',
-                        )
-        self.kh_nl_boost = self.cp_nl_ngdp_model.modes # 0.01..5. h/Mpc 
-        self.zz_boost = np.minimum(self.zz_pk, 2.5)
+        print('initialising nDGP emulator')
+        self.emu_ndgp = BoostPredictor()
+        self.kh_nl_boost = self.emu_ndgp.k_vals # 0.0156606..4.99465 h/Mpc [407]
+        self.zz_boost = np.minimum(self.zz_pk, 2.)
         self.kh_lin_left_boost = self.kh_lin[self.kh_lin<self.kh_nl_boost[0]]
         self.kh_nl_right_boost = self.kh_nl[self.kh_nl>self.kh_nl_boost[-1]]
         self.kh_nl_boost_tot = np.concatenate((self.kh_lin_left_boost, self.kh_nl_boost, self.kh_nl_right_boost))
         self.k_nl_boost_last = self.kh_nl_boost[-1]
         self.k_nl_boost_lastlast = self.kh_nl_boost[-2]
         self.log_k = log(self.k_nl_boost_last / self.k_nl_boost_lastlast)
-        self.emu_name = 'nDGP_ReACT'
+        self.emu_name = 'nDGP_emu'
 
         if option=='linear':
             self.get_pk_nl =  self.get_pk_lin 
@@ -87,10 +86,10 @@ class DGPReACT():
         miss_pars = list(set(comp_pars))
         # check missing parameters
         if miss_pars:
-            print(f"ReACT nDGP emulator:")
+            print(f" nDGP emulator:")
             print(f"  Please add the parameter(s) {miss_pars}"
                   f" to your parameters!")
-            raise KeyError(f"ReACT nDGP emulator: coordinates need the"
+            raise KeyError(f" nDGP emulator: coordinates need the"
                            f" following parameter(s): ", miss_pars)
         pp = [params[p] for p in eva_pars]    
         for i, par in enumerate(eva_pars):
@@ -112,19 +111,20 @@ class DGPReACT():
         h    = params_dic['h']
         omega_b = params_dic['Omega_b']
         omega_m = params_dic['Omega_m']
-        omega_nu  = params_dic['Omega_nu']
         omegarc    = 10**params_dic['log10Omega_rc']
-        params_react = {
-                'ns'            :  np.full(self.nz_pk, ns),
-                'As'            :  np.full(self.nz_pk, a_s),
-                'H0'            :  np.full(self.nz_pk, h*100),
-                'Omega_b'       :  np.full(self.nz_pk, omega_b),
-                'Omega_m'       :  np.full(self.nz_pk, omega_m),
-                'Omega_nu'      :  np.full(self.nz_pk, omega_nu),
-                'omegarc'       :  np.full(self.nz_pk, omegarc),
-                'z'             :  self.zz_boost
+        params_emu = {
+                'ns'       :  ns,
+                'As'       :  a_s,
+                'h'        :  h,
+                'Ob'       :  omega_b,
+                'Om'       :  omega_m,
             }
-        mg_boost = self.cp_nl_ngdp_model.predictions_np(params_react) #(zz_boost, kh_nl_boost)
+        H0rc = 0.5/np.sqrt(omegarc)
+        # dimension (zz_pk, kh_nl_boost)
+        mg_boost = np.array([
+            self.emu_ndgp.predict(H0rc, z_i, params_emu)
+            for z_i in self.zz_boost
+        ])
         self.d2_mg_lcdm = mg_boost[0, 0] # zz_boost[0] must be 0.!
         self.d2_mg_lcdm_z = mg_boost[:, 0]
         # constant extrapolation for k<0.01 h/Mpc
@@ -202,7 +202,7 @@ class DGPReACT():
                             kx=1, ky=1)     
         return  pnl_interp
     
-    def get_pk_react(self, params_dic, k, lbin, zz_integr, mg_boost_l_interp):
+    def get_pk_boost(self, params_dic, k, lbin, zz_integr, mg_boost_l_interp):
         pk_m_l  = np.zeros((lbin, len(zz_integr)), 'float64')
         index_pknn = np.array(np.where((k > k_min_h_by_mpc) & (k < k_max_h_by_mpc))).transpose()
         pk_l_interp = self.get_pk_hmcode_interp(params_dic)
@@ -215,7 +215,7 @@ class DGPReACT():
 
     def get_pk_nl_(self, params_dic, k, lbin, zz_integr):
         mg_boost_l_interp = self.get_mg_boost_interp(params_dic)
-        pk_m_l = self.get_pk_react(params_dic, k, lbin, zz_integr, mg_boost_l_interp)
+        pk_m_l = self.get_pk_boost(params_dic, k, lbin, zz_integr, mg_boost_l_interp)
         return pk_m_l
     
     def get_pk_pseudo(self, params_dic, k, lbin, zz_integr):

@@ -23,6 +23,10 @@ NL_MODEL_NDGP = 2
 NL_MODEL_GAMMAZ = 3
 NL_MODEL_MUSIGMA = 4
 NL_MODEL_DS = 5
+NL_MODEL_FOFR = 6
+NL_MODEL_FOFR_EMANTIS = 7
+NL_MODEL_NDGP_EMU = 8
+NL_MODEL_MGROWTH = 9
 
 COMP_DATA = 0
 READ_DATA = 1
@@ -353,14 +357,11 @@ class MGL():
         NewModel.k = k
         if theo_model['nl_model'] == NL_MODEL_BACCO and 'sigma8_cb' not in params:
             params['sigma8_cb'] = NewModel.StructureEmu.get_sigma8_cb(params)
+        if theo_model['nl_model'] == NL_MODEL_FOFR_EMANTIS and 'sigma8_lcdm' not in params:
+            params['sigma8_lcdm'] = NewModel.StructureEmu.HMcodeEmu.get_sigma8_lcdm(params)[0]   
         pmm, bar_boost = NewModel.get_pmm(params)
         NewModel.pmm = pmm
         NewModel.pmm_no_barboost = NewModel.pmm/bar_boost
-        #if NewModel.flag_heft or NewModel.flag_sample_bheftsigma8:
-        #    NewModel.pk_exp, NewModel.pk_exp_extr = NewModel.get_heft_pk_exp(params)
-        #    pgm = NewModel.get_pgm(params)*np.sqrt(bar_boost[:, :, None]) 
-        #else:
-        #    pgm = NewModel.get_pgm(params)  
         if NewModel.flag_cross_sqrt_bar_boost:
             print('cross sqrt bar boost')
             pgm = NewModel.get_pgm(params)*np.sqrt(bar_boost[:, :, None])                 
@@ -401,6 +402,8 @@ class MGL():
         print('Theo model: ', theo_model)
         if theo_model['nl_model'] == NL_MODEL_BACCO and 'sigma8_cb' not in params:
             params['sigma8_cb'] = NewModel.StructureEmu.get_sigma8_cb(params) 
+        if theo_model['nl_model'] == NL_MODEL_FOFR_EMANTIS and 'sigma8_lcdm' not in params:
+            params['sigma8_lcdm'] = NewModel.StructureEmu.HMcodeEmu.get_sigma8_lcdm(params)[0]    
         NewModel.ez, NewModel.rz, NewModel.k = NewModel.get_ez_rz_k(params)
         NewModel.dz, _ = NewModel.StructureEmu.get_growth_binned(params, NewModel.k, NewModel.Survey.lbin, NewModel.Survey.zz_integr) if NewModel.flag_fofr else NewModel.StructureEmu.get_growth(params, NewModel.Survey.zz_integr)
         NewModel.deltaz_s, NewModel.deltaz_l = NewModel.get_deltaz(params)
@@ -450,25 +453,13 @@ class MGL():
         print('Theo model: ', theo_model)
         if theo_model['nl_model'] == NL_MODEL_BACCO and 'sigma8_cb' not in params:
             params['sigma8_cb'] = NewModel.StructureEmu.get_sigma8_cb(params) 
+        if theo_model['nl_model'] == NL_MODEL_FOFR_EMANTIS and 'sigma8_lcdm' not in params:
+            params['sigma8_lcdm'] = NewModel.StructureEmu.HMcodeEmu.get_sigma8_lcdm(params)[0]
         NewModel.ez, NewModel.rz, NewModel.k = NewModel.get_ez_rz_k(params)
         NewModel.dz, _ = NewModel.StructureEmu.get_growth_binned(params, NewModel.k, NewModel.Survey.lbin, NewModel.Survey.zz_integr) if NewModel.flag_fofr else NewModel.StructureEmu.get_growth(params, NewModel.Survey.zz_integr)
         NewModel.deltaz_s, NewModel.deltaz_l = NewModel.get_deltaz(params)
         NewModel.pmm, bar_boost = NewModel.get_pmm(params)
         NewModel.pmm_no_barboost = NewModel.pmm/bar_boost
-        #if flag_test_heft_new_extrap:
-        #    print('compute with flag_test_heft_new_extrap')
-        #    NewModel.pgg = NewModel.StructureEmu.get_heft_pgg_zextr_lin(params, NewModel.k, self.Survey.lbin, self.Survey.zz_integr, self.Survey.nbin)
-        #    NewModel.pgm = NewModel.StructureEmu.get_heft_pgm_zextr_lin(params, NewModel.k, self.Survey.lbin, self.Survey.zz_integr, self.Survey.nbin)
-        #else:
-        #    if NewModel.flag_heft or NewModel.flag_sample_bheftsigma8:
-        #        NewModel.pk_exp, NewModel.pk_exp_extr = NewModel.get_heft_pk_exp(params)
-        #        if NewModel.flag_heft_pnl_bar:
-        #            NewModel.pgm = NewModel.get_pgm(params)
-        #        else:
-        #            NewModel.pgm = NewModel.get_pgm(params)*np.sqrt(bar_boost[:, :, None]) 
-        #    else:
-        #        NewModel.pgm = NewModel.get_pgm(params)
-        #    NewModel.pgg = NewModel.get_pgg(params)
         if NewModel.flag_cross_sqrt_bar_boost:
             NewModel.pgm = NewModel.get_pgm(params)*np.sqrt(bar_boost[:, :, None])                 
         else:        
@@ -609,7 +600,7 @@ class MGL():
 
         def get_model_label(value, model_type):
             model_maps = {
-                "nl_model": {0: "HMcode", 1: "bacco", 2: "nDGP", 3: "gLEMURS", 4: "mu-Sigma", 5:"Dark Scattering", 6:"f(R)"},
+                "nl_model": {0: "HMcode", 1: "bacco", 2: "nDGP: ReACT", 3: "gLEMURS: ReACT", 4: "mu-Sigma: ReACT", 5:"Dark Scattering: ReACT", 6:"f(R): ReACT", 7: "f(R): EMANTIS", 8: "nDGPemu", 9: "scale-dep mu: MGrowth"},
                 "bias_model": {0: "b1 constant within bins", 1: "(b1, b2) constant within bins", 2: "HEFT", 3: 'HEFT with Pnl', 4: 'HEFT with Pnl*S', 5: 'sample in b1*sigma8', 6: 'sample in heft*sigma8'},
                 "ia_model": {0: "zNLA", 1: "TATT"},
                 "baryon_model": {0: "no baryons", 1: "Tagn HMcode", 2: "bcemu", 3: "bacco"},

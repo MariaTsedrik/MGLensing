@@ -46,7 +46,9 @@ class FofRReACT():
         self.kh_lin_left = self.kh_lin[self.kh_lin<self.kh_nl[0]]
         self.kh_tot = np.concatenate((self.kh_lin_left, self.kh_nl))
 
-        print('initialising f(R)')
+        self.kh_lin_short = np.logspace(np.log10(3.7e-4), np.log10(50.), 50, endpoint=True)
+
+        print('initialising f(R) ReACT')
         self.cp_nl_fofr_model = cosmopower_NN(restore=True, 
                         restore_filename=dirname+'/../../emulators/react_boost_spph_nn_wide_100k_mt',
                         )
@@ -233,7 +235,7 @@ class FofRReACT():
         _, dz0_lcdm = self.get_growth_lcdm(params_dic, self.zz_pk)
         dz_norm = (dz_fr0_notnorm/dz0_lcdm)**2
         d2_mg_lcdm_z_interp  = RectBivariateSpline(
-                            self.kh_lin,
+                            self.kh_lin_short,
                             self.zz_pk,
                             dz_norm,
                             kx=1, ky=1)    
@@ -244,12 +246,12 @@ class FofRReACT():
     def get_growth_binned(self, params_dic, k, lbin,  zz_integr):
         dz_fr0, dz0_fr0 = self.get_growth(params_dic, self.zz_pk)
         dz_fr0_interp  = RectBivariateSpline(
-                            self.kh_lin,
+                            self.kh_lin_short,
                             self.zz_pk,
                             dz_fr0,
                             kx=1, ky=1)  
         dz0_fr0_interp  = interp1d(
-                            self.kh_lin,
+                            self.kh_lin_short,
                             dz0_fr0[:, 0])  
         # ones instead of zeros, because dz is in the denominator 
         # of the intrinsic alignment signal
@@ -273,7 +275,7 @@ class FofRReACT():
             }
         cosmo = mg.fR_HS(background)
         fr0    = 10**params_dic['log10f_R0']
-        da, _ = cosmo.growth_parameters(self.kh_lin, fr0)  
+        da, _ = cosmo.growth_parameters(self.kh_lin_short, fr0)  
         dz = da[:, ::-1] 
         # growth factor should be normalised to z=0
         # return array of k and z

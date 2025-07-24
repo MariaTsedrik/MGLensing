@@ -12,7 +12,7 @@ DEG2_IN_SPHERE = 4 * np.pi * (180 / np.pi)**2
 dirname = os.path.split(__file__)[0]
 print(dirname)
 H0_h_c = 1./2997.92458 #=100/c in Mpc/h
-z_bins_for_integration = 256 #512 
+z_bins_for_integration = 360 #256 #512 
 
 def get_luminosity_func(file_name):
     """

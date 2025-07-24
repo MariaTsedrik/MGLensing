@@ -10,6 +10,10 @@ from .structure.react_gamma_interface import GammaReACT
 from .structure.react_musigma_interface import MuSigmaReACT
 from .structure.react_ide_interface import DarkScatteringReACT
 from .structure.react_fr_interface import FofRReACT
+from .structure.emantis_fr_interface import FofReMANTIS
+from .structure.ndgpemu_interface import NDGPEmu
+from .structure.mgrowth_mu_zk import MGrowthMuKZ
+
 from math import sqrt, log, exp, pow, log10
 import os
 try: import fastpt as fpt
@@ -33,6 +37,9 @@ NL_MODEL_GAMMAZ = 3
 NL_MODEL_MUSIGMA = 4
 NL_MODEL_DS = 5
 NL_MODEL_FOFR = 6
+NL_MODEL_FOFR_EMANTIS = 7
+NL_MODEL_NDGP_EMU = 8
+NL_MODEL_MGROWTH = 9
 
 
 NO_BARYONS = 0
@@ -156,7 +163,10 @@ class Theory:
             NL_MODEL_GAMMAZ: GammaReACT,
             NL_MODEL_MUSIGMA: MuSigmaReACT,
             NL_MODEL_DS: DarkScatteringReACT,
-            NL_MODEL_FOFR: FofRReACT
+            NL_MODEL_FOFR: FofRReACT,
+            NL_MODEL_FOFR_EMANTIS: FofReMANTIS,
+            NL_MODEL_NDGP_EMU: NDGPEmu,
+            NL_MODEL_MGROWTH: MGrowthMuKZ
         }
         print('model["nl_model"] = ', model['nl_model'])
         try:
@@ -170,7 +180,7 @@ class Theory:
         except KeyError:
             raise ValueError("Invalid nl_model option.")
         check_zmax(self.Survey.zmax, self.StructureEmu)
-        if model['nl_model'] == NL_MODEL_FOFR:
+        if (model['nl_model'] == NL_MODEL_FOFR) or (model['nl_model'] == NL_MODEL_FOFR_EMANTIS) or (model['nl_model'] == NL_MODEL_MGROWTH):
             self.flag_fofr = True
         else:
             self.flag_fofr = False   

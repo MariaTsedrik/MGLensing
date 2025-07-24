@@ -7,7 +7,7 @@ import os
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
 with open("plotting_scripts/params_names.yaml", "r") as file:
     params_dic = yaml.safe_load(file)
-with open("params_data_zennaro.yaml", "r") as file:
+with open("params_data_hmcode.yaml", "r") as file:
     fiducials = yaml.safe_load(file)
 
 
@@ -29,15 +29,16 @@ def read_last_header_line(file_path):
 file_paths = [ #'chains/chain_lsst_y1_fix_cosmo_zennaro_data_zennaro_model.txt',  
               #'chains/chain_lsst_y1_fix_cosmo_zennaro_data_heft_model.txt',
               #'chains/chain_lsst_y1_fix_cosmo_zennaro_data_des_model.txt',
-              'chains/chain_lsst_y1_fix_cosmo_zennaro_data_positiv_b2_zennaro_model.txt',
-              'chains/chain_lsst_y1_fix_cosmo_zennaro_data_positiv_b2_zennaro_model_nobar.txt'
+              #'chains/chain_lsst_y1_fix_cosmo_zennaro_data_positiv_b2_zennaro_model.txt',
+              #'chains/chain_lsst_y1_fix_cosmo_zennaro_data_positiv_b2_zennaro_model_nobar.txt'
+              'chains/chain_euclid_5bins_linscales_mukdep_fixnuisance_new.txt'
 
  ]  
 
-file_name = 'fixcosmo_bias_b2_lsst_3x2pt'
+file_name = 'fixnuisance_fixcosmo_mu_scaledept_3x2pt'
 legend_labels = [
-'with baryons fixed',
-'no baryons'
+#'with baryons fixed',
+#'no baryons'
 #'model: heft',
 #'model: DES-like'
 

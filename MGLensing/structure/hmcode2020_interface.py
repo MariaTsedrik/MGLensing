@@ -323,3 +323,27 @@ class HMcode2020():
         sigma8_emu = self.cp_sigma8_model.predictions_np(params_hmcode)
         sigma8 = sigma8_emu[:, 0]
         return sigma8
+    
+    def get_sigma8_lcdm(self, params_dic):
+        ns   = params_dic['ns']
+        a_s   = params_dic['As']
+        h    = params_dic['h']
+        w0    = -1.0
+        wa    = 0.
+        omega_b = params_dic['Omega_b']
+        omega_c = params_dic['Omega_c']
+        m_nu  = params_dic['Mnu']
+        params_hmcode = {
+                'ns'            :  [ns],
+                'As'            :  [a_s],
+                'hubble'        :  [h],
+                'omega_baryon'  :  [omega_b],
+                'omega_cdm'     :  [omega_c],
+                'neutrino_mass' :  [m_nu],
+                'w0'            :  [w0],
+                'wa'            :  [wa],
+                'z'             :  [0.]
+            }
+        sigma8_emu = self.cp_sigma8_model.predictions_np(params_hmcode)
+        sigma8 = sigma8_emu[0]
+        return sigma8

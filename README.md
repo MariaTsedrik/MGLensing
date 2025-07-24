@@ -21,6 +21,9 @@ This code is not complete to perform a real data analysis (yet), but is a fairly
     - [growth index parametrisation](https://arxiv.org/abs/astro-ph/0507263) and [time-dependent growth index](https://arxiv.org/abs/2304.07281) with [Screening](https://arxiv.org/abs/2210.01094);
     - [mu-Sigma with DE time-evolution](https://arxiv.org/abs/1212.3339) with [Screening](https://arxiv.org/abs/2210.01094);
     - Interacting Dark Energy also known as [Dark Scattering](https://arxiv.org/abs/1605.05623).
+- Simulation-based emulators: 
+    - [eMANTIS](https://arxiv.org/abs/2303.08899) for f(R) gravity;
+    - [nDGPemu](https://github.com/BartolomeoF/nDGPemu/tree/main) for nDGP. 
 - Galaxy bias:
     - Linear;
     - Phenomenalogical $b(z, k) = b_1(z) + b_2(z) k^2$;
