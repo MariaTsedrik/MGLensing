@@ -7,6 +7,8 @@ import os
 import MGrowth as mg
 from math import log10, log
 from .hmcode2020_interface import HMcode2020
+try: import pyhmcode
+except: print('PyHMCode not installed!')
 
 dirname = os.path.split(__file__)[0]
 
@@ -68,6 +70,11 @@ class FofReMANTIS():
         self.emu_name = 'fR_eMANTIS'
         # load for sigma8 computation 
         self.HMcodeEmu = HMcode2020()
+        # load pyhmcode objects
+        self.hmc = pyhmcode.Cosmology()
+        # Set the halo model in HMcode
+        # Options: HMcode2015, HMcode2016, HMcode2020
+        self.hmod = pyhmcode.Halomodel(pyhmcode.HMcode2020, verbose=False)
 
         if option=='linear':
             self.get_pk_nl =  self.get_pk_lin 

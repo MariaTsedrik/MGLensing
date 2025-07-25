@@ -4,6 +4,9 @@ from cosmopower import cosmopower_NN
 import os
 import MGrowth as mg
 from math import log10, log
+from .hmcode2020_interface import HMcode2020
+try: import pyhmcode
+except: print('PyHMCode not installed!')
 
 dirname = os.path.split(__file__)[0]
 
@@ -61,6 +64,14 @@ class FofRReACT():
         self.k_nl_boost_lastlast = self.kh_nl_boost[-2]
         self.log_k = log(self.k_nl_boost_last / self.k_nl_boost_lastlast)
         self.emu_name = 'fR_ReACT'
+
+        # load for sigma8 computation 
+        self.HMcodeEmu = HMcode2020()
+        # load pyhmcode objects
+        self.hmc = pyhmcode.Cosmology()
+        # Set the halo model in HMcode
+        # Options: HMcode2015, HMcode2016, HMcode2020
+        self.hmod = pyhmcode.Halomodel(pyhmcode.HMcode2020, verbose=False)
 
         if option=='linear':
             self.get_pk_nl =  self.get_pk_lin 
@@ -221,13 +232,67 @@ class FofRReACT():
         return pk_m_l
     
     def get_pk_pseudo(self, params_dic, k, lbin, zz_integr):
-        raise NotImplementedError("Pseudo f(R) model is not implemented yet. Use 'linear' or 'nonlinear' options instead.")
+        # call linear lcdm with original As  
+        # interpolator of (zz, k)
+        pk_l_interp = self.get_pk_hmcode_lin_interp(params_dic)
+        # TO-DO implemenet this propery later
+        #self.pklin_z0 = self.pklin_z0_lcdm # later used in tatt 
+        dz_fr0, dz0_fr0 = self.get_growth(params_dic, self.zz_pk)
+        dz_fr0_notnorm = dz_fr0*dz0_fr0
+        dz_lcdm, dz0_lcdm = self.get_growth_lcdm(params_dic, self.zz_pk)
+        dz_lcdm_notnorm = dz_lcdm*dz0_lcdm
+        #dz_norm = (dz_fr0_notnorm/dz0_lcdm)**2
+        dz_rescale = (dz_fr0_notnorm/dz_lcdm_notnorm[None, :])**2
+        
+        zz_pk_short = np.linspace(0., 3., 32, endpoint=True)
+        
+        d2_mg_lcdm_z_interp  = RectBivariateSpline(
+                            self.kh_lin_short,
+                            self.zz_pk,
+                            dz_rescale, #dz_norm,
+                            kx=1, ky=1)  
+        # zz_pk, kh_lin
+        pk_lin = pk_l_interp(0., self.kh_lin)*d2_mg_lcdm_z_interp(self.kh_lin, zz_pk_short).T  
+        sigma8 = self.HMcodeEmu.get_sigma8_lcdm(params_dic)[0]
+
+        # Set HMcode internal cosmological parameters
+        self.hmc.om_m = params_dic['Omega_m']
+        self.hmc.om_b = params_dic['Omega_b']
+        self.hmc.om_v = 1.- params_dic['Omega_m']
+        self.hmc.h = params_dic['h']
+        self.hmc.ns = params_dic['ns']
+        self.hmc.sig8 = sigma8
+        self.hmc.m_nu = params_dic['Mnu'] if 'Mnu' in params_dic else 0.
+        # silly re-scalling required py pyhmcode
+        pnl_hmcode = []
+        pk_lin_hmc_4 =  pk_lin[:4, :]
+        self.hmc.set_linear_power_spectrum(self.kh_lin, zz_pk_short[:4], pk_lin_hmc_4)
+        pnl_hmcode.append(pyhmcode.calculate_nonlinear_power_spectrum(self.hmc, self.hmod, verbose=False)[0])
+        for i in range(len(zz_pk_short)-1):
+            zz_pk_short_4 = np.linspace(0., zz_pk_short[i+1], endpoint=True, num=4)
+            pk_lin_hmc_4[0] = pk_lin[i+1]
+            self.hmc.set_linear_power_spectrum(self.kh_lin, zz_pk_short_4, pk_lin_hmc_4)
+            pnl_hmcode.append(pyhmcode.calculate_nonlinear_power_spectrum(self.hmc, self.hmod, verbose=False)[-1])
+
+        pnl_hmcode = np.array(pnl_hmcode)
+        pnl_hmcode_interp = RectBivariateSpline(
+                                    zz_pk_short,
+                                    self.kh_lin,
+                                    pnl_hmcode,
+                                    kx=1, ky=1)
+
+        pk_m_l  = np.zeros((lbin, len(zz_integr)), 'float64')
+        index_pknn = np.array(np.where((k > k_min_h_by_mpc) & (k < k_max_h_by_mpc))).transpose()
+        for index_l, index_z in index_pknn:
+            pk_m_l[index_l, index_z] = pnl_hmcode_interp(zz_integr[index_z], k[index_l,index_z])
+        return pk_m_l  
+
 
     def get_pk_lin(self, params_dic, k, lbin, zz_integr):
         # call linear lcdm with original As  
         pk_l_interp = self.get_pk_hmcode_lin_interp(params_dic)
         # TO-DO implemenet this propery later
-        self.pklin_z0 = self.pklin_z0_lcdm # later used in tatt 
+        #self.pklin_z0 = self.pklin_z0_lcdm # later used in tatt 
         pk_m_l  = np.zeros((lbin, len(zz_integr)), 'float64')
         index_pknn = np.array(np.where((k > k_min_h_by_mpc) & (k < k_max_h_by_mpc))).transpose()
         dz_fr0, dz0_fr0 = self.get_growth(params_dic, self.zz_pk)

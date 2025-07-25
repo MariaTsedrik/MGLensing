@@ -63,4 +63,5 @@ dependencies:
       - sphynx
       - pyccl
       - emantis
+      - pyhmcode
 
