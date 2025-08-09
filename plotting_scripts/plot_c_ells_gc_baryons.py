@@ -177,11 +177,9 @@ err_cl_ll, err_cl_gg, err_cl_lg  = MGL.get_errorbars(params)
 model={
     #'bacco_bar': {'nl_model': NL_MODEL_BACCO, 'bias_model': BIAS_LIN, 'ia_model': 0, 'baryon_model': BARYONS_BACCO, 'photoz_err_model': 0.},
     #'bacco_nobar': {'nl_model': NL_MODEL_BACCO, 'bias_model': BIAS_LIN, 'ia_model': 0, 'baryon_model': NO_BARYONS, 'photoz_err_model': 0.},
-    'bacco_bar': {'nl_model': NL_MODEL_BACCO, 'bias_model': 4, 'ia_model': 0, 'baryon_model': BARYONS_BACCO, 'photoz_err_model': 0.},
-    'bacco_nobar': {'nl_model': NL_MODEL_BACCO, 'bias_model': 3, 'ia_model': 0, 'baryon_model': NO_BARYONS, 'photoz_err_model': 0.},
+    'bacco_bar': {'nl_model': NL_MODEL_BACCO, 'bias_model': 4, 'ia_model': 0, 'baryon_model': BARYONS_BACCO, 'photoz_err_model': 0.},   # ref
+    'bacco_nobar': {'nl_model': NL_MODEL_BACCO, 'bias_model': 3, 'ia_model': 0, 'baryon_model': NO_BARYONS, 'photoz_err_model': 0.},   # den
     'bacco_nobar_heft': {'nl_model': NL_MODEL_BACCO, 'bias_model': 3, 'ia_model': 0, 'baryon_model': NO_BARYONS, 'photoz_err_model': 0.}
-
-    
     }
 
 cls_fid = MGL.get_c_ells(params, model['bacco_nobar'])[1]

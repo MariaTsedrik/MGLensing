@@ -16,6 +16,7 @@ import MGrowth as mg
 from scipy import interpolate as itp
 from scipy.linalg import cholesky, solve_triangular
 import matplotlib.pyplot as plt
+import pyccl as ccl
 
 NL_MODEL_HMCODE = 0
 NL_MODEL_BACCO = 1
@@ -27,6 +28,9 @@ NL_MODEL_FOFR = 6
 NL_MODEL_FOFR_EMANTIS = 7
 NL_MODEL_NDGP_EMU = 8
 NL_MODEL_MGROWTH = 9
+
+BIAS_LIN = 0
+BIAS_HEFT = 2
 
 COMP_DATA = 0
 READ_DATA = 1
@@ -426,26 +430,27 @@ class MGL():
         """
         Compute the angular power spectra (C_ells) for different components based on the theoretical model and parameters provided.
 
-        Parameters:
+        This method supports two computation modes:
+        - If the model requests CCL (Core Cosmology Library), the computation is delegated to `get_c_ells_CCL`, which uses pyccl for C_ell calculation.
+        - Otherwise, the spectra are computed using the internal pipeline.
+
+        Parameters
         ----------
         params : dict
             Dictionary containing the parameters required for the theoretical model.
         theo_model : dict
             Dictionary specifying the theoretical model to be used, including non-linear model and other configurations.
 
-        Returns:
+        Returns
         -------
         tuple
             A tuple containing the following angular power spectra:
             - cl_ll : array
                 Angular power spectrum for shear-shear correlations.
-
             - cl_gg : array
                 Angular power spectrum for galaxy clustering correlations.
-
             - cl_lg : array
                 Angular power spectrum for shear-galaxy cross-correlations.
-
             - cl_gl : array
                 Angular power spectrum for galaxy-shear cross-correlations.
         """
@@ -475,6 +480,133 @@ class MGL():
         cl_lg, cl_gl = NewModel.get_cell_cross() 
         return cl_ll, cl_gg, cl_lg, cl_gl  
     
+    def get_c_ells_CCL(self, params, theo_model):
+        """
+        Compute angular power spectra (C_ell) using pyccl for the given cosmological and nuisance parameters.
+
+        This method supports linear and HEFT bias models. It constructs the appropriate CCL cosmology and tracer objects,
+        computes the angular power spectra for lensing-lensing, galaxy-galaxy, and cross terms, and adds noise to the diagonals.
+
+        Parameters
+        ----------
+        params : dict
+            Dictionary of cosmological and nuisance parameters.
+        theo_model : dict
+            Dictionary specifying the theoretical model, including 'bias_model'.
+
+        Returns
+        -------
+        tuple of np.ndarray
+            cl_ll : (n_ell, nbin, nbin)
+                Shear-shear angular power spectra.
+            cl_gg : (n_ell, nbin, nbin)
+                Galaxy-galaxy angular power spectra.
+            cl_lg : (n_ell, nbin, nbin)
+                Shear-galaxy angular power spectra.
+            cl_gl : (n_ell, nbin, nbin)
+                Galaxy-shear angular power spectra.
+
+        Raises
+        ------
+        KeyError
+            If the bias model is not supported by this method.
+        """
+        bemu_nl = ccl.BaccoemuNonlinear()
+        cosmo_nl = ccl.Cosmology(
+            Omega_c=params['Omega_c'],
+            Omega_b=params['Omega_b'],
+            h=params['h'],
+            n_s=params['ns'],
+            sigma8=params['sigma8_cb'],
+            m_nu=params['Mnu'],
+            w0=params['w0'],
+            wa=params['wa'],
+            Omega_k=0.,
+            T_ncdm=0,
+            transfer_function='boltzmann_camb',
+            matter_power_spectrum=bemu_nl
+        )
+        bias_ia = params['a1_IA'] * (1. + self.Survey.zz_integr) ** params['eta1_IA'] * 0.0134 / 0.01387684609
+        nbin = self.Survey.nbin
+        n_ell = len(self.Survey.ell)
+        cl_ll = np.zeros((n_ell, nbin, nbin))
+        cl_gg = np.zeros((n_ell, nbin, nbin))
+        cl_lg = np.zeros((n_ell, nbin, nbin))
+        cl_gl = np.zeros((n_ell, nbin, nbin))
+
+        if theo_model['bias_model'] == BIAS_LIN:
+            b1_arr = np.array([params[f'b1_{i+1}'] for i in range(nbin)])
+            for i in range(nbin):
+                bias_g_i = np.ones_like(self.Survey.zz_integr) * b1_arr[i]
+                t_g_i = ccl.NumberCountsTracer(cosmo_nl, has_rsd=False, dndz=(self.Survey.zz_integr, self.Survey.eta_z_l[:, i]), 
+                                               bias=(self.Survey.zz_integr, bias_g_i), mag_bias=None)
+                t_l_i = ccl.WeakLensingTracer(cosmo_nl, dndz=(self.Survey.zz_integr, self.Survey.eta_z_s[:, i]),
+                                              ia_bias=(self.Survey.zz_integr, bias_ia))
+                for j in range(nbin):
+                    bias_g_j = np.ones_like(self.Survey.zz_integr) * b1_arr[j]
+                    t_g_j = ccl.NumberCountsTracer(cosmo_nl, has_rsd=False, dndz=(self.Survey.zz_integr, self.Survey.eta_z_l[:, j]),
+                                                   bias=(self.Survey.zz_integr, bias_g_j), mag_bias=None)
+                    t_l_j = ccl.WeakLensingTracer(cosmo_nl, dndz=(self.Survey.zz_integr, self.Survey.eta_z_s[:, j]),
+                                                  ia_bias=(self.Survey.zz_integr, bias_ia))
+                    cl_ll[:, i, j] = ccl.angular_cl(cosmo_nl, t_l_i, t_l_j, self.Survey.l_wl)
+                    cl_gg[:, i, j] = ccl.angular_cl(cosmo_nl, t_g_i, t_g_j, self.Survey.l_gc)
+                    cl_lg[:, i, j] = ccl.angular_cl(cosmo_nl, t_l_i, t_g_j, self.Survey.l_xc)
+                    cl_gl[:, i, j] = ccl.angular_cl(cosmo_nl, t_g_i, t_l_j, self.Survey.l_xc)
+
+        elif theo_model['bias_model'] == BIAS_HEFT:
+            min_k = np.log10(2.e-4 * params['h'])
+            max_k = np.log10(0.7 * params['h'])
+            heft = ccl.nl_pt.BaccoLbiasCalculator(
+                cosmo=cosmo_nl, log10k_min=min_k, log10k_max=max_k, nk_per_decade=20
+            )
+            heft.update_ingredients(cosmo_nl)
+            b1L = np.array([params[f'b1L_{i+1}'] + 1 for i in range(nbin)])
+            b2L = np.array([params[f'b2L_{i+1}'] * 2 for i in range(nbin)])
+            bs2 = np.array([params[f'bs2L_{i+1}'] * 2 for i in range(nbin)])
+            bLap = np.array([params[f'blaplL_{i+1}'] * 2 for i in range(nbin)])
+            pk_gg = [[None for _ in range(nbin)] for _ in range(nbin)]
+            pk_lg = [[None for _ in range(nbin)] for _ in range(nbin)]
+            pk_gl = [[None for _ in range(nbin)] for _ in range(nbin)]
+            for i in range(nbin):
+                for j in range(nbin):
+                    ptt_g_i = ccl.nl_pt.PTNumberCountsTracer(b1=(self.Survey.zz_integr, b1L[i] * np.ones(len(self.Survey.zz_integr))), b2=(self.Survey.zz_integr, b2L[i] * np.ones(len(self.Survey.zz_integr))),
+                                                             bs=(self.Survey.zz_integr, bs2[i] * np.ones(len(self.Survey.zz_integr))), bk2=(self.Survey.zz_integr, bLap[i] * np.ones(len(self.Survey.zz_integr))))
+                    ptt_g_j = ccl.nl_pt.PTNumberCountsTracer(b1=(self.Survey.zz_integr, b1L[j] * np.ones(len(self.Survey.zz_integr))), b2=(self.Survey.zz_integr, b2L[j] * np.ones(len(self.Survey.zz_integr))),
+                                                             bs=(self.Survey.zz_integr, bs2[j] * np.ones(len(self.Survey.zz_integr))), bk2=(self.Survey.zz_integr, bLap[j] * np.ones(len(self.Survey.zz_integr))))
+                    ptt_l_i = ccl.nl_pt.PTMatterTracer()
+                    ptt_l_j = ccl.nl_pt.PTMatterTracer()
+                    pk_gg[i][j] = heft.get_biased_pk2d(tracer1=ptt_g_i, tracer2=ptt_g_j)
+                    pk_lg[i][j] = heft.get_biased_pk2d(tracer1=ptt_l_i, tracer2=ptt_g_j)
+                    pk_gl[i][j] = heft.get_biased_pk2d(tracer1=ptt_g_i, tracer2=ptt_l_j)
+            bias_g = np.ones_like(self.Survey.zz_integr)
+            for i in range(nbin):
+                t_g_i = ccl.NumberCountsTracer(cosmo_nl, has_rsd=False, dndz=(self.Survey.zz_integr, self.Survey.eta_z_l[:, i]),
+                                               bias=(self.Survey.zz_integr, bias_g), mag_bias=None)
+                t_l_i = ccl.WeakLensingTracer(cosmo_nl, dndz=(self.Survey.zz_integr, self.Survey.eta_z_s[:, i]),
+                                               ia_bias=(self.Survey.zz_integr, bias_ia))
+                for j in range(nbin):
+                    t_g_j = ccl.NumberCountsTracer(cosmo_nl, has_rsd=False, dndz=(self.Survey.zz_integr, self.Survey.eta_z_l[:, j]),
+                                                   bias=(self.Survey.zz_integr, bias_g), mag_bias=None)
+                    t_l_j = ccl.WeakLensingTracer(
+                        cosmo_nl,
+                        dndz=(self.Survey.zz_integr, self.Survey.eta_z_s[:, j]),
+                        ia_bias=(self.Survey.zz_integr, bias_ia)
+                    )
+                    cl_ll[:, i, j] = ccl.angular_cl(cosmo_nl, t_l_i, t_l_j, self.Survey.l_wl)
+                    cl_gg[:, i, j] = ccl.angular_cl(cosmo_nl, t_g_i, t_g_j, self.Survey.l_gc, p_of_k_a=pk_gg[i][j])
+                    cl_lg[:, i, j] = ccl.angular_cl(cosmo_nl, t_l_i, t_g_j, self.Survey.l_xc, p_of_k_a=pk_lg[i][j])
+                    cl_gl[:, i, j] = ccl.angular_cl(cosmo_nl, t_g_i, t_l_j, self.Survey.l_xc, p_of_k_a=pk_gl[i][j])
+
+        else:
+            raise KeyError('CCL implementation currently supports only linear and HEFT bias models.')
+
+        # Add noise to the diagonal
+        for i in range(nbin):
+            cl_ll[:, i, i] += self.Survey.noise['LL']
+            cl_gg[:, i, i] += self.Survey.noise['GG']
+            cl_lg[:, i, i] += self.Survey.noise['LG']
+            cl_gl[:, i, i] += self.Survey.noise['GL']
+        return cl_ll, cl_gg, cl_lg, cl_gl
 
     
     def get_errorbars(self, params):

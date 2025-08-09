@@ -61,7 +61,7 @@ data:
   #     1 -> read from a file
   data_file: 
 
-  nl_model: 0
+  nl_model: 1
   #bacco_option: 'z_extrap_hmcode'
   #Nonlinear power spectrum
   #     0 -> HMcode
@@ -70,7 +70,7 @@ data:
   #     3 -> gLEMURS
   #     4 -> μ-Σ (Σ is not properly implemented in Cls yet)
   #     5 -> Dark Scattering (Interacting Dark Energy)
-  bias_model: 0
+  bias_model: 2
   # Photometric galaxy bias model (redshift dependence)
   #     0 -> constant linear bias within bins
   #     1 -> (b1, b2) constant within bins
@@ -95,12 +95,13 @@ data:
   #     0 -> no photo-z error
   #     1 -> additive mode, n(z') = n(z + dz)
   #     2 -> multiplicative mode, n(z') = n(z(1 + dz))
-  params: ./params_data_hmcode.yaml
+  params: ./params_data.yaml
 
 theory:
   add_noise: False
-  nl_model: 0
+  nl_model: 1
   #bacco_option: 'z_extrap_hmcode'
+  heft_extrap_k_const: True
   #Nonlinear power spectrum
   #     0 -> HMcode
   #     1 -> bacco
@@ -108,7 +109,7 @@ theory:
   #     3 -> gLEMURS
   #     4 -> μ-Σ (Σ is not properly implemented in Cls yet)
   #     5 -> Dark Scattering (Interacting Dark Energy)
-  bias_model: 0
+  bias_model: 2
   # Photometric galaxy bias model (redshift dependence)
   #     0 -> linear interpolation
   #     1 -> constant within bins
@@ -133,10 +134,10 @@ theory:
   #     0 -> no photo-z error
   #     1 -> additive mode, n(z') = n(z + dz)
   #     2 -> multiplicative mode, n(z') = n(z(1 + dz))
-  params: ./params_model_hmcode.yaml   
+  params: ./params_bacco_test.yaml   
 
 output: 
-  chain_name: lsst_y1_ccl_comparison
+  chain_name: xxx
 sampler: 
   mcmc:
     verbose: True
@@ -144,5 +145,5 @@ sampler:
     n_live: 1000
     pool: 20
     resume: True
-    hdf5_name:  lsst_y1_ccl_comparison
+    hdf5_name:  xxx
     

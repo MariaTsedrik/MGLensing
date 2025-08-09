@@ -143,7 +143,7 @@ class BaccoEmu:
         print('initialising baccoemu')
         self.baccoemulator = baccoemu.Matter_powerspectrum()
         self.heftemulator = baccoemu.Lbias_expansion()
-        k_min_lin = 1.e-4
+        k_min_lin = 2.e-4
         k_max_lin = 50.
         z_min = 0.
         z_max_lin = 3. #add a comment about global z_max

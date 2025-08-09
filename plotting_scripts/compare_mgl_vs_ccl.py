@@ -7,8 +7,10 @@ import sys
 import os
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
 import MGLensing
+folder = os.path.dirname(os.path.abspath(__file__))
+os.chdir(folder+'/../')
 from matplotlib import rc
-rc('text', usetex=True)
+# rc('text', usetex=True)
 rc('font',**{'family':'serif','serif':['Times']})
 SMALL_SIZE = 16
 MEDIUM_SIZE = 18
@@ -50,7 +52,7 @@ def plot_cl_mgl_vs_ccl(ell, lmax, cl_mgl, cl_mgl_lin, cl_ccl, cl_ccl_lin, err_cl
                 #ax[i,j].semilogx(ell, (cl_mgl[:,i,j]-cl_ccl[i, j, :])/err_cl[:, i, j], linewidth=2)
                 #ax[i,j].semilogx(ell, (cl_mgl_lin[:,i,j]-cl_ccl_lin[i, j, :])/err_cl[:, i, j], linewidth=2)
                 #ax[i, j].fill_between(ell, 1, -1, color='tab:pink', alpha=0.1)
-                #ax[i, j].set_ylim(-2.4, 2.4)
+                ax[i,j].set_ylim(0.985, 1.015)
                 #ax[i,j].text(.4, .8, 'bin %s, %s'%(str(i+1),(j+1)), fontsize="medium", horizontalalignment='center', transform=ax[i,j].transAxes)  
                 #ax[i, j].axhline(0, color='grey', alpha=0.1)  
                 ax[i, j].axvspan(xmin=lmax[i, j], xmax=ell[-1], color='grey', alpha=0.1)

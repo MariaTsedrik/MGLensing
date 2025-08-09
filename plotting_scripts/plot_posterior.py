@@ -5,8 +5,11 @@ import yaml
 import os
 
 folder = os.path.dirname(os.path.abspath(__file__))
-# my_colors = ['#FFDD03', "#78206E", '#035177', '#F58300', '#8ECAE6', '#78206E', '#ED91DC']
-my_colors = ['tab:orange', 'tab:blue', 'tab:green', 'tab:red', 'tab:purple', 'tab:olive', 'tab:cyan']
+# my_colors = ['#035177', '#F58300', '#FFDD03', "#78206E", '#8ECAE6', '#78206E', '#ED91DC']
+# my_colors = ['tab:orange', 'tab:blue', 'tab:green', 'tab:red', 'tab:purple', 'tab:olive', 'tab:cyan']
+my_colors = [ '#18698F', '#7AC011', '#FF7083', '#99D4E5']
+# my_colors = ["#18698F", "#8C6381", "#FF7083"]
+
 
 
 def read_last_header_line(file_path):
@@ -102,15 +105,16 @@ def plot_corner(list_of_files, legend_labels, annotation_text, file_name, plotbi
                               )
         )
 
+    # ModelPars = ['Omega_m', 'sigma8_cb']
     ModelPars = chains_info[0]['pars']
 
     from matplotlib import rc
     rc('text', usetex=False)
     rc('font',**{'family':'serif','serif':['Times']})
-    g = getdist.plots.getSubplotPlotter(subplot_size=1.3)
+    g = getdist.plots.getSubplotPlotter(subplot_size=1.3)  # width_inch=8, 
 
     plt.rcParams.update({'font.size':16})
-    g.settings.legend_fontsize = 20
+    g.settings.legend_fontsize = 30
     g.settings.axes_fontsize = 20
     g.settings.axes_labelsize = 20
     g.settings.linewidth = 5
@@ -130,9 +134,9 @@ def plot_corner(list_of_files, legend_labels, annotation_text, file_name, plotbi
             for j in range(i+1):
                 ax = g.subplots[i, j]
                 if i != j and ModelPars[i] in fiducials and fiducials[ModelPars[i]] is not None:
-                    ax.axhline(fiducials[ModelPars[i]], lw=2., color='tab:gray')
+                    ax.axhline(fiducials[ModelPars[i]], lw=1., color='tab:gray')
                 if ModelPars[j] in fiducials and fiducials[ModelPars[j]] is not None:
-                    ax.axvline(fiducials[ModelPars[j]], lw=2., color='tab:gray')
+                    ax.axvline(fiducials[ModelPars[j]], lw=1., color='tab:gray')
 
     ax = g.subplots[num, num]
     # ax.annotate(annotation_text, (2.5, 0.5), xycoords='axes fraction', clip_on=False, fontsize=12)     
@@ -140,7 +144,7 @@ def plot_corner(list_of_files, legend_labels, annotation_text, file_name, plotbi
     plt.tight_layout()
     if not plotbias:
         file_name += '_noBias'
-    plt.savefig(folder+'/../figs/posteriors/'+file_name+'.png')
+    plt.savefig(folder+'/../figs/posteriors/ottis/'+file_name+'.png')
     # plt.show()
 
 
@@ -170,7 +174,7 @@ file_paths = [
     # 'chains/chain_HEFTdata_HEFTmodel_kmax0.7_largerlogMc_-11Apr.txt',
     # 'chains/chain_HEFTdata_HEFTmodel_kmax0.7_noSystematics-fcfs_07Apr.txt',
     # 'chains/chain_heft_heft_kmax0.5_SRD_20Jun.txt', 
-    'chains/chain_heft_heft_kmax0.7_SRD_20Jun.txt', 
+    # 'chains/chain_heft_heft_kmax0.7_SRD_20Jun.txt', 
     # 'chains/chain_HEFTdata_bextramodel_kmax0.2_noSystematics_15Apr.txt',
     # 'chains/chain_HEFTdata_b1model_kmax0.1_noSystematics-fcfs_03Apr.txt',
     # 'chains/chain_HEFTdata_b1model_kmax0.2_noSystematics_21Apr.txt',
@@ -221,10 +225,31 @@ file_paths = [
     # 'chains/chain_heft_heft_kmax0.4_SRD_high_bLap_fixing_bs2_bLap_toZero_19Jun.txt',
     # 'chains/chain_heft_heft_kmax0.4_SRD_high_bs2_fixing_bs2_bLap_toZero_20Jun.txt',
     # 'chains/chain_heft_heft_kmax0.5_SRD_fixing_bs2_bLap_toZero_19Jun.txt',
-    'chains/chain_heft_heft_kmax0.7_SRD_fixing_bs2_bLap_toZero_19Jun.txt',
+    # 'chains/chain_heft_heft_kmax0.7_SRD_fixing_bs2_bLap_toZero_19Jun.txt',
+    #
+    # 'chains/chain_heft_heft_kmax0.3_SRD_negativeb2prior_21Jul.txt',
+    # 'chains/chain_heft_heft_kmax0.3_SRD_fix_bs2_blap_toZero_negativeb2prior_21Jul.txt',
+    # 'chains/chain_heft_heft_kmax0.7_SRD_negativeb2prior_21Jul.txt',
+    # 'chains/chain_heft_heft_kmax0.7_SRD_fix_bs2_blap_toZero_negativeb2prior_21Jul.txt',
+    # 'chains/chain_heft_b1_kmax0.7_SRD_21Jul.txt',
+    # 'chains/chain_heft_heft_kmax0.5_SRD_negativeb2prior_18Jul.txt',
+    # 'chains/chain_heft_heft_kmax0.5_SRD_fix_bs2_blap_toZero_negativeb2prior_18Jul.txt',
+    # 'chains/chain_heft_heft_kmax0.3_SRD_negativeb2prior_fix_Ob_h_ns_22Jul.txt',
+    # 'chains/chain_heft_b1_kmax0.3_SRD_21Jul.txt',
+    # 'chains/chain_heft_heft_kmax0.3_SRD_fix_bs2_blap_toZero_negativeb2prior_fix_Ob_h_ns_22Jul.txt',
+    # 'chains/chain_heft_b1_kmax0.3_SRD_negativeb2prior_fix_Ob_h_ns_22Jul.txt',
+    # 'chains/chain_heft_heft_kmax0.7_SRD_negativeb2prior_constant_extrap_23Jul.txt',
+    # 'chains/chain_heft_heft_kmax0.7_SRD_negativeb2prior_powerlaw_extrap_23Jul.txt',
+    # 'chains/chain_heft_heft_kmax0.3_SRD_negativeb2prior_logMc_28Jul.txt',
+    # 'chains/chain_heft_heft_kmax0.7_SRD_negativeb2prior_logMc_25Jul.txt',
+    # 'chains/chain_heft_heft_kmax0.7_SRD_negativeb2prior_fix_bs2_blap_logMc_28Jul.txt',
+    #
+    'chains/chain_heft_heft_kmax0.1_SRD_negativeb2prior_fix_bs2_blap_with_logMc_Mnu_w0wa_29Jul.txt',
+    'chains/chain_heft_heft_kmax0.3_SRD_negativeb2prior_fix_bs2_blap_with_logMc_Mnu_w0wa_29Jul.txt',
+    'chains/chain_heft_heft_kmax0.7_SRD_negativeb2prior_fix_bs2_blap_with_logMc_Mnu_w0wa_28Jul.txt',
     ]  
 
-file_name = 'fixing_bs2_bLap_toZero_SRD_kmax0.5'
+file_name = 'heft-heft_kmax0.1_0.3_0.7_SRD_negative_b2_prior_fix_bs2_blap_free_Mnu_w0wa_logMc'
 legend_labels = [
     # 'data: b1, model: heft, no baryons, kmax = 0.1',
     # 'data: b1, model: heft, no baryons, kmax = 0.7',
@@ -252,7 +277,7 @@ legend_labels = [
     # 'HEFTdata, HEFTmodel, kmax=0.7, logMc=14.8',
     # 'HEFTdata, HEFTmodel, kmax=0.7',
     # 'HEFTdata, HEFTmodel, kmax=0.5, SRD fiducials',
-    'HEFTdata, HEFTmodel, SRD fiducials, \n kmax=0.7',
+    # 'HEFTdata, HEFTmodel, SRD fiducials, \n kmax=0.7',
     # 'HEFTdata, b1+betra*k+b2*k^2, kmax=0.2'
     # 'HEFTdata, b1model, kmax=0.1',
     # 'HEFTdata, b1model, kmax=0.2',
@@ -279,7 +304,7 @@ legend_labels = [
     #
     # 'fixed bs2, bLap to 0 (not fiducial) \n kmax = 0.1',
     # 'fixed bs2, bLap to 0 (not fiducial) \n kmax = 0.3',
-    # 'fixed bs2, bLap to 0 (not fiducial) \n kmax = 0.4',
+    # 'fixed bs2, bLap to 0 (Bacco fiducial) \n kmax = 0.4',
     # 'fixed bLap to 0 (not fiducial) \n kmax = 0.4',
     # 'fixed bs2 to 0 (not fiducial) \n kmax = 0.4',
     # 'fixed bs2, bLap to 0 (not fiducial) \n kmax = 0.4, more nlive',
@@ -294,14 +319,31 @@ legend_labels = [
     # 'fixed logMc = 11.8 (vary etabc)',
     # 'fixed etabc = 0',
     # 'fixed betabc = 0',
-    # 'fixed bs2, bLap to 0 (fiducial) \n kmax = 0.4',
+    # 'fixed bs2, bLap to 0 (SRD fiducial) \n kmax = 0.4',
     # 'fixed bLap to quasi 0 (not fiducial) \n kmax = 0.4',
     #
     # 'fixed bLap to 0, SRD fiducials \n kmax = 0.4',
     # 'fixed bLap to 0, SRD fiducials \n high bLap, kmax = 0.4',
     # 'fixed bLap to 0, SRD fiducials \n high bs2, kmax = 0.4',
     # 'fixed bLap to 0, SRD fiducials \n kmax = 0.5',
-    'fixed bLap to 0, SRD fiducials \n kmax = 0.7',
+    # 'fixed bLap to 0, SRD fiducials \n kmax = 0.7',
+    # 'heft-heft, kmax=0.3',
+    # 'heft-heft, kmax=0.3, fix bs2=blap=0',
+    # 'heft-heft, kmax=0.7',
+    # 'heft-heft, kmax=0.7, fix bs2=blap=0',
+    # 'heft-b1, kmax=0.7',
+    # 'heft-heft, kmax=0.5',
+    # 'heft-heft, kmax=0.5, fix bs2=blap=0',
+    # 'heft-b1, kmax=0.3',
+    # 'const extrap',
+    # 'powerlaw extrap',
+    # 'heft-heft, kmax=0.3, free logMc',
+    # 'heft-heft, kmax=0.7, free logMc',
+    # 'heft-heft, kmax=0.7, free logMc, fix bs2=blap=0',
+    #
+    'heft-heft, fixed bs2 = blap = 0, kmax=0.1, logMc, Mnu, w0wa',
+    'heft-heft, fixed bs2 = blap = 0, kmax=0.3, logMc, Mnu, w0wa',
+    'heft-heft, fixed bs2 = blap = 0, kmax=0.7, logMc, Mnu, w0wa',
     ]
 annotation_text = '' #'LSST Y1 kmax=0.7 h/Mpc \n HEFT data, HEFT model'
 
@@ -309,5 +351,5 @@ b1 = ['b1L_1', 'b1L_2', 'b1L_3', 'b1L_4', 'b1L_5']
 b2 = ['b2L_1', 'b2L_2', 'b2L_3', 'b2L_4', 'b2L_5']
 bs2 = ['bs2L_1', 'bs2L_2', 'bs2L_3', 'bs2L_4', 'bs2L_5']
 bLap = ['blaplL_1', 'blaplL_2', 'blaplL_3', 'blaplL_4', 'blaplL_5']
-plot_corner(file_paths, legend_labels=legend_labels, annotation_text=annotation_text, file_name=file_name, plotbias=False, derive=False)
+plot_corner(file_paths, legend_labels=legend_labels, annotation_text=annotation_text, file_name=file_name, plotbias=True, derive=False)
 

@@ -1,12 +1,14 @@
 import os
 import matplotlib.pyplot as plt
+from matplotlib.ticker import ScalarFormatter
 import numpy as np
 folder = os.path.dirname(os.path.abspath(__file__))
 os.chdir(folder+'/../chains/')
 
 # check FoM and FoB examples here: https://arxiv.org/pdf/1810.10104
 # my_colors = ['#FAC13B', '#48849C', '#F5998E', '#BCDCDA', '#A32F28']
-my_colors = ['#8ECAE6', '#F58300', '#78206E', '#ED91DC', '#035177', '#FFDD03']
+my_colors = ['#FF7083', '#7AC011', '#18698F', "#82CFE5", '#FFDD03']
+# my_colors = ['#8ECAE6', '#F58300', '#78206E', '#ED91DC', '#035177', '#FFDD03']
 
 
 def read_last_header_line(file_path):  # from plot_posterior.py
@@ -57,7 +59,10 @@ def get_FoM(file_path, pars_name='all'):
         chain_selected_pars = chain['chain'][:, [chain['pars'].index(p) for p in pars_name]]
     cov = np.cov(chain_selected_pars, rowvar=False, aweights=chain['weights'])
     # calculate FoM
-    fom = 1 / np.sqrt(np.linalg.det(cov))
+    if len(chain_selected_pars[0]) == 1:
+        fom = 1 / np.sqrt(cov)
+    else:
+        fom = 1 / np.sqrt(np.linalg.det(cov))
     return fom
 
 def get_FoB(file_path, fiducials, pars_name='all'):
@@ -82,7 +87,10 @@ def get_FoB(file_path, fiducials, pars_name='all'):
     for i in range(len(chain_selected_pars[0])):
         delta_fid[i] = np.average(chain_selected_pars[:,i], weights=chain['weights']) - fiducials_selected_pars[i]
     # calculate FoB
-    fob = np.sqrt(np.linalg.multi_dot([delta_fid, np.linalg.inv(cov), delta_fid.T]))
+    if len(chain_selected_pars[0]) == 1:
+        fob = np.abs(delta_fid) / np.sqrt(cov)
+    else:
+        fob = np.sqrt(np.linalg.multi_dot([delta_fid, np.linalg.inv(cov), delta_fid.T]))
     return fob
 
 
@@ -132,20 +140,31 @@ fiducials = {
 'log10Mc_bc': 13.8
 }
 
-chain_files = [['chain_HEFTdata_b1model_kmax0.1_noSystematics-fcfs_03Apr.txt', 'chain_HEFTdata_b1model_kmax0.3_noSystematics_28Apr.txt', 'chain_HEFTdata_b1model_kmax0.5_noSystematics_29Apr.txt', 'chain_HEFTdata_b1model_kmax0.7_noSystematics_28Apr.txt'],  #'chain_HEFTdata_b1model_kmax0.2_noSystematics_21Apr.txt',
-               ['chain_heft_heft_kmax0.1_fixed_bs2_bLap_toZero_15May.txt', 'chain_heft_heft_kmax0.3_fixed_bs2_bLap_toZero_13May.txt', 'chain_heft_heft_kmax0.4_fixed_bs2_bLap_toZero_15May.txt', 'chain_heft_heft_kmax0.5_fixed_bs2_bLap_toZero_15May.txt', 'chain_heft_heft_kmax0.7_fixed_bs2_bLap_toZero_13May.txt'],
-               ['chain_HEFTdata_HEFTmodel_kmax0.1_noSystematics-fcfs_03Apr.txt', 'chain_HEFTdata_HEFTmodel_kmax0.3_noSystematics_28Apr.txt', 'chain_HEFTdata_HEFTmodel_kmax0.5_noSystematics_28Apr.txt', 'chain_HEFTdata_HEFTmodel_kmax0.7_noSystematics-fcfs_07Apr.txt']]
-# with SRD bias fiducials           
-chain_files = [['chain_heft_b1_kmax0.1_SRD_23Jun.txt', 'chain_heft_b1_kmax0.3_SRD_23Jun.txt', 'chain_heft_b1_kmax0.5_SRD_23Jun.txt', 'chain_heft_b1_kmax0.7_SRD_20Jun.txt'],
-                   ['chain_heft_heft_kmax0.1_SRD_fixing_bs2_bLap_toZero_19Jun.txt', 'chain_heft_heft_kmax0.3_SRD_fixing_bs2_bLap_toZero_19Jun.txt', 'chain_heft_heft_kmax0.5_SRD_fixing_bs2_bLap_toZero_19Jun.txt', 'chain_heft_heft_kmax0.7_SRD_fixing_bs2_bLap_toZero_19Jun.txt'],
-                   ['chain_heft_heft_kmax0.1_SRD_20Jun.txt', 'chain_heft_heft_kmax0.3_SRD_20Jun.txt', 'chain_heft_heft_kmax0.5_SRD_20Jun.txt', 'chain_heft_heft_kmax0.7_SRD_20Jun.txt']]
-# fixed bias varying baryons 
-chain_files = [['chain_heft_heft_kmax0.1_fixbias_7baryons_23Jun.txt', 'chain_heft_heft_kmax0.3_fixbias_7baryons_23Jun.txt', 'chain_heft_heft_kmax0.5_fixbias_7baryons_23Jun.txt', 'chain_heft_heft_kmax0.7_fixbias_7baryons_23Jun.txt'],
-               ['chain_heft_heft_kmax0.1_fixbias_logMcEtaBeta_23Jun.txt', 'chain_heft_heft_kmax0.3_fixbias_logMcEtaBeta_23Jun.txt', 'chain_heft_heft_kmax0.5_fixbias_logMcEtaBeta_23Jun.txt', 'chain_heft_heft_kmax0.7_fixbias_logMcEtaBeta_23Jun.txt'],
-               ['chain_heft_heft_kmax0.1_fixbias_logMc_23Jun.txt', 'chain_heft_heft_kmax0.3_fixbias_logMc_23Jun.txt', 'chain_heft_heft_kmax0.5_fixbias_logMc_23Jun.txt', 'chain_heft_heft_kmax0.7_fixbias_logMc_23Jun.txt']]
+# chain_files = [['chain_HEFTdata_b1model_kmax0.1_noSystematics-fcfs_03Apr.txt', 'chain_HEFTdata_b1model_kmax0.3_noSystematics_28Apr.txt', 'chain_HEFTdata_b1model_kmax0.5_noSystematics_29Apr.txt', 'chain_HEFTdata_b1model_kmax0.7_noSystematics_28Apr.txt'],  #'chain_HEFTdata_b1model_kmax0.2_noSystematics_21Apr.txt',
+#                ['chain_heft_heft_kmax0.1_fixed_bs2_bLap_toZero_15May.txt', 'chain_heft_heft_kmax0.3_fixed_bs2_bLap_toZero_13May.txt', 'chain_heft_heft_kmax0.4_fixed_bs2_bLap_toZero_15May.txt', 'chain_heft_heft_kmax0.5_fixed_bs2_bLap_toZero_15May.txt', 'chain_heft_heft_kmax0.7_fixed_bs2_bLap_toZero_13May.txt'],
+#                ['chain_HEFTdata_HEFTmodel_kmax0.1_noSystematics-fcfs_03Apr.txt', 'chain_HEFTdata_HEFTmodel_kmax0.3_noSystematics_28Apr.txt', 'chain_HEFTdata_HEFTmodel_kmax0.5_noSystematics_28Apr.txt', 'chain_HEFTdata_HEFTmodel_kmax0.7_noSystematics-fcfs_07Apr.txt']]
+# # with SRD bias fiducials           
+# chain_files = [['chain_heft_b1_kmax0.1_SRD_23Jun.txt', 'chain_heft_b1_kmax0.3_SRD_23Jun.txt', 'chain_heft_b1_kmax0.5_SRD_23Jun.txt', 'chain_heft_b1_kmax0.7_SRD_20Jun.txt'],
+#                    ['chain_heft_heft_kmax0.1_SRD_fixing_bs2_bLap_toZero_19Jun.txt', 'chain_heft_heft_kmax0.3_SRD_fixing_bs2_bLap_toZero_19Jun.txt', 'chain_heft_heft_kmax0.5_SRD_fixing_bs2_bLap_toZero_19Jun.txt', 'chain_heft_heft_kmax0.7_SRD_fixing_bs2_bLap_toZero_19Jun.txt'],
+#                    ['chain_heft_heft_kmax0.1_SRD_20Jun.txt', 'chain_heft_heft_kmax0.3_SRD_20Jun.txt', 'chain_heft_heft_kmax0.5_SRD_20Jun.txt', 'chain_heft_heft_kmax0.7_SRD_20Jun.txt']]
+# # fixed bias varying baryons 
+# chain_files = [['chain_heft_heft_kmax0.1_fixbias_7baryons_23Jun.txt', 'chain_heft_heft_kmax0.3_fixbias_7baryons_23Jun.txt', 'chain_heft_heft_kmax0.5_fixbias_7baryons_23Jun.txt', 'chain_heft_heft_kmax0.7_fixbias_7baryons_23Jun.txt'],
+#                ['chain_heft_heft_kmax0.1_fixbias_logMcEtaBeta_23Jun.txt', 'chain_heft_heft_kmax0.3_fixbias_logMcEtaBeta_23Jun.txt', 'chain_heft_heft_kmax0.5_fixbias_logMcEtaBeta_23Jun.txt', 'chain_heft_heft_kmax0.7_fixbias_logMcEtaBeta_23Jun.txt'],
+#                ['chain_heft_heft_kmax0.1_fixbias_logMc_23Jun.txt', 'chain_heft_heft_kmax0.3_fixbias_logMc_23Jun.txt', 'chain_heft_heft_kmax0.5_fixbias_logMc_23Jun.txt', 'chain_heft_heft_kmax0.7_fixbias_logMc_23Jun.txt']]
+# new extrapolation with SRD bias fiducials and negative b2 prior - b1, fix h.o., full heft
+# chain_files = [['chain_heft_b1_kmax0.1_SRD_21Jul.txt', 'chain_heft_b1_kmax0.3_SRD_21Jul.txt', 'chain_heft_b1_kmax0.5_SRD_21Jul.txt', 'chain_heft_b1_kmax0.7_SRD_21Jul.txt'],
+#                ['chain_heft_heft_kmax0.1_SRD_fix_bs2_blap_toZero_negativeb2prior_21Jul.txt', 'chain_heft_heft_kmax0.3_SRD_fix_bs2_blap_toZero_negativeb2prior_21Jul.txt', 'chain_heft_heft_kmax0.5_SRD_fix_bs2_blap_toZero_negativeb2prior_21Jul.txt', 'chain_heft_heft_kmax0.7_SRD_fix_bs2_blap_toZero_negativeb2prior_21Jul.txt'],
+#                ['chain_heft_heft_kmax0.1_SRD_negativeb2prior_21Jul.txt', 'chain_heft_heft_kmax0.3_SRD_negativeb2prior_21Jul.txt', 'chain_heft_heft_kmax0.5_SRD_negativeb2prior_21Jul.txt', 'chain_heft_heft_kmax0.7_SRD_negativeb2prior_21Jul.txt']]
+# new extrapolation with negative prior on b2 and free logMC
+chain_files = [['chain_heft_b1_kmax0.1_SRD_negativeb2prior_logMc_31Jul.txt', 'chain_heft_b1_kmax0.3_SRD_negativeb2prior_logMc_31Jul.txt', 'chain_heft_b1_kmax0.5_SRD_negativeb2prior_logMc_31Jul.txt', 'chain_heft_b1_kmax0.7_SRD_negativeb2prior_logMc_31Jul.txt'],
+               ['chain_heft_heft_kmax0.1_SRD_negativeb2prior_fix_bs2_blap_logMc_28Jul.txt', 'chain_heft_heft_kmax0.3_SRD_negativeb2prior_fix_bs2_blap_logMc_28Jul.txt', 'chain_heft_heft_kmax0.5_SRD_negativeb2prior_fix_bs2_blap_logMc_28Jul.txt', 'chain_heft_heft_kmax0.7_SRD_negativeb2prior_fix_bs2_blap_logMc_28Jul.txt'],
+               ['chain_heft_heft_kmax0.1_SRD_negativeb2prior_logMc_28Jul.txt', 'chain_heft_heft_kmax0.3_SRD_negativeb2prior_logMc_28Jul.txt', 'chain_heft_heft_kmax0.5_SRD_negativeb2prior_logMc_28Jul.txt', 'chain_heft_heft_kmax0.7_SRD_negativeb2prior_logMc_25Jul.txt'],]
 
-name_save = 'baryons_fixed_bias'
+neutrino_chains = [['chain_heft_heft_kmax0.1_SRD_negativeb2prior_fix_bs2_blap_with_logMc_Mnu_w0wa_29Jul.txt', 'chain_heft_heft_kmax0.3_SRD_negativeb2prior_fix_bs2_blap_with_logMc_Mnu_w0wa_29Jul.txt', 'chain_heft_heft_kmax0.5_SRD_negativeb2prior_fix_bs2_blap_with_logMc_Mnu_w0wa_29Jul.txt', 'chain_heft_heft_kmax0.7_SRD_negativeb2prior_fix_bs2_blap_with_logMc_Mnu_w0wa_28Jul.txt'],]
 
+name_save = 'b1_fix_bs2_blap_logMc'
+
+print('------ Omegam, sigma8 -------')
 fom_Omegam_sigma8 = np.zeros((len(chain_files), len(chain_files[0])))
 fob_Omegam_sigma8 = np.zeros((len(chain_files), len(chain_files[0])))
 # calculate FoM for Omega_m and sigma8  
@@ -153,29 +172,70 @@ for i in range(len(chain_files)):
     for j in range(len(chain_files[i])):
         fom_Omegam_sigma8[i,j] = get_FoM(chain_files[i][j], ['Omega_m', 'sigma8_cb'])
         fob_Omegam_sigma8[i,j] = get_FoB(chain_files[i][j], {'Omega_m':0.31, 'sigma8_cb':0.83}, ['Omega_m', 'sigma8_cb'])
-    print(fom_Omegam_sigma8[i])
+    print('FoM: ', fom_Omegam_sigma8[i])
+    print('FoB: ', fob_Omegam_sigma8[i])
+
+print('-------- neutrinos ----------')
+fom_neutrinos = np.zeros((len(neutrino_chains), len(neutrino_chains[0])))
+fob_neutrinos = np.zeros((len(neutrino_chains), len(neutrino_chains[0])))
+# calculate FoM for Omega_m and sigma8  
+for i in range(len(neutrino_chains)):
+    for j in range(len(neutrino_chains[i])):
+        fom_neutrinos[i,j] = get_FoM(neutrino_chains[i][j], ['Mnu'])
+        fob_neutrinos[i,j] = get_FoB(neutrino_chains[i][j], {'Mnu':0.06}, ['Mnu'])
+    print('FoM: ', fom_neutrinos[i])
+    print('FoB: ', fob_neutrinos[i])
+
+
+fig, ax = plt.subplots(2, 1, figsize=(7, 7), sharex=True)
+ax[0].plot([0.1, 0.3, 0.5, 0.7], fom_neutrinos[0], 'o-', color=my_colors[0])
+ax[0].set_ylabel(r'FoM $(M_\nu)$')
+ax[1].plot([0.1, 0.3, 0.5, 0.7], fob_neutrinos[0], 'o-', color=my_colors[0], label='logMc, w0wa, heft with fixed bs2 and blap') 
+ax[1].axhspan(0, 1., facecolor='grey', alpha=0.1)
+ax[1].axhspan(0, 2., facecolor='grey', alpha=0.1)
+ax[1].set_xlim(0.09, 0.71)
+ax[1].set_ylim(-0.1, 3)
+ax[1].set_xlabel(r'$k_{\rm max}\, h/$Mpc')
+ax[1].set_ylabel(r'FoB $(M_\nu)$')
+ax[1].legend(loc='upper left')
+fig.tight_layout()
+plt.savefig(folder + '/../figs/other/FoM_FoB_neutrinos.png', bbox_inches='tight', pad_inches=0.2)
 
 
 fig, ax = plt.subplots(2, 1, figsize=(7, 7), sharex=True)
 ax[0].plot([0.1, 0.3, 0.5, 0.7], fom_Omegam_sigma8[0], 'o-', color=my_colors[0])
 ax[0].plot([0.1, 0.3, 0.5, 0.7], fom_Omegam_sigma8[1], 'o-', color=my_colors[1])
 ax[0].plot([0.1, 0.3, 0.5, 0.7], fom_Omegam_sigma8[2], 'o-', color=my_colors[2])
-# ax[0].set_ylim(1.6e5, 3.3e5)
-ax[0].set_ylabel(r'FoM $(\Omega_m,\sigma_8)$ ')
-# ax[0].set_yscale('log')
+ax[0].set_ylabel(r'FoM $(\Omega_m,\sigma_8)$', fontsize=15)
+# Set scientific notation for ax[0] y-axis
+ax[0].yaxis.set_major_formatter(ScalarFormatter(useMathText=True))
+ax[0].ticklabel_format(style='sci', axis='y', scilimits=(0,0))
+ax[0].tick_params(labelsize=15)
 #
-ax[1].plot([0.1, 0.3, 0.5, 0.7], fob_Omegam_sigma8[0], 'o-', color=my_colors[0], label='all 7 parameters')  #label=r'HEFT data, linear bias model')
-ax[1].plot([0.1, 0.3, 0.5, 0.7], fob_Omegam_sigma8[1], 'o-', color=my_colors[1], label=r'log$M_C$, log$\eta$, log$\beta$')  #label=r'HEFT data, HEFT model, fixed $b_{s^2}=0$ and $b_{\nabla^2}=0$')
-ax[1].plot([0.1, 0.3, 0.5, 0.7], fob_Omegam_sigma8[2], 'o-', color=my_colors[2], label=r'log$M_C$')  #label=r'HEFT data, HEFT model')
-ax[1].axhspan(0, 1.52, facecolor='grey', alpha=0.1)
-ax[1].axhspan(0, 2.49, facecolor='grey', alpha=0.1)
+# ax[1].grid(color='gray', alpha=0.1)
+ax[1].plot([0.1, 0.3, 0.5, 0.7], fob_Omegam_sigma8[0], 'o-', color=my_colors[0], label=r'Linear bias')
+ax[1].plot([0.1, 0.3, 0.5, 0.7], fob_Omegam_sigma8[1], 'o-', color=my_colors[1], label=r'HEFT with fixed $b_{s^2}=b_{\nabla^2}=0$')
+ax[1].plot([0.1, 0.3, 0.5, 0.7], fob_Omegam_sigma8[2], 'o-', color=my_colors[2], label=r'HEFT')
+ax[1].axhspan(0, 1.52, facecolor='gray', alpha=0.1)
+ax[1].axhspan(0, 2.49, facecolor='gray', alpha=0.1)
 ax[1].set_xlim(0.09, 0.71)
-# ax[1].set_ylim(-0.2, 15)
-ax[1].set_xlabel(r'$k_{\rm max}$')
-ax[1].set_ylabel(r'FoB ($N_\sigma$)')
-ax[1].legend(loc='upper left')
-# ax[1].set_xticks(range(len(chain_files[0])), ['0.1', '0.7'])
+ax[1].set_xlabel(r'$k_{\rm max}\, [h/$Mpc]', fontsize=15)
+ax[1].set_ylabel(r'FoB $(\Omega_m,\sigma_8)$', fontsize=15)
+ax[1].tick_params(labelsize=15)
+ax[1].legend(loc='upper left', fontsize=13)
+fig.suptitle(r'Baryonic feedback (free log$M_{\rm C}$)', fontsize=15)
 fig.tight_layout()
-# fig.suptitle(r'$\Omega_m$ and $\sigma_8$ FoM and FoB')
-# plt.subplots_adjust(hspace=0)
-plt.savefig('/home/s2561233/Documents/lss/nonlinear-bias-3x2-MG/new-MGlensing/MGlensing/figs/other/FoM_FoB_' + name_save + '.png', transparent=False)
+plt.savefig(folder + '/../figs/other/FoM_FoB_' + name_save + '.png', bbox_inches='tight', pad_inches=0.2)
+
+
+
+# ------------ #
+# FoM steepness
+# ------------ #
+plt.figure(figsize=(7,4))
+plt.plot([0.1, 0.3, 0.5, 0.7], fom_Omegam_sigma8[0]/np.linalg.norm(fom_Omegam_sigma8[0]), 'o-', color=my_colors[1], label='Omegam, sigma8 (free logMc, fix h.o. bias)')
+plt.plot([0.1, 0.3, 0.5, 0.7], fom_neutrinos[0]/np.linalg.norm(fom_neutrinos[0]), 'o-', color=my_colors[2], label='Mnu (free logMc, w0wa, fix h.o. bias)')
+plt.ylabel(r'normalized FoM')
+plt.xlabel(r'$k_{\rm max}$')
+plt.legend()
+plt.savefig(folder + '/../figs/other/FoM_omegam_sigma8_vs_Mnu_steepness.png', bbox_inches='tight', pad_inches=0.2)
