@@ -466,7 +466,7 @@ class LSSTSetUp:
         
         if survey_info == 'LSST_Y1':
             self.fsky = 0.43 #0.5
-            self.gal_per_sqarcmn = 20.0
+            #self.gal_per_sqarcmn = 20.0
             self.gal_per_sqarcmn_s = 10.0
             self.gal_per_sqarcmn_l = 18.0
             self.rms_shear = 0.26
@@ -475,9 +475,20 @@ class LSSTSetUp:
             self.z_bin_center_s = np.array([2.253273944137912099e-01, 4.490567958326107112e-01, 6.545664037512012312e-01, 9.258332934738261466e-01, 1.590547464182611836e+00]) #from DESC github
             self.z_bin_center_l = np.array([3.083232685515536753e-01, 5.011373846158426737e-01, 6.981257392184466726e-01, 8.964730913147888058e-01, 1.095412294727920344e+00])  #from DESC github
         elif survey_info == 'LSST_Y10': 
-            raise NotImplementedError('LSST_Y10 is not implemented yet')  
+            self.fsky = 0.43 #0.5
+            #self.gal_per_sqarcmn = 20.0
+            self.gal_per_sqarcmn_s = 27.0
+            self.gal_per_sqarcmn_l = 48.0
+            self.rms_shear = 0.26
+            # CHANGE THIS TO DIFFER BETWEEN S AND L
+            self.nbin = 10 
+            self.z_bin_center_s = np.array([0.3093, 0.589, 0.8671, 1.241, 2.0528]) #from DESC github
+            self.z_bin_center_l = np.array([0.2627, 0.3587, 0.4563, 0.5547, 0.6534, 0.7522, 0.8513, 0.9504, 1.0495, 1.1486])  #from DESC github
+            # WARNINNG NOT A SACC FILE
+            nz_sacc_file = dirname+'/forecast_fid_y10.sacc'
         # normalized galaxy distribution and noise
         self.eta_z_s, self.eta_z_l = self.get_norm_galaxy_distrib(nz_sacc_file) 
+        # WARNINRG: taking a maximum value of n(z) and not W(z): fine for galazy clustering but very wrong for weak lensing
         zz_mod_wl = [self.zz_integr[np.argmax(self.eta_z_s[:, i])] for i in range (self.nbin)]
         zz_mod_gg = [self.zz_integr[np.argmax(self.eta_z_l[:, i])] for i in range (self.nbin)]
         n_bar = get_noise(self.nbin, self.gal_per_sqarcmn)
