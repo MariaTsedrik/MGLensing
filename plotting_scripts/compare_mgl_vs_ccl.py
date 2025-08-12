@@ -114,7 +114,7 @@ f_inv_arr = [ell2k, ell2k1, ell2k2]
 # ------------------------- #
 MGL = MGLensing.MGL("config_ccl_comparison.yaml")
 zz = MGL.Survey.zz_integr
-nbin = MGL.Survey.nbin
+nbin = MGL.Survey.nbin_s
 
 
 l_wl_max, l_gc_max = MGL.Survey.ells_wl_max, MGL.Survey.ells_gc_max

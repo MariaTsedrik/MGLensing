@@ -70,46 +70,53 @@ def check_zmax(zmax, emu_obj):
     if zmax > emu_z_max:
         raise ValueError(f'Survey z_max must not exceed zz_max in the power spectrum computation for {emu_obj.emu_name}!')
 
-def compute_spline(c_ell, binned_ell, nbin):
-    spline_c_ell = np.empty((nbin, nbin), dtype=(list, 3))
+def compute_spline(c_ell, binned_ell, nbin1, nbin2):
+    spline_c_ell = np.empty((nbin1, nbin2), dtype=(list, 3))
     # create an interpolator at the binned ells
-    for bin1 in range(nbin):
-        for bin2 in range(nbin):
+    for bin1 in range(nbin1):
+        for bin2 in range(nbin2):
             spline_c_ell[bin1, bin2] = list(itp.splrep(
                 binned_ell[:], c_ell[:, bin1, bin2]))    
     return spline_c_ell        
 
-def build_data_matrix(c_ell, binned_ell, all_int_ell, nbin):
+def build_data_matrix(c_ell, binned_ell, all_int_ell, nbin1, nbin2):
     # create an interpolator at the binned ells
-    spline_c_ell = compute_spline(c_ell, binned_ell, nbin)
-    cov_theory = np.zeros((len(all_int_ell), nbin, nbin), 'float64')
+    spline_c_ell = compute_spline(c_ell, binned_ell, nbin1, nbin2)
+    cov_theory = np.zeros((len(all_int_ell), nbin1, nbin2), 'float64')
     # interpolate at all integer values of ell
-    for bin1 in range(nbin):
-        for bin2 in range(nbin):
+    for bin1 in range(nbin1):
+        for bin2 in range(nbin2):
             cov_theory[:, bin1, bin2] = itp.splev(all_int_ell[:], spline_c_ell[bin1, bin2])
     return cov_theory  
 
 def build_data_matrix_3x2pt(cl_ll, cl_gg, cl_lg, cl_gl,  binned_ell_wl, binned_ell_gc, binned_ell_xc, 
-                            all_int_ell_wl, all_int_ell_gc, ell_jump, nbin):
+                            all_int_ell_wl, all_int_ell_gc, ell_jump, nbin_s, nbin_l):
     # create an interpolator at the binned ells
-    spline_ll = compute_spline(cl_ll, binned_ell_wl, nbin)
-    spline_gg = compute_spline(cl_gg, binned_ell_gc, nbin)
-    spline_lg = compute_spline(cl_lg, binned_ell_xc, nbin)
-    spline_gl = compute_spline(cl_gl, binned_ell_xc, nbin)
-    cov_theory = np.zeros((len(all_int_ell_gc), 2 * nbin, 2 * nbin), 'float64')
-    cov_theory_high = np.zeros(((len(all_int_ell_wl) - ell_jump), nbin, nbin), 'float64')  
-    for bin1 in range(nbin):
-        for bin2 in range(nbin):
+    spline_ll = compute_spline(cl_ll, binned_ell_wl, nbin_s, nbin_s)
+    spline_gg = compute_spline(cl_gg, binned_ell_gc, nbin_l, nbin_l)
+    spline_lg = compute_spline(cl_lg, binned_ell_xc, nbin_s, nbin_l)
+    spline_gl = compute_spline(cl_gl, binned_ell_xc, nbin_l, nbin_s)
+    cov_theory = np.zeros((len(all_int_ell_gc), nbin_s+nbin_l, nbin_s+nbin_l), 'float64')
+    cov_theory_high = np.zeros(((len(all_int_ell_wl) - ell_jump), nbin_s, nbin_s), 'float64')  
+    for bin1 in range(nbin_s):
+        for bin2 in range(nbin_s):
             cov_theory[:, bin1, bin2] = itp.splev(
                 all_int_ell_gc[:], spline_ll[bin1, bin2])
-            cov_theory[:, nbin + bin1, bin2] = itp.splev(
-                all_int_ell_gc[:], spline_gl[bin1, bin2])
-            cov_theory[:, bin1, nbin + bin2] = itp.splev(
-                all_int_ell_gc[:], spline_lg[bin1, bin2])
-            cov_theory[:, nbin + bin1, nbin + bin2] = itp.splev(
-                all_int_ell_gc[:], spline_gg[bin1, bin2])
             cov_theory_high[:, bin1, bin2] = itp.splev(
-                all_int_ell_wl[ell_jump:], spline_ll[bin1, bin2])           
+                all_int_ell_wl[ell_jump:], spline_ll[bin1, bin2])  
+    for bin1 in range(nbin_l):
+        for bin2 in range(nbin_l):
+            cov_theory[:, nbin_s + bin1, nbin_s + bin2] = itp.splev(
+                all_int_ell_gc[:], spline_gg[bin1, bin2])
+    for bin1 in range(nbin_s):
+        for bin2 in range(nbin_l):
+            cov_theory[:, bin1, nbin_s + bin2] = itp.splev(
+                all_int_ell_gc[:], spline_lg[bin1, bin2]) 
+    for bin1 in range(nbin_l):
+        for bin2 in range(nbin_s):        
+            cov_theory[:, nbin_l + bin1, bin2] = itp.splev(
+                all_int_ell_gc[:], spline_gl[bin1, bin2])
+                 
     return cov_theory, cov_theory_high
 
 #flag_test_heft_new_extrap = True
@@ -272,7 +279,7 @@ class Theory:
 
         # assign photo-z model
         photoz_err_models = {
-            PHOTOZ_NONE: lambda nz, deltas: nz,
+            PHOTOZ_NONE: lambda nz, deltas, bins: nz,
             PHOTOZ_ADD: self.get_add_photoz_error,
             PHOTOZ_MULT: self.get_mult_photoz_error
         }
@@ -556,7 +563,7 @@ class Theory:
         k_grid =(self.Survey.ell[:,None]+0.5)/r_z_grid
         return e_z_grid, r_z_grid, k_grid
     
-    def get_add_photoz_error(self, nz, deltaz):
+    def get_add_photoz_error(self, nz, deltaz, nbin):
         """
         Additative photo-z error to the redshift distribution of galaxies:
         :math:`n(z')=n(z+\delta_z)`.
@@ -573,8 +580,8 @@ class Theory:
         nz_biased : numpy.ndarray
             The biased redshift distribution of galaxies after applying the additive photo-z error.
         """
-        nz_biased = np.zeros((len(self.Survey.zz_integr), self.Survey.nbin))
-        for i in range(self.Survey.nbin):
+        nz_biased = np.zeros((len(self.Survey.zz_integr), nbin))
+        for i in range(nbin):
             f = itp.interp1d(self.Survey.zz_integr, nz[:,i], fill_value=0.0, bounds_error=False)
             # additive mode
             nz_biased[:,i] = f(self.Survey.zz_integr - deltaz[i])
@@ -582,7 +589,7 @@ class Theory:
             nz_biased[:,i] /= np.trapz(nz_biased[:,i], self.Survey.zz_integr)
         return nz_biased
     
-    def get_mult_photoz_error(self, nz, deltaz):
+    def get_mult_photoz_error(self, nz, deltaz, nbin):
         """
         Multiplicative photo-z error to the redshift distribution of galaxies:
         :math:`n(z')=n(z(1+\delta_z))`.
@@ -599,8 +606,8 @@ class Theory:
         nz_biased : numpy.ndarray
             The biased redshift distribution of galaxies after applying the multiplicative photo-z error.
         """
-        nz_biased = np.zeros((len(self.Survey.zz_integr), self.Survey.nbin))
-        for i in range(self.Survey.nbin):
+        nz_biased = np.zeros((len(self.Survey.zz_integr), nbin))
+        for i in range(nbin):
             f = itp.interp1d(self.Survey.zz_integr, nz[:,i], fill_value=0.0, bounds_error=False)
             # multiplicative mode
             nz_biased[:,i] = f(self.Survey.zz_integr * (1 - deltaz[i]))
@@ -775,7 +782,7 @@ class Theory:
         omega_m = params_dic['Omega_m']
         # can be later changed 
         #deltas = np.array([params_dic['deltaz_'+str(i+1)] for i in range(self.Survey.nbin)])
-        eta_z_s =  self.get_n_of_z(self.Survey.eta_z_s, self.deltaz_s)
+        eta_z_s =  self.get_n_of_z(self.Survey.eta_z_s, self.deltaz_s, self.Survey.nbin_s)
         
         # in the integrand dimensions are (bin_i, zz_integr, zz_integr)
         integrand = 3./2.*H0_h_c**2. * omega_m * self.rz[None,:,None]*(1.+self.Survey.zz_integr[None,:,None])*eta_z_s.T[:,None,:]*(1.-self.rz[None,:,None]/self.rz[None,None,:])
@@ -815,7 +822,7 @@ class Theory:
             intrinsic alignment kernel.
         """
         # dimension (ell, zz_integr, bin_i)
-        eta_z_s =  self.get_n_of_z(self.Survey.eta_z_s, self.deltaz_s)
+        eta_z_s =  self.get_n_of_z(self.Survey.eta_z_s, self.deltaz_s, self.Survey.nbin_s)
         w_ia = eta_z_s[None, :, :] * self.ez[None, :,None] * H0_h_c 
         return w_ia
     
@@ -852,7 +859,7 @@ class Theory:
         # integrate along the z_integr-direction
         cl_ll = simpson(cl_ll_int, self.Survey.zz_integr, axis=1)[:self.Survey.nell_wl, :, :] #trapezoid(cl_ll_int, self.Survey.zz_integr, axis=1)[:self.Survey.nell_wl, :, :]
         # add noise to the auto-correlated bins
-        for i in range(self.Survey.nbin):
+        for i in range(self.Survey.nbin_s):
             cl_ll[:, i, i] += self.Survey.noise['LL']
         return cl_ll
     
@@ -874,7 +881,7 @@ class Theory:
             matter_power_spectrum=bemu_nl
         )
         bias_ia = params_dic['a1_IA'] * (1. + self.Survey.zz_integr) ** params_dic['eta1_IA'] * 0.0134 / 0.01387684609
-        nbin = self.Survey.nbin
+        nbin = self.Survey.nbin_s
         n_ell = len(self.Survey.ell)
         cl_ll = np.zeros((n_ell, nbin, nbin))
 
@@ -929,7 +936,7 @@ class Theory:
         pgg : numpy.ndarray
             The galaxy-galaxy power spectrum.
         """
-        bias1 = np.array([params_dic['b1_'+str(i+1)] for i in range(self.Survey.nbin)])
+        bias1 = np.array([params_dic['b1_'+str(i+1)] for i in range(self.Survey.nbin_l)])
         # return dimension (lbin, z_integr, bin_i, bin_j)
         pgg = bias1[None, None, :, None] * bias1[None, None, None, :] * self.pmm[:,:,None, None]
         return pgg
@@ -948,8 +955,8 @@ class Theory:
         pgm : numpy.ndarray
             The galaxy-galaxy power spectrum.
         """
-        bias1 = np.array([params_dic['b1_'+str(i+1)] for i in range(self.Survey.nbin)])
-        bias2 = np.array([params_dic['b2_'+str(i+1)] for i in range(self.Survey.nbin)])  
+        bias1 = np.array([params_dic['b1_'+str(i+1)] for i in range(self.Survey.nbin_l)])
+        bias2 = np.array([params_dic['b2_'+str(i+1)] for i in range(self.Survey.nbin_l)])  
         # return dimension (lbin, z_integr, bin_i, bin_j)
         pgg = ( bias1[None, None,:, None] + bias2[None, None, :, None] * self.k[:, :, None, None]**2 ) * \
               ( bias1[None, None, None, :] + bias2[None, None, None, :] * self.k[:, :, None, None]**2 ) * self.pmm[:,:,None,None]
@@ -969,7 +976,7 @@ class Theory:
         pgm : numpy.ndarray
             The matter-galaxy power spectrum.
         """
-        bias1 = np.array([params_dic['b1_'+str(i+1)] for i in range(self.Survey.nbin)])
+        bias1 = np.array([params_dic['b1_'+str(i+1)] for i in range(self.Survey.nbin_l)])
         # return dimension (lbin, z_integr, bin_i)
         pgm = bias1[None, None, :] * self.pmm[:,:,None]
         return pgm
@@ -988,8 +995,8 @@ class Theory:
         pgm : numpy.ndarray
             The matter-galaxy power spectrum.
         """
-        bias1 = np.array([params_dic['b1_'+str(i+1)] for i in range(self.Survey.nbin)])
-        bias2 = np.array([params_dic['b2_'+str(i+1)] for i in range(self.Survey.nbin)])  
+        bias1 = np.array([params_dic['b1_'+str(i+1)] for i in range(self.Survey.nbin_l)])
+        bias2 = np.array([params_dic['b2_'+str(i+1)] for i in range(self.Survey.nbin_l)])  
         # return dimension (lbin, z_integr, bin_i)
         pgm = ( bias1[None, None,:] + bias2[None, None, :] * self.k[:, :, None]**2 ) * self.pmm[:,:,None]
         return pgm
@@ -1010,7 +1017,7 @@ class Theory:
         pgg : numpy.ndarray
             The galaxy-galaxy power spectrum.
         """
-        pgg = self.BaccoEmuClass.get_heft_pgg_zextr_lin(params_dic, self.k, self.Survey.lbin, self.Survey.zz_integr, self.Survey.nbin, 
+        pgg = self.BaccoEmuClass.get_heft_pgg_zextr_lin(params_dic, self.k, self.Survey.lbin, self.Survey.zz_integr, self.Survey.nbin_l, 
                                                         self.flag_sample_bheftsigma8, self.flag_extrap_k_const)
         # return dimension (lbin, z_integr, bin_i, bin_j)
         return pgg
@@ -1029,7 +1036,7 @@ class Theory:
         pgg : numpy.ndarray
             The galaxy-galaxy power spectrum.
         """
-        pgg = self.BaccoEmuClass.get_heft_nl_pgg_zextr_lin(params_dic, self.k, self.Survey.lbin, self.Survey.zz_integr, self.Survey.nbin, 
+        pgg = self.BaccoEmuClass.get_heft_nl_pgg_zextr_lin(params_dic, self.k, self.Survey.lbin, self.Survey.zz_integr, self.Survey.nbin_l, 
                                                            self.flag_heft_pnl_bar, self.flag_sample_bheftsigma8, self.flag_extrap_k_const)
         # return dimension (lbin, z_integr, bin_i, bin_j)
         return pgg
@@ -1048,7 +1055,7 @@ class Theory:
         pgm : numpy.ndarray
             The matter-galaxy power spectrum.
         """
-        pgm = self.BaccoEmuClass.get_heft_pgm_zextr_lin(params_dic, self.k, self.Survey.lbin, self.Survey.zz_integr, self.Survey.nbin,
+        pgm = self.BaccoEmuClass.get_heft_pgm_zextr_lin(params_dic, self.k, self.Survey.lbin, self.Survey.zz_integr, self.Survey.nbin_l,
                                                         self.flag_sample_bheftsigma8, self.flag_extrap_k_const)
         # return dimension (lbin, z_integr, bin_i)
         return pgm
@@ -1067,7 +1074,7 @@ class Theory:
         pgm : numpy.ndarray
             The matter-galaxy power spectrum.
         """
-        pgm = self.BaccoEmuClass.get_heft_nl_pgm_zextr_lin(params_dic, self.k, self.Survey.lbin, self.Survey.zz_integr, self.Survey.nbin, 
+        pgm = self.BaccoEmuClass.get_heft_nl_pgm_zextr_lin(params_dic, self.k, self.Survey.lbin, self.Survey.zz_integr, self.Survey.nbin_l, 
                                                            self.flag_heft_pnl_bar, self.flag_sample_bheftsigma8, self.flag_extrap_k_const)
         # return dimension (lbin, z_integr, bin_i)
         return pgm
@@ -1091,8 +1098,8 @@ class Theory:
         numpy.ndarray
             The galaxy-galaxy lensing kernel with shape (1, zbin_integr, nbin).
         """
-        eta_z_l = self.get_n_of_z(self.Survey.eta_z_l, self.deltaz_l) 
-        w_g = np.zeros((self.Survey.zbin_integr, self.Survey.nbin), 'float64')
+        eta_z_l = self.get_n_of_z(self.Survey.eta_z_l, self.deltaz_l, self.Survey.nbin_l) 
+        w_g = np.zeros((self.Survey.zbin_integr, self.Survey.nbin_l), 'float64')
         w_g = self.ez[:, None] * H0_h_c * eta_z_l
         # add an extra dimension, now (ell, z_integr, bin_i)
         w_g = w_g[None, :, :]
@@ -1122,7 +1129,7 @@ class Theory:
         # integrate along the z_integr direction
         cl_gg = trapezoid(cl_gg_int, self.Survey.zz_integr, axis=1)[:self.Survey.nell_gc, :, :] #simpson(cl_gg_int, self.Survey.zz_integr, axis=1)[:self.Survey.nell_gc, :, :] 
         # add noise
-        for i in range(self.Survey.nbin):
+        for i in range(self.Survey.nbin_l):
             cl_gg[:, i, i] += self.Survey.noise['GG']
         return cl_gg 
     
@@ -1143,7 +1150,7 @@ class Theory:
             transfer_function='boltzmann_camb',
             matter_power_spectrum=bemu_nl
         )
-        nbin = self.Survey.nbin
+        nbin = self.Survey.nbin_l
         n_ell = len(self.Survey.ell)
         cl_gg = np.zeros((n_ell, nbin, nbin))
 
@@ -1236,7 +1243,7 @@ class Theory:
         numpy.ndarray
             The galaxy-intrinsic alignment power spectrum for the TATT model.
         """
-        bias1 = np.array([params_dic['b1_'+str(i+1)] for i in range(self.Survey.nbin)])
+        bias1 = np.array([params_dic['b1_'+str(i+1)] for i in range(self.Survey.nbin_l)])
         # return dimension (lbin, z_integr, bin_i)
         # if ia dependens on the photo-z bin
         # then change to bias1[None, None, None, :]*pk_delta_ia[:, :, :, None]
@@ -1301,31 +1308,43 @@ class Theory:
             matter_power_spectrum=bemu_nl
         )
         bias_ia = params_dic['a1_IA'] * (1. + self.Survey.zz_integr) ** params_dic['eta1_IA'] * 0.0134 / 0.01387684609
-        nbin = self.Survey.nbin
+        nbin_s = self.Survey.nbin_s
+        nbin_l = self.Survey.nbin_l
         n_ell = len(self.Survey.ell)
-        cl_ll = np.zeros((n_ell, nbin, nbin))
-        cl_gg = np.zeros((n_ell, nbin, nbin))
-        cl_lg = np.zeros((n_ell, nbin, nbin))
-        cl_gl = np.zeros((n_ell, nbin, nbin))
+        cl_ll = np.zeros((n_ell, nbin_s, nbin_s))
+        cl_gg = np.zeros((n_ell, nbin_l, nbin_l))
+        cl_lg = np.zeros((n_ell, nbin_s, nbin_l))
+        cl_gl = np.zeros((n_ell, nbin_l, nbin_s))
 
         if self.flag_blinear:
-            b1_arr = np.array([params_dic[f'b1_{i+1}'] for i in range(nbin)])
-            for i in range(nbin):
+            b1_arr = np.array([params_dic[f'b1_{i+1}'] for i in range(nbin_l)])
+            for i in range(nbin_l):
                 bias_g_i = np.ones_like(self.Survey.zz_integr) * b1_arr[i]
                 t_g_i = ccl.NumberCountsTracer(cosmo_nl, has_rsd=False, dndz=(self.Survey.zz_integr, self.Survey.eta_z_l[:, i]), 
                                                bias=(self.Survey.zz_integr, bias_g_i), mag_bias=None)
-                t_l_i = ccl.WeakLensingTracer(cosmo_nl, dndz=(self.Survey.zz_integr, self.Survey.eta_z_s[:, i]),
-                                              ia_bias=(self.Survey.zz_integr, bias_ia))
-                for j in range(nbin):
+                for j in range(nbin_l):
                     bias_g_j = np.ones_like(self.Survey.zz_integr) * b1_arr[j]
                     t_g_j = ccl.NumberCountsTracer(cosmo_nl, has_rsd=False, dndz=(self.Survey.zz_integr, self.Survey.eta_z_l[:, j]),
                                                    bias=(self.Survey.zz_integr, bias_g_j), mag_bias=None)
+                    cl_gg[:, i, j] = ccl.angular_cl(cosmo_nl, t_g_i, t_g_j, self.Survey.l_gc)
+                for k in range(nbin_s):
+                    t_l_k = ccl.WeakLensingTracer(cosmo_nl, dndz=(self.Survey.zz_integr, self.Survey.eta_z_s[:, k]),
+                                                  ia_bias=(self.Survey.zz_integr, bias_ia))
+                    cl_gl[:, i, k] = ccl.angular_cl(cosmo_nl, t_g_i, t_l_k, self.Survey.l_xc)
+            
+            for i in range(nbin_s):    
+                t_l_i = ccl.WeakLensingTracer(cosmo_nl, dndz=(self.Survey.zz_integr, self.Survey.eta_z_s[:, i]),
+                                              ia_bias=(self.Survey.zz_integr, bias_ia))
+                for j in range(nbin_s):   
                     t_l_j = ccl.WeakLensingTracer(cosmo_nl, dndz=(self.Survey.zz_integr, self.Survey.eta_z_s[:, j]),
                                                   ia_bias=(self.Survey.zz_integr, bias_ia))
                     cl_ll[:, i, j] = ccl.angular_cl(cosmo_nl, t_l_i, t_l_j, self.Survey.l_wl)
-                    cl_gg[:, i, j] = ccl.angular_cl(cosmo_nl, t_g_i, t_g_j, self.Survey.l_gc)
-                    cl_lg[:, i, j] = ccl.angular_cl(cosmo_nl, t_l_i, t_g_j, self.Survey.l_xc)
-                    cl_gl[:, i, j] = ccl.angular_cl(cosmo_nl, t_g_i, t_l_j, self.Survey.l_xc)
+                for k in range(nbin_l):
+                    bias_g_k = np.ones_like(self.Survey.zz_integr) * b1_arr[k]
+                    t_g_k = ccl.NumberCountsTracer(cosmo_nl, has_rsd=False, dndz=(self.Survey.zz_integr, self.Survey.eta_z_l[:, k]),
+                                                   bias=(self.Survey.zz_integr, bias_g_k), mag_bias=None)
+                    cl_lg[:, i, k] = ccl.angular_cl(cosmo_nl, t_l_i, t_g_k, self.Survey.l_xc)
+
 
         elif self.flag_heft_original:
             min_k = np.log10(2.e-4 * params_dic['h'])
@@ -1334,52 +1353,67 @@ class Theory:
                 cosmo=cosmo_nl, log10k_min=min_k, log10k_max=max_k, nk_per_decade=20
             )
             heft.update_ingredients(cosmo_nl)
-            b1L = np.array([params_dic[f'b1L_{i+1}'] + 1 for i in range(nbin)])
-            b2L = np.array([params_dic[f'b2L_{i+1}'] * 2 for i in range(nbin)])
-            bs2 = np.array([params_dic[f'bs2L_{i+1}'] * 2 for i in range(nbin)])
-            bLap = np.array([params_dic[f'blaplL_{i+1}'] * 2 for i in range(nbin)])
-            pk_gg = [[None for _ in range(nbin)] for _ in range(nbin)]
-            pk_lg = [[None for _ in range(nbin)] for _ in range(nbin)]
-            pk_gl = [[None for _ in range(nbin)] for _ in range(nbin)]
-            for i in range(nbin):
-                for j in range(nbin):
-                    ptt_g_i = ccl.nl_pt.PTNumberCountsTracer(b1=(self.Survey.zz_integr, b1L[i] * np.ones(len(self.Survey.zz_integr))), b2=(self.Survey.zz_integr, b2L[i] * np.ones(len(self.Survey.zz_integr))),
-                                                             bs=(self.Survey.zz_integr, bs2[i] * np.ones(len(self.Survey.zz_integr))), bk2=(self.Survey.zz_integr, bLap[i] * np.ones(len(self.Survey.zz_integr))))
+            b1L = np.array([params_dic[f'b1L_{i+1}'] + 1 for i in range(nbin_l)])
+            b2L = np.array([params_dic[f'b2L_{i+1}'] * 2 for i in range(nbin_l)])
+            bs2 = np.array([params_dic[f'bs2L_{i+1}'] * 2 for i in range(nbin_l)])
+            bLap = np.array([params_dic[f'blaplL_{i+1}'] * 2 for i in range(nbin_l)])
+            pk_gg = [[None for _ in range(nbin_l)] for _ in range(nbin_l)]
+            #pk_lg = [[None for _ in range(nbin_s)] for _ in range(nbin_l)]
+            pk_gl = [[None for _ in range(nbin_l)] for _ in range(nbin_s)]
+            for i in range(nbin_l):
+                #ptt_l_i = ccl.nl_pt.PTMatterTracer()
+                ptt_g_i = ccl.nl_pt.PTNumberCountsTracer(b1=(self.Survey.zz_integr, b1L[i] * np.ones(len(self.Survey.zz_integr))), b2=(self.Survey.zz_integr, b2L[i] * np.ones(len(self.Survey.zz_integr))),
+                                            bs=(self.Survey.zz_integr, bs2[i] * np.ones(len(self.Survey.zz_integr))), bk2=(self.Survey.zz_integr, bLap[i] * np.ones(len(self.Survey.zz_integr))))
+                for j in range(nbin_l):
                     ptt_g_j = ccl.nl_pt.PTNumberCountsTracer(b1=(self.Survey.zz_integr, b1L[j] * np.ones(len(self.Survey.zz_integr))), b2=(self.Survey.zz_integr, b2L[j] * np.ones(len(self.Survey.zz_integr))),
                                                              bs=(self.Survey.zz_integr, bs2[j] * np.ones(len(self.Survey.zz_integr))), bk2=(self.Survey.zz_integr, bLap[j] * np.ones(len(self.Survey.zz_integr))))
-                    ptt_l_i = ccl.nl_pt.PTMatterTracer()
-                    ptt_l_j = ccl.nl_pt.PTMatterTracer()
                     pk_gg[i][j] = heft.get_biased_pk2d(tracer1=ptt_g_i, tracer2=ptt_g_j)
-                    pk_lg[i][j] = heft.get_biased_pk2d(tracer1=ptt_l_i, tracer2=ptt_g_j)
-                    pk_gl[i][j] = heft.get_biased_pk2d(tracer1=ptt_g_i, tracer2=ptt_l_j)
+                for k in range(nbin_s):
+                    ptt_l_k = ccl.nl_pt.PTMatterTracer()
+                    #pk_lg[i][j] = heft.get_biased_pk2d(tracer1=ptt_l_i, tracer2=ptt_g_j)
+                    pk_gl[i][j] = heft.get_biased_pk2d(tracer1=ptt_g_i, tracer2=ptt_l_k)
             bias_g = np.ones_like(self.Survey.zz_integr)
-            for i in range(nbin):
+            for i in range(nbin_l):
                 t_g_i = ccl.NumberCountsTracer(cosmo_nl, has_rsd=False, dndz=(self.Survey.zz_integr, self.Survey.eta_z_l[:, i]),
                                                 bias=(self.Survey.zz_integr, bias_g), mag_bias=None)
-                t_l_i = ccl.WeakLensingTracer(cosmo_nl, dndz=(self.Survey.zz_integr, self.Survey.eta_z_s[:, i]),
-                                               ia_bias=(self.Survey.zz_integr, bias_ia))
-                for j in range(nbin):
+                for j in range(nbin_l):
                     t_g_j = ccl.NumberCountsTracer(cosmo_nl, has_rsd=False, dndz=(self.Survey.zz_integr, self.Survey.eta_z_l[:, j]),
                                                    bias=(self.Survey.zz_integr, bias_g), mag_bias=None)
+                    cl_gg[:, i, j] = ccl.angular_cl(cosmo_nl, t_g_i, t_g_j, self.Survey.l_gc, p_of_k_a=pk_gg[i][j])
+                for k in range(nbin_s): 
+                    t_l_k = ccl.WeakLensingTracer(
+                        cosmo_nl,
+                        dndz=(self.Survey.zz_integr, self.Survey.eta_z_s[:, k]),
+                        ia_bias=(self.Survey.zz_integr, bias_ia)
+                    )   
+                    cl_gl[:, i, k] = ccl.angular_cl(cosmo_nl, t_g_i, t_l_k, self.Survey.l_xc, p_of_k_a=pk_gl[i][k])
+                
+                
+            for i in range(nbin_s):    
+                t_l_i = ccl.WeakLensingTracer(cosmo_nl, dndz=(self.Survey.zz_integr, self.Survey.eta_z_s[:, i]),
+                                               ia_bias=(self.Survey.zz_integr, bias_ia))
+                for j in range(nbin_s):
                     t_l_j = ccl.WeakLensingTracer(
                         cosmo_nl,
                         dndz=(self.Survey.zz_integr, self.Survey.eta_z_s[:, j]),
                         ia_bias=(self.Survey.zz_integr, bias_ia)
                     )
                     cl_ll[:, i, j] = ccl.angular_cl(cosmo_nl, t_l_i, t_l_j, self.Survey.l_wl)
-                    cl_gg[:, i, j] = ccl.angular_cl(cosmo_nl, t_g_i, t_g_j, self.Survey.l_gc, p_of_k_a=pk_gg[i][j])
-                    cl_lg[:, i, j] = ccl.angular_cl(cosmo_nl, t_l_i, t_g_j, self.Survey.l_xc, p_of_k_a=pk_lg[i][j])
-                    cl_gl[:, i, j] = ccl.angular_cl(cosmo_nl, t_g_i, t_l_j, self.Survey.l_xc, p_of_k_a=pk_gl[i][j])
+                
+                for k in range(nbin_l):
+                    t_g_k = ccl.NumberCountsTracer(cosmo_nl, has_rsd=False, dndz=(self.Survey.zz_integr, self.Survey.eta_z_l[:, k]),
+                                                   bias=(self.Survey.zz_integr, bias_g), mag_bias=None)
+                    cl_lg[:, i, k] = ccl.angular_cl(cosmo_nl, t_l_i, t_g_k, self.Survey.l_xc, p_of_k_a=pk_gl[k][i])
+
 
         else:
             raise KeyError('CCL implementation currently supports only linear and HEFT bias models.')
 
         # Add noise to the diagonal
-        for i in range(nbin):
+        for i in range(nbin_s):
             cl_ll[:, i, i] += self.Survey.noise['LL']
+        for i in range(nbin_l):    
             cl_gg[:, i, i] += self.Survey.noise['GG']
-            cl_lg[:, i, i] += self.Survey.noise['LG']
-            cl_gl[:, i, i] += self.Survey.noise['GL']
         return cl_ll, cl_gg, cl_lg, cl_gl
 
     def compute_shear(self, params_dic):
@@ -1522,12 +1556,12 @@ class Theory:
     def get_deltaz(self, params):
         deltaz_s = deltaz_l = None
         if 'deltaz_1' in params:     
-            deltaz_s = np.array([params[f'deltaz_{i+1}'] for i in range(self.Survey.nbin)])
-            deltaz_l = deltaz_s.copy()
+            deltaz_s = np.array([params[f'deltaz_{i+1}'] for i in range(self.Survey.nbin_s)])
+            deltaz_l = np.array([params[f'deltaz_{i+1}'] for i in range(self.Survey.nbin_l)])  
         if 'deltaz_1_s' in params:  
-            deltaz_s = np.array([params[f'deltaz_{i+1}_s'] for i in range(self.Survey.nbin)])  
+            deltaz_s = np.array([params[f'deltaz_{i+1}_s'] for i in range(self.Survey.nbin_s)])  
         if 'deltaz_1_l' in params:    
-            deltaz_l = np.array([params[f'deltaz_{i+1}_l'] for i in range(self.Survey.nbin)])  
+            deltaz_l = np.array([params[f'deltaz_{i+1}_l'] for i in range(self.Survey.nbin_l)])  
         return deltaz_s, deltaz_l
 
     def compute_data_matrix_3x2pt(self, params_dic):
@@ -1566,7 +1600,7 @@ class Theory:
         cov_theory, cov_theory_high = build_data_matrix_3x2pt(cl_ll, cl_gg, cl_lg, cl_gl, 
                                                               self.Survey.l_wl, self.Survey.l_gc, self.Survey.l_xc,
                                                               self.Survey.ells_wl, self.Survey.ells_gc, self.Survey.ell_jump, 
-                                                              self.Survey.nbin)
+                                                              self.Survey.nbin_s, self.Survey.nbin_l)
         # dimensions: 
         # cov_theory (len(all_int_ell_wl), 2 * nbin, 2 * nbin)
         # cov_theory_high (len(all_int_ell_wl) - ell_jump), nbin, nbin)
@@ -1589,145 +1623,30 @@ class Theory:
         """
         # compute 3x2pt angular power spectra
         cl_ll, cl_gg, cl_lg, cl_gl = self.compute_3x2pt(params_dic)
-        data_vector = np.zeros(((self.Survey.nell_wl+self.Survey.nell_gc)*self.Survey.nbin_flat+self.Survey.nell_xc*self.Survey.nbin**2), 'float64')
+        data_vector = np.zeros((self.Survey.nell_wl*self.Survey.nbin_flat_s+self.Survey.nell_gc*self.Survey.nbin_flat_l+self.Survey.nell_xc*self.Survey.nbin_s*self.Survey.nbin_l), 'float64')
         # construct a vector
         idx_start = 0
-        start_lg = self.Survey.nell_wl*self.Survey.nbin_flat
-        start_gc = start_lg+self.Survey.nell_xc*self.Survey.nbin**2
-        for bin1 in range(self.Survey.nbin):
-            for bin2 in range(bin1, self.Survey.nbin):
+        start_xc = self.Survey.nell_wl*self.Survey.nbin_flat_s
+        start_gc = start_xc+self.Survey.nell_xc*self.Survey.nbin_s*self.Survey.nbin_l    #self.Survey.nbin**2
+        for bin1 in range(self.Survey.nbin_s):
+            for bin2 in range(bin1, self.Survey.nbin_s):
                 data_vector[idx_start*self.Survey.nell_wl:(idx_start+1)*self.Survey.nell_wl] = cl_ll[:, bin1, bin2]
+                idx_start += 1
+        idx_start = 0        
+        for bin1 in range(self.Survey.nbin_l):
+            for bin2 in range(bin1, self.Survey.nbin_l):
                 data_vector[idx_start*self.Survey.nell_gc+start_gc:(idx_start+1)*self.Survey.nell_gc+start_gc] = cl_gg[:, bin1, bin2]
                 idx_start += 1
         idx_start = 0
-        for bin1 in range(self.Survey.nbin):
-            for bin2 in range(self.Survey.nbin):
-                # for compute_covariance_3x2pt:
-                # data_vector[idx_start*self.Survey.nell_xc+start_lg:(idx_start+1)*self.Survey.nell_xc+start_lg] = cl_lg[:, bin1, bin2] 
+        for bin1 in range(self.Survey.nbin_l):
+            for bin2 in range(self.Survey.nbin_s):
                 # for direct comparison with cosmosis:
-                data_vector[idx_start*self.Survey.nell_xc+start_lg:(idx_start+1)*self.Survey.nell_xc+start_lg] = cl_gl[:, bin1, bin2]
+                data_vector[idx_start*self.Survey.nell_xc+start_xc:(idx_start+1)*self.Survey.nell_xc+start_xc] = cl_gl[:, bin1, bin2]
                 idx_start += 1
         # apply mask for different scale-cuts per photo-z bin        
         data_vector_masked = data_vector[self.Survey.mask_data_vector_3x2pt]
         return data_vector_masked
     
-    def compute_covariance_3x2pt(self, params_dic):
-        r"""Compute the gaussian (only diagonal components with :math:`\ell=\ell'`) covariance matrix for the 3x2pt analysis.
-        This function calculates the covariance matrix for the 3x2pt analysis, which includes 
-        weak lensing (LL), galaxy clustering (GG), and their cross-correlation (LG and GL). 
-        The covariance matrix is computed for different bins and multipoles as follows
-
-        .. math::
-            \mathrm{Cov}[C_{ij}^{AB}(\ell)C_{kl}^{CD}(\ell)]=\frac{1}{2f_{\rm sky}(2 \ell+1) \Delta \ell} 
-            \left( C^{AC}_{ik}C^{BD}_{jl}+C^{AD}_{il}C^{BC}_{jk}\right)\, ,
-
-        where :math:`A,B,C,D = \{L, G\}` and :math:`i,j` correspond to redshift-bins.
-        
-        Parameters:
-        ----------
-        params_dic : dict
-            Dictionary containing the parameters required for the computation of the 3x2pt 
-            angular power spectra.
-        Returns:
-        -------
-        cov_flat_masked : numpy.ndarray
-            The masked covariance matrix for the 3x2pt analysis.
-        """
-
-        # compute all angular power spectra
-        cl_ll, cl_gg, cl_lg, cl_gl = self.compute_3x2pt(params_dic)
-        # l_wl, l_xc, l_gc are centers of the lbins
-        # now we compute at the same number of ell-bins for all probes
-        # and then apply a mask
-        denom = ((2*self.Survey.ell+1)*self.Survey.fsky*self.Survey.d_ell_bin)
-        cov_flat = np.zeros((2*self.Survey.lbin*self.Survey.nbin_flat+self.Survey.lbin*self.Survey.nbin**2, 2*self.Survey.lbin*self.Survey.nbin_flat+self.Survey.lbin*self.Survey.nbin**2), 'float64')
-        counter_x = 0
-        counter_y = 0
-        start_lg = self.Survey.lbin*self.Survey.nbin_flat 
-        start_gc = start_lg+self.Survey.lbin*self.Survey.nbin**2
-        for bin1 in range(self.Survey.nbin):
-            for bin2 in range(bin1, self.Survey.nbin):
-                for bin3 in range(self.Survey.nbin):
-                    for bin4 in range(bin3, self.Survey.nbin):
-                        for ell_i in range(self.Survey.lbin):
-                            #ABCD=LLLL
-                            cov_flat[self.Survey.lbin*counter_y+ell_i, self.Survey.lbin*counter_x+ell_i] = (cl_ll[ell_i, bin1, bin3] * cl_ll[ell_i, bin2, bin4] +
-                            cl_ll[ell_i, bin1, bin4] * cl_ll[ell_i, bin2, bin3])/denom[ell_i] 
-
-                            #ABCD=LLGG
-                            cov_flat[self.Survey.lbin*counter_y+ell_i, start_gc+self.Survey.lbin*counter_x+ell_i] = (cl_lg[ell_i, bin1, bin3] * cl_lg[ell_i, bin2, bin4] +
-                            cl_lg[ell_i, bin1, bin4] * cl_lg[ell_i, bin2, bin3])/denom[ell_i]  
-
-                            #ABCD=GGLL
-                            cov_flat[start_gc+self.Survey.lbin*counter_y+ell_i, self.Survey.lbin*counter_x+ell_i] = (cl_gl[ell_i, bin1, bin3] * cl_gl[ell_i, bin2, bin4] +
-                            cl_gl[ell_i, bin1, bin4] * cl_gl[ell_i, bin2, bin3])/denom[ell_i] 
-                            
-                            #ABCD=GGGG
-                            cov_flat[start_gc+self.Survey.lbin*counter_y+ell_i, start_gc+self.Survey.lbin*counter_x+ell_i] = (cl_gg[ell_i, bin1, bin3] * cl_gg[ell_i, bin2, bin4] +
-                            cl_gg[ell_i, bin1, bin4] * cl_gg[ell_i, bin2, bin3])/denom[ell_i]    
-
-                        if counter_x<self.Survey.nbin_flat-1:
-                            counter_x+=1
-                        else:
-                            counter_x = 0
-                            counter_y+=1       
-        counter_x = 0
-        counter_y = 0
-        for bin1 in range(self.Survey.nbin):
-            for bin2 in range(bin1, self.Survey.nbin):
-                for bin3 in range(self.Survey.nbin):
-                    for bin4 in range(self.Survey.nbin):
-                        for ell_i in range(self.Survey.lbin):
-                            #ABCD=LLLG
-                            cov_flat[self.Survey.lbin*counter_y+ell_i, start_lg+self.Survey.lbin*counter_x+ell_i] = (cl_ll[ell_i, bin1, bin3] * cl_lg[ell_i, bin2, bin4] +
-                            cl_lg[ell_i, bin1, bin4] * cl_ll[ell_i, bin2, bin3])/denom[ell_i]   
-                            #ABCD=GGLG
-                            cov_flat[start_gc+self.Survey.lbin*counter_y+ell_i, start_lg+self.Survey.lbin*counter_x+ell_i] = (cl_gl[ell_i, bin1, bin3] * cl_gg[ell_i, bin2, bin4] +
-                            cl_gg[ell_i, bin1, bin4] * cl_gl[ell_i, bin2, bin3])/denom[ell_i] 
-                        if counter_x<self.Survey.nbin**2-1:
-                            counter_x+=1
-                        else:
-                            counter_x = 0
-                            counter_y+=1  
-        counter_x = 0
-        counter_y = 0
-        for bin1 in range(self.Survey.nbin):
-            for bin2 in range(self.Survey.nbin):
-                for bin3 in range(self.Survey.nbin):
-                    for bin4 in range(self.Survey.nbin):
-                        for ell_i in range(self.Survey.lbin):
-                            #ABCD=LGLG
-                            cov_flat[start_lg+self.Survey.lbin*counter_y+ell_i, start_lg+self.Survey.lbin*counter_x+ell_i] = (cl_ll[ell_i, bin1, bin3] * cl_gg[ell_i, bin2, bin4] +
-                            cl_lg[ell_i, bin1, bin4] * cl_gl[ell_i, bin2, bin3])/denom[ell_i] 
-                        if counter_x<self.Survey.nbin**2-1:
-                            counter_x+=1
-                        else:
-                            counter_x = 0
-                            counter_y+=1      
-                    
-        counter_x = 0
-        counter_y = 0
-        for bin1 in range(self.Survey.nbin):
-            for bin2 in range(self.Survey.nbin):
-                for bin3 in range(self.Survey.nbin):
-                    for bin4 in range(bin3, self.Survey.nbin):
-                        for ell_i in range(self.Survey.lbin):            
-                            #ABCD=LGLL
-                            cov_flat[start_lg+self.Survey.lbin*counter_y+ell_i, self.Survey.lbin*counter_x+ell_i] = (cl_ll[ell_i, bin1, bin3] * cl_gl[ell_i, bin2, bin4] +
-                            cl_ll[ell_i, bin1, bin4] * cl_gl[ell_i, bin2, bin3])/denom[ell_i]     
-                            #ABCD=LGGG
-                            cov_flat[start_lg+self.Survey.lbin*counter_y+ell_i, start_gc+self.Survey.lbin*counter_x+ell_i] = (cl_lg[ell_i, bin1, bin3] * cl_gg[ell_i, bin2, bin4] +
-                            cl_lg[ell_i, bin1, bin4] * cl_gg[ell_i, bin2, bin3])/denom[ell_i] 
-                        if counter_x<self.Survey.nbin_flat-1:
-                            counter_x+=1
-                        else:
-                            counter_x = 0
-                            counter_y+=1         
-
-        print('cov_flat: ', cov_flat.shape)                                      
-        cov_flat_masked = cov_flat[self.Survey.mask_cov_3x2pt]
-        print('cov_flat_masked: ', cov_flat_masked.shape)  
-        return cov_flat_masked 
     
     def get_cov_diag_ijkl(self, theory_spectra, name1, name2, bin_ij, bin_kl): 
         c_ij_12 = theory_spectra[name1]
@@ -1774,27 +1693,28 @@ class Theory:
         self.Survey.ell = self.Survey.l_wl = self.Survey.l_xc = self.Survey.l_gc = ell_vals
         self.Survey.nell_wl = self.Survey.nell_xc = self.Survey.nell_gc = len(self.Survey.l_wl)
 
-        cl_ll_, cl_gg_, cl_lg_, _ = self.compute_3x2pt(params_dic)
-        cl_ll = build_data_matrix(cl_ll_, ell_vals, ell_all_int, self.Survey.nbin)
-        cl_gg = build_data_matrix(cl_gg_, ell_vals, ell_all_int, self.Survey.nbin)
-        cl_lg = build_data_matrix(cl_lg_, ell_vals, ell_all_int, self.Survey.nbin)
+        cl_ll_, cl_gg_, cl_lg_, cl_gl_ = self.compute_3x2pt(params_dic)
+        cl_ll = build_data_matrix(cl_ll_, ell_vals, ell_all_int, self.Survey.nbin_s, self.Survey.nbin_s)
+        cl_gg = build_data_matrix(cl_gg_, ell_vals, ell_all_int, self.Survey.nbin_l, self.Survey.nbin_l)
+        cl_lg = build_data_matrix(cl_lg_, ell_vals, ell_all_int, self.Survey.nbin_s, self.Survey.nbin_l)
+        cl_gl = build_data_matrix(cl_gl_, ell_vals, ell_all_int, self.Survey.nbin_l, self.Survey.nbin_s)
         self.Survey.ell = self.Survey.l_wl = self.Survey.l_xc = self.Survey.l_gc = ell_all_int
         self.Survey.lbin = len(ell_all_int)
         self.Survey.nell_wl = self.Survey.nell_xc = self.Survey.nell_gc = len(self.Survey.l_wl)
 
-        cl_ll_dic = {'bin_pairs': [(i, j) for i in range(self.Survey.nbin) for j in range(i, self.Survey.nbin)], 
+        cl_ll_dic = {'bin_pairs': [(i, j) for i in range(self.Survey.nbin_s) for j in range(i, self.Survey.nbin_s)], 
                     'cls': cl_ll,
                     'is_auto': True,
                     'name': 'LL',
                     'types': (0, 0)
                     }
-        cl_gg_dic = {'bin_pairs': [(i, j) for i in range(self.Survey.nbin) for j in range(i, self.Survey.nbin)], 
+        cl_gg_dic = {'bin_pairs': [(i, j) for i in range(self.Survey.nbin_l) for j in range(i, self.Survey.nbin_l)], 
                     'cls': cl_gg,
                     'is_auto': True,
                     'name': 'GG',
                     'types': (1, 1)
                     }
-        cl_lg_dic = {'bin_pairs': [(j, i) for i in range(self.Survey.nbin) for j in range(self.Survey.nbin)], #changed from (i, j) to recreate cosmosis
+        cl_lg_dic = {'bin_pairs': [(j, i) for i in range(self.Survey.nbin_l) for j in range(self.Survey.nbin_s)], #changed from (i, j) to recreate cosmosis
                     'cls': cl_lg,
                     'is_auto': False,
                     'name': 'LG',
@@ -1804,11 +1724,11 @@ class Theory:
         self.types = [cl_ll_dic['types'], cl_lg_dic['types'], cl_gg_dic['types']]
         # Get the starting index in the full datavector for each spectrum
         # this will be used later for adding covariance blocks to the full matrix.
-        cl_lengths = [n_ell*self.Survey.nbin_flat, n_ell*self.Survey.nbin**2, n_ell*self.Survey.nbin_flat]
+        cl_lengths = [n_ell*self.Survey.nbin_flat_s, n_ell*self.Survey.nbin_s*self.Survey.nbin_l, n_ell*self.Survey.nbin_flat_l]
         cl_starts = []
         for i in range(3):
             cl_starts.append( int(sum(cl_lengths[:i])) )
-        covmat = np.zeros((2*n_ell*self.Survey.nbin_flat+n_ell*self.Survey.nbin**2, 2*n_ell*self.Survey.nbin_flat+n_ell*self.Survey.nbin**2), 'float64')
+        covmat = np.zeros((n_ell*(self.Survey.nbin_flat_s + self.Survey.nbin_flat_l + self.Survey.nbin_s*self.Survey.nbin_l), n_ell*(self.Survey.nbin_flat_s + self.Survey.nbin_flat_l + self.Survey.nbin_s*self.Survey.nbin_l)), 'float64')
         # Now loop through pairs of Cls and pairs of bin pairs filling the covariance matrix
         for i_cl in range(3):
             cl_spec_i = theory_spectra[i_cl]
@@ -1878,7 +1798,7 @@ class Theory:
         # compute weak lensing angular power spectra
         cl_wl = self.compute_shear(params_dic)
         # construct matrix
-        cov_theory = build_data_matrix(cl_wl, self.Survey.l_wl, self.Survey.ells_wl, self.Survey.nbin)
+        cov_theory = build_data_matrix(cl_wl, self.Survey.l_wl, self.Survey.ells_wl, self.Survey.nbin_s, self.Survey.nbin_s)
         return cov_theory
     
     def compute_data_vector_wl(self, params_dic):
@@ -1898,10 +1818,10 @@ class Theory:
         """
         # compute weak lensing angular power spectra
         cl_wl = self.compute_shear(params_dic)
-        data_vector = np.zeros((self.Survey.nell_wl*self.Survey.nbin_flat), 'float64')
+        data_vector = np.zeros((self.Survey.nell_wl*self.Survey.nbin_flat_s), 'float64')
         idx_start = 0
-        for bin1 in range(self.Survey.nbin):
-            for bin2 in range(bin1, self.Survey.nbin):
+        for bin1 in range(self.Survey.nbin_s):
+            for bin2 in range(bin1, self.Survey.nbin_s):
                 data_vector[idx_start*self.Survey.nell_wl:(idx_start+1)*self.Survey.nell_wl] = cl_wl[:, bin1, bin2]
                 idx_start += 1
         data_vector_masked = data_vector[self.Survey.mask_data_vector_wl]
@@ -1932,17 +1852,17 @@ class Theory:
         cl_wl = self.compute_shear(params_dic)
         # l_wl are centers of the lbins
         denom = ((2*self.Survey.l_wl+1)*self.Survey.fsky*self.Survey.d_ell_bin_cut_wl)
-        cov_flat = np.zeros((self.Survey.nell_wl*self.Survey.nbin_flat, self.Survey.nell_wl*self.Survey.nbin_flat), 'float64')
+        cov_flat = np.zeros((self.Survey.nell_wl*self.Survey.nbin_flat_s, self.Survey.nell_wl*self.Survey.nbin_flat_s), 'float64')
         counter_x = 0
         counter_y = 0
-        for bin1 in range(self.Survey.nbin):
-            for bin2 in range(bin1, self.Survey.nbin):
-                for bin3 in range(self.Survey.nbin):
-                    for bin4 in range(bin3, self.Survey.nbin):
+        for bin1 in range(self.Survey.nbin_s):
+            for bin2 in range(bin1, self.Survey.nbin_s):
+                for bin3 in range(self.Survey.nbin_s):
+                    for bin4 in range(bin3, self.Survey.nbin_s):
                         for i in range(self.Survey.nell_wl):
                             cov_flat[self.Survey.nell_wl*counter_y+i, self.Survey.nell_wl*counter_x+i] = (cl_wl[i, bin1, bin3] * cl_wl[i, bin2, bin4] +
                             cl_wl[i, bin1, bin4]* cl_wl[i, bin2, bin3])/denom[i] 
-                        if counter_x<self.Survey.nbin_flat-1:
+                        if counter_x<self.Survey.nbin_flat_s-1:
                             counter_x+=1
                         else:
                             counter_x = 0
@@ -1972,7 +1892,7 @@ class Theory:
         # compute angular power spectra
         cl_gc = self.compute_galclust(params_dic)
         # construct matrix
-        cov_theory = build_data_matrix(cl_gc, self.Survey.l_gc, self.Survey.ells_gc, self.Survey.nbin)
+        cov_theory = build_data_matrix(cl_gc, self.Survey.l_gc, self.Survey.ells_gc, self.Survey.nbin_l, self.Survey.nbin_l)
         return cov_theory
     
     def compute_data_vector_gc(self, params_dic):
@@ -1994,10 +1914,10 @@ class Theory:
         # compute angular power spectra
         cl_gc = self.compute_galclust(params_dic)
         # construct vector
-        data_vector = np.zeros((self.Survey.nell_gc*self.Survey.nbin_flat), 'float64')
+        data_vector = np.zeros((self.Survey.nell_gc*self.Survey.nbin_flat_l), 'float64')
         idx_start = 0
-        for bin1 in range(self.Survey.nbin):
-            for bin2 in range(bin1, self.Survey.nbin):
+        for bin1 in range(self.Survey.nbin_l):
+            for bin2 in range(bin1, self.Survey.nbin_l):
                 data_vector[idx_start*self.Survey.nell_gc:(idx_start+1)*self.Survey.nell_gc] = cl_gc[:, bin1, bin2]
                 idx_start += 1
         data_vector_masked = data_vector[self.Survey.mask_data_vector_gc]
@@ -2028,17 +1948,17 @@ class Theory:
         cl_gc = self.compute_galclust(params_dic)
         # l_gc are centers of the lbins
         denom = ((2*self.Survey.l_gc+1)*self.Survey.fsky*self.Survey.d_ell_bin_cut_gc)
-        cov_flat = np.zeros((self.Survey.nell_gc*self.Survey.nbin_flat, self.Survey.nell_gc*self.Survey.nbin_flat), 'float64')
+        cov_flat = np.zeros((self.Survey.nell_gc*self.Survey.nbin_flat_l, self.Survey.nell_gc*self.Survey.nbin_flat_l), 'float64')
         counter_x = 0
         counter_y = 0
-        for bin1 in range(self.Survey.nbin):
-            for bin2 in range(bin1, self.Survey.nbin):
-                for bin3 in range(self.Survey.nbin):
-                    for bin4 in range(bin3, self.Survey.nbin):
+        for bin1 in range(self.Survey.nbin_l):
+            for bin2 in range(bin1, self.Survey.nbin_l):
+                for bin3 in range(self.Survey.nbin_l):
+                    for bin4 in range(bin3, self.Survey.nbin_l):
                         for i in range(self.Survey.nell_gc):
                             cov_flat[self.Survey.nell_gc*counter_y+i, self.Survey.nell_gc*counter_x+i] = (cl_gc[i, bin1, bin3] * cl_gc[i, bin2, bin4] +
                             cl_gc[i, bin1, bin4]* cl_gc[i, bin2, bin3])/denom[i] 
-                        if counter_x<self.Survey.nbin_flat-1:
+                        if counter_x<self.Survey.nbin_flat_l-1:
                             counter_x+=1
                         else:
                             counter_x = 0

@@ -10,10 +10,10 @@ class MGLike:
                 self.compute = self.loglikelihood_det_3x2pt
             elif Model.Survey.observable == 'WL':
                 self.compute_data_matrix = self.Theo.compute_data_matrix_wl
-                self.compute = self.loglikelihood_det
+                self.compute = self.loglikelihood_det_wl
             elif Model.Survey.observable == 'GC':
                 self.compute_data_matrix = self.Theo.compute_data_matrix_gc
-                self.compute = self.loglikelihood_det    
+                self.compute = self.loglikelihood_det_gc    
     
         else:
             if Model.Survey.observable == 'WL':
@@ -56,14 +56,14 @@ class MGLike:
             det_mix = np.zeros_like(det_theo)
             det_obs = self.Data.det_obs
             det_obs_high = self.Data.det_obs_high
-            for i in range(2*self.Theo.Survey.nbin):
+            for i in range(self.Theo.Survey.nbin_s+self.Theo.Survey.nbin_l):
                 new_cov = cov_theo.copy()
                 new_cov[:, i] = self.Data.cov_obs[:, :, i]
                 det_mix += np.linalg.det(new_cov)
 
             det_theo_high = np.linalg.det(cov_theo_high)
             det_mix_high = np.zeros_like(det_theo_high)
-            for i in range(self.Theo.Survey.nbin):
+            for i in range(self.Theo.Survey.nbin_s):
                 new_cov = cov_theo_high.copy()
                 new_cov[:, i] = self.Data.cov_obs_high[:, :, i]
                 det_mix_high += np.linalg.det(new_cov)
@@ -77,7 +77,7 @@ class MGLike:
 
 
     
-    def loglikelihood_det(self, param_dic):
+    def loglikelihood_det_wl(self, param_dic):
         """Compute the log-likelihood for a given set of parameters using the determinant method.
 
         Parameters:
@@ -96,7 +96,37 @@ class MGLike:
             cov_theo = self.compute_data_matrix(param_dic_all)
             det_theo = np.linalg.det(cov_theo)
             det_mix = np.zeros_like(det_theo)
-            for i in range(self.Theo.Survey.nbin):
+            for i in range(self.Theo.Survey.nbin_s):
+                new_cov = np.copy(cov_theo)
+                det_obs = self.Data.det_obs
+                new_cov[:, i] = self.Data.cov_obs[:, :, i]
+                det_mix += np.linalg.det(new_cov)
+            chi2 += np.sum((2*self.Data.ells+1)*self.Theo.Survey.fsky*((det_mix/det_theo)+np.log(det_theo/det_obs)))
+            return -0.5*chi2    
+        else:
+            return -np.inf    
+        
+        
+    def loglikelihood_det_gc(self, param_dic):
+        """Compute the log-likelihood for a given set of parameters using the determinant method.
+
+        Parameters:
+        -----------
+        param_dic : dict
+            Dictionary containing the parameters for the model.
+
+        Returns:
+        --------
+        float
+            The log-likelihood value. If the parameters are invalid, returns negative infinity.
+        """
+        param_dic_all, status = self.Theo.check_pars(param_dic)
+        if status:  
+            chi2 = 0. 
+            cov_theo = self.compute_data_matrix(param_dic_all)
+            det_theo = np.linalg.det(cov_theo)
+            det_mix = np.zeros_like(det_theo)
+            for i in range(self.Theo.Survey.nbin_l):
                 new_cov = np.copy(cov_theo)
                 det_obs = self.Data.det_obs
                 new_cov[:, i] = self.Data.cov_obs[:, :, i]

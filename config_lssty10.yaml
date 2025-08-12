@@ -1,0 +1,177 @@
+observable: '3x2pt'
+#Observables 
+#     'WL' -> shear-shear
+#     'GC' -> photo-clustering
+#     '3x2pt' -> 3x2pt: shear-shear, photo-clustering, galaxy-galaxy lensing
+
+
+likelihood: 'binned'
+#Likelihood
+#      'determinants' -> using determinants and summing over all integer ell-values
+#      'binned' -> using covariance and differences between data vectors
+
+
+specs:
+  #Scale cuts
+  #'const_lmax' -> same lmax in all z-bins
+  #'lmax' -> vary lmax in each z-bin
+  #'kmax' -> vary kmax in each z-bin, which technically equals to the 'lmax'-option via lmax=kmax rcom(z_mod)/(1+z_mod)
+  #           with z_mod corresponding to a peak of the shear and photo-GC kernels 
+  scale_cuts:
+    type: 'lmax'
+    max_WL: #[4900]
+            #[2800, 2800, 2800, 2800, 2800, 
+            #       3000, 3000, 3000, 3000, 
+            #             3000, 3000, 3000, 
+            #                   3000, 3000,
+            #                         3000] #always a list, same length as nbin*(nbin+1)/2 or just 1 for const_lmax
+            [2000, 2000, 2000, 2000, 2000, 
+                   2000, 2000, 2000, 2000, 
+                         2000, 2000, 2000, 
+                               2000, 2000,
+                                     2000] #always a list, same length as nbin*(nbin+1)/2 or just 1 for const_lmax
+            #[5., 3., 3., 2., 2.]
+    max_GC: #[500]
+            [401, 401, 401, 401, 401, 401, 401, 401, 401, 401, 
+                  498, 498, 498, 498, 498, 498, 498, 498, 498, 
+                       584, 584, 584, 584, 584, 584, 584, 584, 
+                            645, 645, 645, 645, 645, 645, 645, 
+                                 694, 694, 694, 694, 694, 694, 
+                                      737, 737, 737, 737, 737, 
+                                           767, 767, 767, 767, 
+                                                794, 794, 794, 
+                                                     812, 812,
+                                                          826] #always a list, same length as nbin*(nbin+1)/2 or just 1 for const_lmax
+            #[0.7, 0.7, 0.7, 0.7, 0.7, 0.7, 0.7, 0.7, 0.7, 0.7]
+    cosmo: # for transformation from k_eff to ell
+      'Omega_m': 0.31
+      'w0': -1.
+      'wa': 0.
+
+  #Survey info
+  #     Euclid: Euclid_Y1, Euclid_5bins or Euclid_10bins
+  #     LSST: LSST_Y1 or LSST_Y10 
+  #----- not implemented yet:  
+  #     Custom: analytical n(z) or from file
+  survey_info: 'LSST_Y10' #'Euclid_Y1' #'Euclid_5bins'
+  custom_survey_path: 
+
+
+data:
+  add_noise: False
+  type: 0
+  #Types:
+  #     0 -> compute for a given model and likelihood
+  #----- not implemented yet:  
+  #     1 -> read from a file
+  data_file: 
+
+  nl_model: 1
+  #Options for bacco extrapolation in redshift: 
+  #               'z_extrap_hmcode' (nonlinear power spectrum in shear for z>1.5 is extrapolated with HMcode2020) 
+  #               or 'linear' (pmm is linear at all redshifts) 
+  #               or 'z_extrap_linear' (default: nonlinear power spectrum in shear for z>1.5 is extrapolated with bacco's linear power spectrum )
+  bacco_option: 'z_extrap_linear'
+  #Options for power spectrum specifics in extended models:
+  #     'linear' (use MG or DE linear spectrum) or 'pseudo' (use MG or DE pseudo spectrum) or 'nonlinear' (default option)
+  #option: 'linear' 
+  #Nonlinear power spectrum
+  #     0 -> HMcode
+  #     1 -> bacco
+  #     2 -> nDGP with ReACT
+  #     3 -> gLEMURS with ReACT
+  #     4 -> μ-Σ (Σ is not properly implemented in Cls yet) with ReACT
+  #     5 -> Dark Scattering (Interacting Dark Energy) with ReACT
+  #     6 -> f(R) with ReACT
+  #     7 -> f(R) with eMANTIS
+  #     8 -> nDGP with nDGPemu
+  bias_model: 2
+  # Options for extrapolation in k for HEFT-bias expansion with bacco: False (default, power law extrapolation) or True (constant extrapolation)
+  heft_extrap_k_const: False
+  # Photometric galaxy bias model (redshift dependence)
+  #     0 -> constant linear bias within bins
+  #     1 -> (b1, b2) constant within bins
+  #     2 -> heft
+  #     3 -> heft with Pnl instead of Plin
+  #     4 -> heft with PnlxS instead of Plin
+  #     5 -> linear, sampling in b*sigma_8
+  #     6 -> heft, sampling in b*sigma_8
+  ia_model: 0
+  # Intrinsic alignment model
+  #     0 -> zNLA
+  #     1 -> TATT
+  baryon_model: 3
+  # Cross-correlation include/exclude the square root of the baryonic suppression [Zennaro et al. 2024] (default: False)
+  cross_sqrt_baryon: True
+  # Baryonic flag
+  #     0 -> no baryons
+  #     1 -> Tagn HMcode
+  #     2 -> bcemu
+  #     3 -> bacco
+  photoz_err_model: 0
+  # Photo-z error on n(z) model
+  #     0 -> no photo-z error
+  #     1 -> additive mode, n(z') = n(z + dz)
+  #     2 -> multiplicative mode, n(z') = n(z(1 + dz))
+  params: ./params_data_zennaro_y10.yaml
+
+theory:
+  add_noise: False
+  nl_model: 1
+  #Options for bacco extrapolation: 
+  #               'z_extrap_hmcode' (nonlinear power spectrum in shear for z>1.5 is extrapolated with HMcode2020) 
+  #               or 'linear' (pmm is linear at all redshifts) 
+  #               or 'z_extrap_linear' (default: nonlinear power spectrum in shear for z>1.5 is extrapolated with bacco's linear power spectrum )
+  #bacco_option: 'z_extrap_hmcode'
+  #Options for power spectrum specifics in extended models:
+  #     'linear' (use MG or DE linear spectrum) or 'pseudo' (use MG or DE pseudo spectrum) or 'nonlinear' (default option)
+  #option: 'linear' 
+  #Nonlinear power spectrum
+  #     0 -> HMcode
+  #     1 -> bacco
+  #     2 -> nDGP with ReACT
+  #     3 -> gLEMURS with ReACT
+  #     4 -> μ-Σ (Σ is not properly implemented in Cls yet) with ReACT
+  #     5 -> Dark Scattering (Interacting Dark Energy) with ReACT
+  #     6 -> f(R) with ReACT
+  bias_model: 2
+  # Options for extrapolation in k for HEFT-bias expansion with bacco: False (default, power law extrapolation) or True (constant extrapolation)
+  heft_extrap_k_const: False
+  # Photometric galaxy bias model (redshift dependence)
+  #     0 -> linear interpolation
+  #     1 -> constant within bins
+  #     2 -> heft
+  #     3 -> heft with Pnl instead of Plin
+  #     4 -> heft with PnlxS instead of Plin
+  #     5 -> linear, sampling in b*sigma_8
+  #     6 -> heft, sampling in b*sigma_8
+  ia_model: 0
+  # Intrinsic alignment model
+  #     0 -> zNLA
+  #     1 -> TATT
+  baryon_model: 0
+  # Cross-correlation include/exclude the square root of the baryonic suppression [Zennaro et al. 2024] (default: False)
+  cross_sqrt_baryon: False
+  # Baryonic flag
+  #     0 -> no baryons
+  #     1 -> Tagn HMcode
+  #     2 -> bcemu
+  #     3 -> bacco
+  photoz_err_model: 0
+  # Photo-z error on n(z) model
+  #     0 -> no photo-z error
+  #     1 -> additive mode, n(z') = n(z + dz)
+  #     2 -> multiplicative mode, n(z') = n(z(1 + dz))
+  params: ./params_bacco_test_y10.yaml #./params_model_hmcode.yaml   
+
+output: 
+  chain_name: lsst_y10_fix_cosmo_zennaro_data_zennaro_model_test
+sampler: 
+  mcmc:
+    verbose: True
+    n_eff: 5000
+    n_live: 1000
+    pool: 20
+    resume: True
+    hdf5_name:  lsst_y10_fix_cosmo_zennaro_data_zennaro_model_test
+    
