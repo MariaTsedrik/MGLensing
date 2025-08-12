@@ -471,14 +471,15 @@ class LSSTSetUp:
             self.gal_per_sqarcmn_l = 18.0
             self.rms_shear = 0.26
             self.nbin = 5 
-            nz_sacc_file = dirname+'/forecast_fid.sacc'
+            npy_file_lens = dirname+'/lsst_lens_bins_year_1.npy'
+            npy_file_source = dirname+'/lsst_source_bins_year_1.npy'
             self.z_bin_center_s = np.array([2.253273944137912099e-01, 4.490567958326107112e-01, 6.545664037512012312e-01, 9.258332934738261466e-01, 1.590547464182611836e+00]) #from DESC github
             self.z_bin_center_l = np.array([3.083232685515536753e-01, 5.011373846158426737e-01, 6.981257392184466726e-01, 8.964730913147888058e-01, 1.095412294727920344e+00])  #from DESC github
         elif survey_info == 'LSST_Y10': 
             raise NotImplementedError('LSST_Y10 is not implemented yet')  
 
         # normalized galaxy distribution and noise
-        self.eta_z_s, self.eta_z_l = self.get_norm_galaxy_distrib(nz_sacc_file) 
+        self.eta_z_s, self.eta_z_l = self.get_norm_galaxy_distrib(npy_file_lens, npy_file_source) 
         zz_mod_wl = [self.zz_integr[np.argmax(self.eta_z_s[:, i])] for i in range (self.nbin)]
         zz_mod_gg = [self.zz_integr[np.argmax(self.eta_z_l[:, i])] for i in range (self.nbin)]
         n_bar = get_noise(self.nbin, self.gal_per_sqarcmn)
