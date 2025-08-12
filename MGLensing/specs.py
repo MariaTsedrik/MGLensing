@@ -476,6 +476,7 @@ class LSSTSetUp:
             self.z_bin_center_l = np.array([3.083232685515536753e-01, 5.011373846158426737e-01, 6.981257392184466726e-01, 8.964730913147888058e-01, 1.095412294727920344e+00])  #from DESC github
         elif survey_info == 'LSST_Y10': 
             raise NotImplementedError('LSST_Y10 is not implemented yet')  
+
         # normalized galaxy distribution and noise
         self.eta_z_s, self.eta_z_l = self.get_norm_galaxy_distrib(nz_sacc_file) 
         zz_mod_wl = [self.zz_integr[np.argmax(self.eta_z_s[:, i])] for i in range (self.nbin)]
@@ -511,15 +512,16 @@ class LSSTSetUp:
         self.lum_func = get_luminosity_func(dirname+'/scaledmeanlum_E2Sa.dat')
         self.likelihood = likelihood
 
-    def get_norm_galaxy_distrib(self, file_name):
+
+    def get_norm_galaxy_distrib(self, file_name_l, file_name_s):
         """
-        Reads the source and lens galaxy normalized distributions from a sacc file
+        Reads the source and lens galaxy normalized distributions from a npy file
         and compresses them to the required number of redshifts.
 
         Parameters:
         -----------
         file_name : str
-            Name of the sacc file.
+            Name of the npy file.
 
         Returns:
         --------
@@ -530,45 +532,33 @@ class LSSTSetUp:
             Normalized lens galaxy distribution as a function of redshift. 
             Shape: (zbin_integr, nbin).
         """
-        s = sacc.Sacc.load_fits(file_name)
+        lenses = np.load(file_name_l, allow_pickle=True).item()
+        sources = np.load(file_name_s, allow_pickle=True).item()
+        z_arr = lenses['redshift_range']
         dndz_z = []
         lens_z = []
-        z_arr = s.tracers['src0'].z
-        # reduce redshift range
-        #indx_min = np.where(z_arr==self.zmin)[0][0]
-        #indx_max = np.where(z_arr==self.zmax)[0][0]
-        #z_arr = z_arr[indx_min:indx_max]
-        # read sources and lenses distributions for each bin
-        for i in range(self.nbin):
-            dndz_z_i = s.tracers['src'+str(i)].nz
-            dndz_z.append(np.interp(self.zz_integr, z_arr, dndz_z_i))
-            lens_z_i = s.tracers['lens'+str(i)].nz
-            lens_z.append(np.interp(self.zz_integr, z_arr, lens_z_i))
-            #dndz_z.append(s.tracers['src'+str(i)].nz[indx_min:indx_max]) 
-            #lens_z.append(s.tracers['lens'+str(i)].nz[indx_min:indx_max])
-            # reduce array size
-            #dndz_z[i] = reduce_len_by_averaging(dndz_z[i], target_len=z_bins_for_integration)
-            #lens_z[i] = reduce_len_by_averaging(lens_z[i], target_len=z_bins_for_integration)
-        # reduce z array size
-        #z_arr = reduce_len_by_averaging(z_arr, target_len=z_bins_for_integration)
-        #self.zz_integr = z_arr
-        #self.zbin_integr = len(z_arr)
 
+        for i in range(self.nbin_l):
+            lens_z_i = lenses['bins'][i]
+            lens_z.append(np.interp(self.zz_integr, z_arr, lens_z_i))
+        for i in range(self.nbin_s):
+            dndz_z_i = sources['bins'][i]
+            dndz_z.append(np.interp(self.zz_integr, z_arr, dndz_z_i))
         
         norm_nz_s = np.array(dndz_z).T
         norm_nz_l = np.array(lens_z).T
         
         # check if normalized galaxy distribution integrates to 1
-        for Bin in range(self.nbin):
-            check_nz_s_i = trapezoid(norm_nz_s[:,Bin],self.zz_integr[:]) 
+        for Bin in range(self.nbin_l):
             check_nz_l_i= trapezoid(norm_nz_l[:,Bin],self.zz_integr[:]) 
-            print('Source galaxy distribution for bin ', Bin, ' integrates to ', check_nz_s_i)
             print('Lens galaxy distribution for bin ', Bin, ' integrates to ', check_nz_l_i)
-            norm_nz_s[:,Bin] = norm_nz_s[:,Bin] / check_nz_s_i
             norm_nz_l[:,Bin] = norm_nz_l[:,Bin] / check_nz_l_i
+        for Bin in range(self.nbin_s):
+            check_nz_s_i = trapezoid(norm_nz_s[:,Bin],self.zz_integr[:]) 
+            print('Source galaxy distribution for bin ', Bin, ' integrates to ', check_nz_s_i)
+            norm_nz_s[:,Bin] = norm_nz_s[:,Bin] / check_nz_s_i
         
-        
-        return norm_nz_s, norm_nz_l     
+        return norm_nz_s, norm_nz_l  
     
 
 class EuclidSetUp:
