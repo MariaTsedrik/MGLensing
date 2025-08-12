@@ -520,9 +520,11 @@ class LSSTSetUp:
 
         Parameters:
         -----------
-        file_name : str
-            Name of the npy file.
-
+        file_name_l : str
+            Name of the npy file for lenses.
+        file_name_s : str
+            Name of the npy file for sources.
+ 
         Returns:
         --------
         norm_nz_s : np.ndarray
