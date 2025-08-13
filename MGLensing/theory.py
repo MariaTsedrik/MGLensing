@@ -780,7 +780,7 @@ class Theory:
         # in the integrand dimensions are (bin_i, zz_integr, zz_integr)
         integrand = 3./2.*H0_h_c**2. * omega_m * self.rz[None,:,None]*(1.+self.Survey.zz_integr[None,:,None])*eta_z_s.T[:,None,:]*(1.-self.rz[None,:,None]/self.rz[None,None,:])
         # integrate along the third dimension in zz_integr
-        w_gamma  = simpson(np.triu(integrand), self.Survey.zz_integr,axis=-1).T #trapezoid(np.triu(integrand), self.Survey.zz_integr,axis=-1).T
+        w_gamma  = trapezoid(np.triu(integrand), self.Survey.zz_integr,axis=-1).T  # simpson(np.triu(integrand), self.Survey.zz_integr,axis=-1).T 
         # add an extra dimension to w_gamma as we might have ell-dependence in the IA-kernel due to the scale-dependent linear growth
         w_gamma = w_gamma[None,:,:]
         # add modification of the lensing potential
@@ -850,7 +850,7 @@ class Theory:
         #W_L = self.w_gamma + self.factor_nla[:, :, None] *self.w_ia # ell, zz_integr, bin_i
         #cl_ll_int = W_L[:,:,:,None] * W_L[:,:,None,:] * self.pmm[:, :, None, None] / self.ez[None,:,None,None] / self.rz[None,:,None,None] / self.rz[None,:,None,None] / H0_h_c
         # integrate along the z_integr-direction
-        cl_ll = simpson(cl_ll_int, self.Survey.zz_integr, axis=1)[:self.Survey.nell_wl, :, :] #trapezoid(cl_ll_int, self.Survey.zz_integr, axis=1)[:self.Survey.nell_wl, :, :]
+        cl_ll = trapezoid(cl_ll_int, self.Survey.zz_integr, axis=1)[:self.Survey.nell_wl, :, :]  # simpson(cl_ll_int, self.Survey.zz_integr, axis=1)[:self.Survey.nell_wl, :, :]
         # add noise to the auto-correlated bins
         for i in range(self.Survey.nbin):
             cl_ll[:, i, i] += self.Survey.noise['LL']
@@ -1279,7 +1279,7 @@ class Theory:
         #cl_lg_int = W_L[:, :, :, None] * W_G * self.pgm[:,:,None,:] / self.ez[None,:,None,None] / self.rz[None,:,None,None] / self.rz[None,:,None,None] / H0_h_c
 
         # integrate along the z-integr direction
-        cl_lg = simpson(cl_lg_int, self.Survey.zz_integr, axis=1)[:self.Survey.nell_xc,:,:] #trapezoid(cl_lg_int, self.Survey.zz_integr, axis=1)[:self.Survey.nell_xc,:,:]
+        cl_lg = trapezoid(cl_lg_int, self.Survey.zz_integr, axis=1)[:self.Survey.nell_xc,:,:]  # simpson(cl_lg_int, self.Survey.zz_integr, axis=1)[:self.Survey.nell_xc,:,:] 
         # transpose LG to get GL
         cl_gl = np.transpose(cl_lg, (0, 2, 1))  
         return cl_lg, cl_gl
