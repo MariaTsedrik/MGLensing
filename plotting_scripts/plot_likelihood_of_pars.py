@@ -54,7 +54,7 @@ params_fid = {
 print('Specifiy likelihood, data and theoretical model in config.yaml')
 MGL = MGLensing.MGL("config.yaml")
 zz = MGL.Survey.zz_integr
-nbin = MGL.Survey.nbin
+nbin = MGL.Survey.nbin_s
 
 bias1_arr = np.array([1.239, 1.378, 1.525, 1.677, 1.832])
 biasL1_arr = bias1_arr-1

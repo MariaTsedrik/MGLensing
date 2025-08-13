@@ -276,9 +276,10 @@ class MGL():
         with open(self.config_dic['theory']['params'], "r", encoding="utf-8") as file_in:
             params_dic = yaml.safe_load(file_in)
         
+        
         # if sampling in bias*sigma8 change values of bias as bias = bias*sigma8 
         if self.theo_model_dic['bias_model'] == 5:
-            for i in range(1, 6):
+            for i in range(1, self.Survey.nbin_l+1):
                 # change fiducials for test-runs
                 params_dic['b1_'+str(i)]['p0'] = params_dic['b1_'+str(i)]['p0']*params_dic['sigma8_cb']['p0']
                 # change prior ranges
@@ -286,7 +287,7 @@ class MGL():
                     params_dic['b1_'+str(i)]['p1'] = params_dic['b1_'+str(i)]['p1']*params_dic['sigma8_cb']['p1']
                     params_dic['b1_'+str(i)]['p2'] = params_dic['b1_'+str(i)]['p2']*params_dic['sigma8_cb']['p2']
         if self.theo_model_dic['bias_model'] == 6:
-            for i in range(1, 6):
+            for i in range(1, self.Survey.nbin_l+1):
                 # change fiducials for test-runs
                 params_dic['b1L_'+str(i)]['p0'] = params_dic['b1L_'+str(i)]['p0']*params_dic['sigma8_cb']['p0']
                 params_dic['b2L_'+str(i)]['p0'] = params_dic['b2L_'+str(i)]['p0']*params_dic['sigma8_cb']['p0']
@@ -527,7 +528,10 @@ class MGL():
             matter_power_spectrum=bemu_nl
         )
         bias_ia = params['a1_IA'] * (1. + self.Survey.zz_integr) ** params['eta1_IA'] * 0.0134 / 0.01387684609
-        nbin = self.Survey.nbin
+        if self.Survey.nbin_s==self.Survey.nbin_l:
+            nbin = self.Survey.nbin_s
+        else:
+            raise NotImplementedError('get_c_ells_CCL(params, theo_model) with different nbin_l and nbin_s is not implemented yet!')    
         n_ell = len(self.Survey.ell)
         cl_ll = np.zeros((n_ell, nbin, nbin))
         cl_gg = np.zeros((n_ell, nbin, nbin))
@@ -634,26 +638,26 @@ class MGL():
         by taking the square root of the diagonal elements of the covariance matrix. The error bars are
         then split into different components based on the survey configuration.
         """
-        mask_data_vector_3x2pt = np.ones(int(2*self.Survey.lbin*self.Survey.nbin_flat+self.Survey.lbin*self.Survey.nbin**2), dtype=bool)
+        mask_data_vector_3x2pt = np.ones(int(self.Survey.lbin*(self.Survey.nbin_flat_s+self.Survey.nbin_flat_l+self.Survey.nbin_s*self.Survey.nbin_l)), dtype=bool)
         self.Data.DataModel.Survey.mask_cov_3x2pt = np.ix_(mask_data_vector_3x2pt, mask_data_vector_3x2pt)
-        cov3x2pt = self.Data.DataModel.compute_covariance_3x2pt(params)
+        cov3x2pt = self.Data.DataModel.compute_covariance_cosmosis_3x2pt(params)
         errorbars = np.sqrt(np.diag(cov3x2pt))
-        start_lg = self.Survey.lbin*self.Survey.nbin_flat 
-        start_gc = start_lg+self.Survey.lbin*self.Survey.nbin**2
+        start_xc = self.Survey.lbin*self.Survey.nbin_flat_s 
+        start_gc = start_xc+self.Survey.lbin*self.Survey.nbin_s*self.Survey.nbin_l
         
-        errorbars_ll = errorbars[:start_lg]
-        errorbars_lg = errorbars[start_lg:start_gc]
+        errorbars_ll = errorbars[:start_xc]
+        errorbars_xc = errorbars[start_xc:start_gc]
         errorbars_gg = errorbars[start_gc:]
         #return errorbars_ll, errorbars_gg, errorbars_lg, errorbars_gl
-        err_cl_ll = _errorbars_for_plots(self.Survey.nell_wl, self.Survey.nbin, errorbars_ll)
-        err_cl_gg = _errorbars_for_plots(self.Survey.nell_gc, self.Survey.nbin, errorbars_gg)
-        err_cl_lg = np.zeros((self.Survey.nell_xc, self.Survey.nbin, self.Survey.nbin))
+        err_cl_ll = _errorbars_for_plots(self.Survey.nell_wl, self.Survey.nbin_s, errorbars_ll)
+        err_cl_gg = _errorbars_for_plots(self.Survey.nell_gc, self.Survey.nbin_l, errorbars_gg)
+        err_cl_xc = np.zeros((self.Survey.nell_xc, self.Survey.nbin_l, self.Survey.nbin_s))
         idx_start = 0
-        for bin1 in range(self.Survey.nbin):
-            for bin2 in range(self.Survey.nbin):
-                err_cl_lg[:, bin1, bin2] = errorbars_lg[idx_start*self.Survey.nell_xc:(idx_start+1)*self.Survey.nell_xc]
+        for bin1 in range(self.Survey.nbin_l):
+            for bin2 in range(self.Survey.nbin_s):
+                err_cl_xc[:, bin1, bin2] = errorbars_xc[idx_start*self.Survey.nell_xc:(idx_start+1)*self.Survey.nell_xc]
                 idx_start += 1
-        return  err_cl_ll, err_cl_gg, err_cl_lg    
+        return  err_cl_ll, err_cl_gg, err_cl_xc   
 
     
     def get_sigma8_from_a_s_from_chain(self, params, nl_model):
@@ -750,7 +754,7 @@ class MGL():
         # Observable: {observable}
         # Likelihood: {like}
         # Sky Fraction (fsky): {self.Survey.fsky}
-        # Redshift Binning: {self.Survey.nbin} bins ({self.Survey.zmin} ≤ z ≤ {self.Survey.zmax})
+        # Redshift Binning: {self.Survey.nbin_s} source bins and {self.Survey.nbin_l} lense bins ({self.Survey.zmin} ≤ z ≤ {self.Survey.zmax})
         # for n(z) {self.Survey.survey_name}-like
         # Lensing & Clustering Scales:
         #   - l_min: {self.Survey.lmin}

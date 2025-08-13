@@ -108,7 +108,7 @@ MGL = MGLensing.MGL("config.yaml")
 # MGL Cells 
 ell_g = MGL.Survey.l_gc
 zz_integr = MGL.Survey.zz_integr
-nbin = MGL.Survey.nbin
+nbin = MGL.Survey.nbin_l
 
 # b_i = 0 (i > 1)
 params = {'Omega_m' : 0.31,

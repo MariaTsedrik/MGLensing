@@ -80,7 +80,7 @@ def get_noise(nbins, gal_per_sqarcmn):
     n_bar /= nbins
     return n_bar
 
-def check_length(scale_cuts_info, nbin):
+def check_length(scale_cuts_info, nbin_s, nbin_l):
     """
     Check the length of scale cuts information based on the type and number of bins.
 
@@ -97,15 +97,16 @@ def check_length(scale_cuts_info, nbin):
         If the length of 'max_WL' or 'max_GC' does not match the expected number of bins.
     """
     labels = ['max_WL', 'max_GC']
-    nbins = int(nbin*(1+nbin)/2)
+    nbins = {'max_WL':int(nbin_s*(1+nbin_s)/2), 'max_GC': int(nbin_l*(1+nbin_l)/2)}
+    nbin = {'max_WL': nbin_s, 'max_GC': nbin_l}
     if scale_cuts_info['type'] == 'lmax':
         for label in labels:
-            if len(scale_cuts_info[label])!=nbins:
-                raise ValueError(label+' length must be equal to '+str(nbins)+'!')
+            if len(scale_cuts_info[label])!=nbins[label]:
+                raise ValueError(label+' length must be equal to '+str(nbins[label])+'!')
     elif scale_cuts_info['type'] == 'kmax':
         for label in labels:
-            if len(scale_cuts_info[label])!=nbin:
-                raise ValueError(label+' length must be equal to '+str(nbin)+'!')
+            if len(scale_cuts_info[label])!=nbin[label]:
+                raise ValueError(label+' length must be equal to '+str(nbins[label])+'!')
 
 
 def get_rcom(params_dic, z_max):
@@ -160,11 +161,21 @@ def from_keff_to_lmax(n, k_eff, z_mod, params_dic):
             print('bin1, bin2: ', bin1, bin2, 'k_eff[bin1]: ', k_eff[bin1], 'z_mod[bin1]: ', z, 'lmax: ', lmax_i)
     return lmax
 
-def max_ells_for_plots(n, flat_array):
-    matrix_ell_cuts = np.zeros((n, n), dtype=int)
-    iu1 = np.triu_indices(n)
-    matrix_ell_cuts[iu1] = flat_array
-    matrix_ell_cuts = matrix_ell_cuts + matrix_ell_cuts.T - np.diag(np.diag(matrix_ell_cuts))
+def max_ells_for_plots(n1, n2, flat_array):
+    matrix_ell_cuts = np.zeros((n1, n2), dtype=int)
+    if n1==n2:
+        iu1 = np.triu_indices(n1)
+        matrix_ell_cuts[iu1] = flat_array
+        matrix_ell_cuts = matrix_ell_cuts + matrix_ell_cuts.T - np.diag(np.diag(matrix_ell_cuts))
+    else:
+        # for cross-correlation n1=n_lenses, n2=n_sources
+        iu1 = np.triu_indices(n1)
+        matrix_ell_cuts_gc = np.zeros((n1, n1), dtype=int)
+        matrix_ell_cuts_gc[iu1] = flat_array
+        matrix_ell_cuts_gc_diag = np.diag(matrix_ell_cuts_gc)
+        for bin1 in range(n1):
+            for bin2 in range(n2):
+                matrix_ell_cuts[bin1][bin2]=matrix_ell_cuts_gc_diag[bin1]
     return matrix_ell_cuts
 
 def setup_const_lmax(obj, likelihood):
@@ -184,7 +195,8 @@ def setup_const_lmax(obj, likelihood):
     -------
     None
     """
-    nbin_flat = obj.nbin_flat
+    nbin_flat_s = obj.nbin_flat_s
+    nbin_flat_l = obj.nbin_flat_l
     if likelihood == 'determinants':
         idx_lmax_wl = int(np.argwhere(obj.ell >= int(obj.lmax_wl_vals))[0]) 
         # binned ell_wl cut at highest lmax
@@ -203,12 +215,12 @@ def setup_const_lmax(obj, likelihood):
         obj.ells_gc = np.array(range(obj.lmin, int(obj.lmax_gc_vals)+1)) # all integer ells
         obj.ell_jump =  int(obj.lmax_gc_vals) - obj.lmin + 1
     else:
-        obj.lmax_wl_vals = np.full(obj.nbin_flat, obj.lmax_wl_vals)
-        obj.lmax_gc_vals = np.full(obj.nbin_flat, obj.lmax_gc_vals)
+        obj.lmax_wl_vals = np.full(nbin_flat_s, obj.lmax_wl_vals)
+        obj.lmax_gc_vals = np.full(nbin_flat_l, obj.lmax_gc_vals)
         setup_lmax(obj)
 
-    obj.ells_wl_max = max_ells_for_plots(obj.nbin, np.full(nbin_flat, obj.lmax_wl_vals))
-    obj.ells_gc_max = max_ells_for_plots(obj.nbin, np.full(nbin_flat, obj.lmax_gc_vals))    
+    obj.ells_wl_max = max_ells_for_plots(obj.nbin_s, obj.nbin_s, np.full(nbin_flat_s, obj.lmax_wl_vals))
+    obj.ells_gc_max = max_ells_for_plots(obj.nbin_l, obj.nbin_l, np.full(nbin_flat_l, obj.lmax_gc_vals))    
 
 
 def setup_lmax(obj):
@@ -249,7 +261,8 @@ def setup_lmax(obj):
     mask_ells_gc = np.array([(obj.ell_bin_edges<= lmax_gc_i) for lmax_gc_i in obj.lmax_gc_vals])
     mask_ells_gc = mask_ells_gc[:, 1:]
     # later add an option to define xc cuts independently
-    lmax_xc_vals_2d = max_ells_for_plots(obj.nbin, obj.lmax_gc_vals)
+    # here we assume that xc=GL and not LG
+    lmax_xc_vals_2d = max_ells_for_plots(obj.nbin_l, obj.nbin_s, obj.lmax_gc_vals)
     obj.lmax_xc_vals = np.concatenate(lmax_xc_vals_2d)
     mask_ells_xc = np.array([(obj.ell_bin_edges<= lmax_xc_i) for lmax_xc_i in obj.lmax_xc_vals])
     mask_ells_xc = mask_ells_xc[:, 1:]
@@ -261,8 +274,8 @@ def setup_lmax(obj):
     obj.mask_cov_wl = np.ix_(obj.mask_data_vector_wl, obj.mask_data_vector_wl)
     obj.mask_cov_gc = np.ix_(obj.mask_data_vector_gc, obj.mask_data_vector_gc)
     obj.mask_cov_3x2pt = np.ix_(obj.mask_data_vector_3x2pt, obj.mask_data_vector_3x2pt)
-    obj.ells_wl_max = max_ells_for_plots(obj.nbin, obj.lmax_wl_vals)
-    obj.ells_gc_max = max_ells_for_plots(obj.nbin, obj.lmax_gc_vals)
+    obj.ells_wl_max = max_ells_for_plots(obj.nbin_s, obj.nbin_s, obj.lmax_wl_vals)
+    obj.ells_gc_max = max_ells_for_plots(obj.nbin_l, obj.nbin_l, obj.lmax_gc_vals)
 
     
     
@@ -310,7 +323,8 @@ def validate_and_setup_lmax(obj, scale_cuts_info, likelihood, lmin, lmax, zz_mod
         - Incompatible likelihood approach for varied lmax.
         - lmax_gc being greater than lmax_wl in 'const_lmax' type.
     """
-    obj.nbin_flat = int(0.5 * obj.nbin * (obj.nbin + 1))
+    obj.nbin_flat_s = int(0.5 * obj.nbin_s * (obj.nbin_s + 1))
+    obj.nbin_flat_l = int(0.5 * obj.nbin_l * (obj.nbin_l + 1))
     if any(val > lmax for val in scale_cuts_info['max_WL'] + scale_cuts_info['max_GC']):
             raise ValueError(f'lmax cannot exceed {lmax}!!!')    
     if scale_cuts_info['type'] == 'const_lmax':
@@ -322,18 +336,18 @@ def validate_and_setup_lmax(obj, scale_cuts_info, likelihood, lmin, lmax, zz_mod
     elif scale_cuts_info['type'] == 'lmax':
         if likelihood!='binned':
             raise ValueError('Varied lmax is applicable only for the binned approach!')
-        check_length(scale_cuts_info, obj.nbin)
+        check_length(scale_cuts_info, obj.nbin_s, obj.nbin_l)
         obj.lmax_wl_vals = scale_cuts_info['max_WL']
         obj.lmax_gc_vals= scale_cuts_info['max_GC']
         setup_lmax(obj)
     elif scale_cuts_info['type'] == 'kmax':   
         if likelihood!='binned':
             raise ValueError('Varied kmax is applicable only for the binned approach!') 
-        check_length(scale_cuts_info, obj.nbin)
+        check_length(scale_cuts_info, obj.nbin_s, obj.nbin_l)
         params_dic = scale_cuts_info['cosmo']
-        lmax_wl = from_keff_to_lmax(obj.nbin, scale_cuts_info['max_WL'], zz_mod_wl, params_dic)
+        lmax_wl = from_keff_to_lmax(obj.nbin_s, scale_cuts_info['max_WL'], zz_mod_wl, params_dic)
         lmax_wl = np.array(lmax_wl).astype(int)
-        lmax_gc = from_keff_to_lmax(obj.nbin, scale_cuts_info['max_GC'], zz_mod_gg, params_dic)
+        lmax_gc = from_keff_to_lmax(obj.nbin_l, scale_cuts_info['max_GC'], zz_mod_gg, params_dic)
         lmax_gc = np.array(lmax_gc).astype(int)
         obj.lmax_wl_vals = lmax_wl 
         obj.lmax_gc_vals = lmax_gc 
@@ -466,25 +480,38 @@ class LSSTSetUp:
         
         if survey_info == 'LSST_Y1':
             self.fsky = 0.43 #0.5
-            self.gal_per_sqarcmn = 20.0
+            #self.gal_per_sqarcmn = 20.0
             self.gal_per_sqarcmn_s = 10.0
             self.gal_per_sqarcmn_l = 18.0
             self.rms_shear = 0.26
-            self.nbin = 5 
-            npy_file_lens = dirname+'/lsst_lens_bins_year_1.npy'
-            npy_file_source = dirname+'/lsst_source_bins_year_1.npy'
+            #self.nbin = 5 
+            self.nbin_l = 5
+            self.nbin_s = 5
+            nz_sacc_file = dirname+'/n_of_z/forecast_fid.sacc'
+            npy_file_lens = dirname+'/n_of_z/lsst_lens_bins_year_1.npy'
+            npy_file_source = dirname+'/n_of_z/lsst_source_bins_year_1.npy'
             self.z_bin_center_s = np.array([2.253273944137912099e-01, 4.490567958326107112e-01, 6.545664037512012312e-01, 9.258332934738261466e-01, 1.590547464182611836e+00]) #from DESC github
             self.z_bin_center_l = np.array([3.083232685515536753e-01, 5.011373846158426737e-01, 6.981257392184466726e-01, 8.964730913147888058e-01, 1.095412294727920344e+00])  #from DESC github
         elif survey_info == 'LSST_Y10': 
-            raise NotImplementedError('LSST_Y10 is not implemented yet')  
-
+            self.fsky = 0.43 #0.5
+            #self.gal_per_sqarcmn = 20.0
+            self.gal_per_sqarcmn_s = 27.0
+            self.gal_per_sqarcmn_l = 48.0
+            self.rms_shear = 0.26
+            self.nbin_s = 5
+            self.nbin_l = 10 
+            self.z_bin_center_s = np.array([0.3093, 0.589, 0.8671, 1.241, 2.0528]) #from DESC github
+            self.z_bin_center_l = np.array([0.2627, 0.3587, 0.4563, 0.5547, 0.6534, 0.7522, 0.8513, 0.9504, 1.0495, 1.1486])  #from DESC github
+            npy_file_lens = dirname+'/n_of_z/lsst_lens_bins_year_10.npy'
+            npy_file_source = dirname+'/n_of_z/lsst_source_bins_year_10.npy'
         # normalized galaxy distribution and noise
         self.eta_z_s, self.eta_z_l = self.get_norm_galaxy_distrib(npy_file_lens, npy_file_source) 
-        zz_mod_wl = [self.zz_integr[np.argmax(self.eta_z_s[:, i])] for i in range (self.nbin)]
-        zz_mod_gg = [self.zz_integr[np.argmax(self.eta_z_l[:, i])] for i in range (self.nbin)]
-        n_bar = get_noise(self.nbin, self.gal_per_sqarcmn)
-        n_bar_l = get_noise(self.nbin, self.gal_per_sqarcmn_l)
-        n_bar_s = get_noise(self.nbin, self.gal_per_sqarcmn_s)
+        # WARNINRG: taking a maximum value of n(z) and not W(z): fine for galazy clustering but very wrong for weak lensing
+        zz_mod_wl = [self.zz_integr[np.argmax(self.eta_z_s[:, i])] for i in range (self.nbin_s)]
+        zz_mod_gg = [self.zz_integr[np.argmax(self.eta_z_l[:, i])] for i in range (self.nbin_l)]
+        #n_bar = get_noise(self.nbin, self.gal_per_sqarcmn)
+        n_bar_l = get_noise(self.nbin_l, self.gal_per_sqarcmn_l)
+        n_bar_s = get_noise(self.nbin_s, self.gal_per_sqarcmn_s)
         self.noise = {
         'LL': self.rms_shear**2./n_bar_l,
         'LG': 0.,
@@ -500,6 +527,8 @@ class LSSTSetUp:
         lmax = 5e3
         self.lmax = lmax
         if likelihood == 'determinants':
+            if self.nbin_s != self.nbin_l and self.observable=='3x2pt':
+                raise ValueError('Likelihood with determinants is valid only for the same number of z-bins in lenses and sources!')
             self.ell = np.logspace(log10(lmin), log10(lmax), num=self.lbin, endpoint=True) 
         elif likelihood == 'binned':
             self.ell_bin_edges = np.logspace(log10(lmin), log10(lmax), num=self.lbin+1, endpoint=True) 
@@ -513,7 +542,7 @@ class LSSTSetUp:
         self.lum_func = get_luminosity_func(dirname+'/scaledmeanlum_E2Sa.dat')
         self.likelihood = likelihood
 
-
+        
     def get_norm_galaxy_distrib(self, file_name_l, file_name_s):
         """
         Reads the source and lens galaxy normalized distributions from a npy file
@@ -562,6 +591,66 @@ class LSSTSetUp:
             norm_nz_s[:,Bin] = norm_nz_s[:,Bin] / check_nz_s_i
         
         return norm_nz_s, norm_nz_l  
+
+    def get_norm_galaxy_distrib_sacc(self, file_name):
+        """
+        Reads the source and lens galaxy normalized distributions from a sacc file
+        and compresses them to the required number of redshifts.
+
+        Parameters:
+        -----------
+        file_name : str
+            Name of the sacc file.
+
+        Returns:
+        --------
+        norm_nz_s : np.ndarray
+            Normalized source galaxy distribution as a function of redshift. 
+            Shape: (zbin_integr, nbin).
+        norm_nz_l : np.ndarray
+            Normalized lens galaxy distribution as a function of redshift. 
+            Shape: (zbin_integr, nbin).
+        """
+        s = sacc.Sacc.load_fits(file_name)
+        dndz_z = []
+        lens_z = []
+        z_arr = s.tracers['src0'].z
+        # reduce redshift range
+        #indx_min = np.where(z_arr==self.zmin)[0][0]
+        #indx_max = np.where(z_arr==self.zmax)[0][0]
+        #z_arr = z_arr[indx_min:indx_max]
+        # read sources and lenses distributions for each bin
+        for i in range(self.nbin_s):
+            dndz_z_i = s.tracers['src'+str(i)].nz
+            dndz_z.append(np.interp(self.zz_integr, z_arr, dndz_z_i))
+        for i in range(self.nbin_l):    
+            lens_z_i = s.tracers['lens'+str(i)].nz
+            lens_z.append(np.interp(self.zz_integr, z_arr, lens_z_i))
+            #dndz_z.append(s.tracers['src'+str(i)].nz[indx_min:indx_max]) 
+            #lens_z.append(s.tracers['lens'+str(i)].nz[indx_min:indx_max])
+            # reduce array size
+            #dndz_z[i] = reduce_len_by_averaging(dndz_z[i], target_len=z_bins_for_integration)
+            #lens_z[i] = reduce_len_by_averaging(lens_z[i], target_len=z_bins_for_integration)
+        # reduce z array size
+        #z_arr = reduce_len_by_averaging(z_arr, target_len=z_bins_for_integration)
+        #self.zz_integr = z_arr
+        #self.zbin_integr = len(z_arr)
+
+        
+        norm_nz_s = np.array(dndz_z).T
+        norm_nz_l = np.array(lens_z).T
+        
+        # check if normalized galaxy distribution integrates to 1
+        for Bin in range(self.nbin_s):
+            check_nz_s_i = trapezoid(norm_nz_s[:,Bin],self.zz_integr[:]) 
+            print('Source galaxy distribution for bin ', Bin, ' integrates to ', check_nz_s_i)
+            norm_nz_s[:,Bin] = norm_nz_s[:,Bin] / check_nz_s_i
+        for Bin in range(self.nbin_l):    
+            check_nz_l_i= trapezoid(norm_nz_l[:,Bin],self.zz_integr[:]) 
+            print('Lens galaxy distribution for bin ', Bin, ' integrates to ', check_nz_l_i)
+            norm_nz_l[:,Bin] = norm_nz_l[:,Bin] / check_nz_l_i
+        
+        return norm_nz_s, norm_nz_l    
     
 
 class EuclidSetUp:
@@ -654,20 +743,25 @@ class EuclidSetUp:
         self.zmin = 0.001
         self.zmax  = 2.5 
 
-        self.gal_per_sqarcmn = 30.0
+        self.gal_per_sqarcmn_l = self.gal_per_sqarcmn_s = 30.0
         self.rms_shear = 0.30
         self.fsky = 0.375 #15k deg^2
         self.lbin = 20 #100
         self.lmin = 10
         self.lmax = 5000
         if survey_info == 'Euclid_5bins':
-            self.nbin = 5 
+            #self.nbin = 5 
+            self.nbin_l = 5 
+            self.nbin_s = 5 
             self.z_bin_edge = np.array([self.zmin, 0.560, 0.789, 1.019, 1.324, self.zmax])  
+            self.z_bin_edge_s = self.z_bin_edge_l = self.z_bin_edge
             self.fsky = 0.375 #15k deg^2 #sky coverage 14_700  in in deg^2, fskay=sky coverage/DEG2_IN_SPHERE
 
         elif survey_info == 'Euclid_Y1':
-            self.nbin = 5 
+            self.nbin_l = 5 
+            self.nbin_s = 5 
             self.z_bin_edge = np.array([self.zmin, 0.560, 0.789, 1.019, 1.324, self.zmax])  
+            self.z_bin_edge_s = self.z_bin_edge_l = self.z_bin_edge
             self.fsky = 0.375/3. #5k deg^2   
             self.lbin = 30 #80
             self.lmin = 100
@@ -675,27 +769,33 @@ class EuclidSetUp:
             self.gal_per_sqarcmn = 15.0
              
         elif survey_info == 'Euclid_10bins':    
-            self.nbin = 10
+            self.nbin_l = 10
+            self.nbin_s = 10
             self.z_bin_edge = np.array([self.zmin, 0.418, 0.560, 0.678, 0.789, 0.900, 1.019, 1.155, 1.324, 1.576, 2.5])
+            self.z_bin_edge_s = self.z_bin_edge_l = self.z_bin_edge
             self.fsky = 14_700/DEG2_IN_SPHERE #0.4 
-        self.z_bin_center = np.array([(self.z_bin_edge[i]+self.z_bin_edge[i+1])/2 for i in range(self.nbin)])
-        self.z_bin_center_s = self.z_bin_center_l = self.z_bin_center
+        self.z_bin_center_s = np.array([(self.z_bin_edge_s[i]+self.z_bin_edge_s[i+1])/2 for i in range(self.nbin_s)])
+        self.z_bin_center_l = np.array([(self.z_bin_edge_l[i]+self.z_bin_edge_l[i+1])/2 for i in range(self.nbin_l)])
         # z values for integration (!= from z bins)
         self.zbin_integr = z_bins_for_integration 
         self.zz_integr = np.linspace(self.zmin, self.zmax, num=self.zbin_integr, endpoint=True)
         self.aa_integr = np.array(1./(1.+self.zz_integr[::-1])) 
         # normalized galaxy distribution and noise
         self.eta_z_s, self.eta_z_l = self.get_norm_galaxy_distrib()
-        zz_mod_wl = [self.zz_integr[np.argmax(self.eta_z_s[:, i])] for i in range (self.nbin)]
-        zz_mod_gg = [self.zz_integr[np.argmax(self.eta_z_l[:, i])] for i in range (self.nbin)]
-        self.n_bar = get_noise(self.nbin, self.gal_per_sqarcmn) 
+        zz_mod_wl = [self.zz_integr[np.argmax(self.eta_z_s[:, i])] for i in range (self.nbin_s)]
+        zz_mod_gg = [self.zz_integr[np.argmax(self.eta_z_l[:, i])] for i in range (self.nbin_l)]
+        n_bar_l = get_noise(self.nbin_l, self.gal_per_sqarcmn_l)
+        n_bar_s = get_noise(self.nbin_s, self.gal_per_sqarcmn_s)
         self.noise = {
-        'LL': self.rms_shear**2./self.n_bar,
+        'LL': self.rms_shear**2./n_bar_l,
         'LG': 0.,
         'GL': 0.,
-        'GG': 1./self.n_bar}
+        'GG': 1./n_bar_s
+        }
         # \ell bins setup
         if likelihood == 'determinants':
+            if self.nbin_s != self.nbin_l and self.observable=='3x2pt':
+                raise ValueError('Likelihood with determinants is valid only for the same number of z-bins in lenses and sources!')
             self.ell = np.logspace(log10(self.lmin), log10(self.lmax), num=self.lbin, endpoint=True) 
         elif likelihood == 'binned':
             self.ell_bin_edges = np.logspace(log10(self.lmin), log10(self.lmax), num=self.lbin+1, endpoint=True) 
@@ -728,7 +828,7 @@ class EuclidSetUp:
         galaxy_dist = (z/z0)**2*exp(-(z/z0)**(1.5))
         return galaxy_dist
     
-    def photo_z_distribution(self, z, bin):
+    def photo_z_distribution(self, z, bin, tracer='s'):
         """
         Calculate the photo-z error distribution for a given redshift and bin.
         It follows Eqs. (112, 113, 115) in https://arxiv.org/pdf/1910.09273.
@@ -748,10 +848,16 @@ class EuclidSetUp:
         c0, z0, sigma_0 = 1.0, 0.1, 0.05
         cb, zb, sigma_b = 1.0, 0.0, 0.05
         f_out = 0.1
-        term1 = f_out*    erf((0.707107*(z-z0-c0*self.z_bin_edge[bin - 1]))/(sigma_0*(1+z)))/(2.*c0)
-        term2 =-f_out*    erf((0.707107*(z-z0-c0*self.z_bin_edge[bin    ]))/(sigma_0*(1+z)))/(2.*c0)
-        term3 = c0*(1-f_out)*erf((0.707107*(z-zb-cb*self.z_bin_edge[bin - 1]))/(sigma_b*(1+z)))/(2.*cb)
-        term4 =-c0*(1-f_out)*erf((0.707107*(z-zb-cb*self.z_bin_edge[bin    ]))/(sigma_b*(1+z)))/(2.*cb)
+        if tracer=='s':
+            z_bin_edge = self.z_bin_edge_s
+        elif tracer=='l':
+            z_bin_edge = self.z_bin_edge_l
+        else:
+            raise ValueError('Wrong tracer!')        
+        term1 = f_out*    erf((0.707107*(z-z0-c0*z_bin_edge[bin - 1]))/(sigma_0*(1+z)))/(2.*c0)
+        term2 =-f_out*    erf((0.707107*(z-z0-c0*z_bin_edge[bin    ]))/(sigma_0*(1+z)))/(2.*c0)
+        term3 = c0*(1-f_out)*erf((0.707107*(z-zb-cb*z_bin_edge[bin - 1]))/(sigma_b*(1+z)))/(2.*cb)
+        term4 =-c0*(1-f_out)*erf((0.707107*(z-zb-cb*z_bin_edge[bin    ]))/(sigma_b*(1+z)))/(2.*cb)
         return term1+term2+term3+term4
 
     def get_norm_galaxy_distrib(self):
@@ -768,16 +874,25 @@ class EuclidSetUp:
                 - norm_nz (numpy.ndarray): The same normalized galaxy distribution, returned twice as the source distribution
                   is equal to the lens distribution in Euclid. Shape: (zbin_integr, nbin).
         """
-        norm_nz = np.zeros((self.zbin_integr, self.nbin), 'float64')
-        photo_z = np.zeros((self.zbin_integr, self.nbin), 'float64')
+        norm_nz_l = np.zeros((self.zbin_integr, self.nbin_l), 'float64')
+        photo_z_l = np.zeros((self.zbin_integr, self.nbin_l), 'float64')
+
+        norm_nz_s = np.zeros((self.zbin_integr, self.nbin_s), 'float64')
+        photo_z_s = np.zeros((self.zbin_integr, self.nbin_s), 'float64')
         # calculate n(z) and photo-z error
-        for Bin in range(self.nbin):
-                for nz in range(self.zbin_integr):
-                    z = self.zz_integr[nz]
-                    photo_z[nz,Bin] = self.photo_z_distribution(z,Bin+1)
-                    norm_nz[nz, Bin] = photo_z[nz,Bin] * self.galaxy_distribution(z)
-        # normalize galaxy distribution 
-        for Bin in range(self.nbin):
-            norm_nz[:,Bin] /= trapezoid(norm_nz[:,Bin],self.zz_integr[:]) 
-        # return twice as source distrib = lenses distribution in Euclid
-        return norm_nz, norm_nz 
+        for Bin in range(self.nbin_l):
+            for nz in range(self.zbin_integr):
+                z = self.zz_integr[nz]
+                photo_z_l[nz,Bin] = self.photo_z_distribution(z,Bin+1, 'l')
+                norm_nz_l[nz, Bin] = photo_z_l[nz,Bin] * self.galaxy_distribution(z)
+            # normalize galaxy distribution 
+            norm_nz_l[:,Bin] /= trapezoid(norm_nz_l[:,Bin],self.zz_integr[:]) 
+
+        for Bin in range(self.nbin_s):
+            for nz in range(self.zbin_integr):
+                z = self.zz_integr[nz]
+                photo_z_s[nz,Bin] = self.photo_z_distribution(z,Bin+1, 's')
+                norm_nz_s[nz, Bin] = photo_z_s[nz,Bin] * self.galaxy_distribution(z)
+            norm_nz_s[:,Bin] /= trapezoid(norm_nz_s[:,Bin],self.zz_integr[:])     
+
+        return norm_nz_s, norm_nz_l

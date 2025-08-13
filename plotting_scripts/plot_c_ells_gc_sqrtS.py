@@ -49,7 +49,7 @@ print('Ensure that likelihood type is binned in config.yaml')
 
 MGL = MGLensing.MGL("config.yaml")
 zz = MGL.Survey.zz_integr
-nbin = MGL.Survey.nbin
+nbin = MGL.Survey.nbin_l
 
 l_wl_max, l_gc_max = MGL.Survey.ells_wl_max, MGL.Survey.ells_gc_max
 l_wl, l_gc, l_xc = MGL.Survey.l_wl, MGL.Survey.l_gc, MGL.Survey.l_xc

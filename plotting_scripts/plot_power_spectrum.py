@@ -84,7 +84,7 @@ BIAS_HEFT_SIGMA8 = 6
 
 MGL = MGLensing.MGL("config.yaml")
 zz = MGL.Survey.zz_integr
-nbin = MGL.Survey.nbin
+nbin = MGL.Survey.nbin_l
 
 params = {
     'Omega_m' :  0.315,
