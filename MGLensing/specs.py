@@ -542,6 +542,7 @@ class LSSTSetUp:
         self.lum_func = get_luminosity_func(dirname+'/scaledmeanlum_E2Sa.dat')
         self.likelihood = likelihood
 
+        
     def get_norm_galaxy_distrib(self, file_name_l, file_name_s):
         """
         Reads the source and lens galaxy normalized distributions from a npy file
@@ -649,7 +650,7 @@ class LSSTSetUp:
             print('Lens galaxy distribution for bin ', Bin, ' integrates to ', check_nz_l_i)
             norm_nz_l[:,Bin] = norm_nz_l[:,Bin] / check_nz_l_i
         
-        return norm_nz_s, norm_nz_l     
+        return norm_nz_s, norm_nz_l    
     
 
 class EuclidSetUp:
