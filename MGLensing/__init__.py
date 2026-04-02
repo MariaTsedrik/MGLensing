@@ -9,14 +9,15 @@ import numpy as np
 import yaml
 import time
 from .theory import Theory
-from .specs import LSSTSetUp, EuclidSetUp
+from .specs import LSSTSetUp, EuclidSetUp, CLOESetUp
 from .likelihood import MGLike
 from datetime import timedelta
 import MGrowth as mg
 from scipy import interpolate as itp
 from scipy.linalg import cholesky, solve_triangular
 import matplotlib.pyplot as plt
-import pyccl as ccl
+
+import copy
 
 NL_MODEL_HMCODE = 0
 NL_MODEL_BACCO = 1
@@ -27,7 +28,9 @@ NL_MODEL_DS = 5
 NL_MODEL_FOFR = 6
 NL_MODEL_FOFR_EMANTIS = 7
 NL_MODEL_NDGP_EMU = 8
-NL_MODEL_MGROWTH = 9
+NL_MODEL_MUKZ = 9
+NL_MODEL_MUQ123 = 10
+NL_MODEL_MUSPLINE = 11
 
 BIAS_LIN = 0
 BIAS_HEFT = 2
@@ -157,12 +160,13 @@ class DataClass():
                 im3 = ax.imshow(pp_norm, cmap=cmap, vmin=-1, vmax=1)
                 fig.colorbar(im3, orientation='vertical')
                 plt.show()
+
+            self.inv_data_covariance = np.linalg.inv(self.data_covariance) 
             try:
                 self.cholesky_transform = cholesky(self.data_covariance, lower=True)
                 print('managed to do cholesky decomposition')
                 print('######CHOLESKY!!!!########')
             except:                
-                self.inv_data_covariance = np.linalg.inv(self.data_covariance)   
                 print('failed to do cholesky decomposition')
                 print('######INVERSE COVARIANCE!!!!########') 
 
@@ -247,6 +251,8 @@ class MGL():
             self.Survey = LSSTSetUp(self.config_dic)
         elif 'Euclid' in self.config_dic['specs']['survey_info']:
             self.Survey = EuclidSetUp(self.config_dic)    
+        elif self.config_dic['specs']['survey_info'] == 'CLOE':
+            self.Survey = CLOESetUp(self.config_dic)
         else:
             raise ValueError('Invalid survey name')
         if self.Survey.zz_integr[0]==0.:
@@ -258,18 +264,33 @@ class MGL():
             raise ValueError(f"Invalid probe type: {self.probe}. Must be '3x2pt', 'WL', or 'GC'.")
  
         self.path = self.config_dic.get('path', './')
-        self.chain_name = self.config_dic['output']['chain_name']
-        sampler_dic = self.config_dic['sampler']['mcmc']
-        self.hdf5_name = sampler_dic['hdf5_name']
-        self.mcmc_resume = sampler_dic['resume']
-        self.mcmc_verbose = sampler_dic['verbose']
-        self.mcmc_neff = sampler_dic['n_eff']
-        self.mcmc_nlive = sampler_dic['n_live']
-        self.mcmc_pool = sampler_dic['pool']
+        print('path: ', self.path)
+        self.chain_name = self.config_dic.get('output', {}).get('chain_name', 'default_chain_name')
+        if 'sampler' in self.config_dic:
+            sampler_dic = self.config_dic['sampler']['mcmc']
+            self.hdf5_name = sampler_dic['hdf5_name']
+            self.mcmc_resume = sampler_dic['resume']
+            self.mcmc_verbose = sampler_dic['verbose']
+            self.mcmc_neff = sampler_dic['n_eff']
+            self.mcmc_nlive = sampler_dic['n_live']
+            self.mcmc_pool = sampler_dic['pool']
+        else:
+            self.hdf5_name = 'default_name'
+            self.mcmc_resume = False
+            self.mcmc_verbose = True
+            self.mcmc_neff = 10000
+            self.mcmc_nlive = 2000
+            self.mcmc_pool = 10
+
         
         # save modelling choices
-        self.data_model_dic = self.config_dic['data']
-        self.theo_model_dic = self.config_dic['theory']
+        if 'data' in self.config_dic:
+            self.data_model_dic = self.config_dic['data']
+            # initialise data 
+            self.Data = DataClass(self.data_model_dic, self.Survey)
+        else:
+            print('No data model found, data object is not initialised.')
+            self.Data = None
 
         
         # save values of parameters (cosmological and nuisances)
@@ -277,38 +298,8 @@ class MGL():
             params_dic = yaml.safe_load(file_in)
         
         
-        # if sampling in bias*sigma8 change values of bias as bias = bias*sigma8 
-        if self.theo_model_dic['bias_model'] == 5:
-            for i in range(1, self.Survey.nbin_l+1):
-                # change fiducials for test-runs
-                params_dic['b1_'+str(i)]['p0'] = params_dic['b1_'+str(i)]['p0']*params_dic['sigma8_cb']['p0']
-                # change prior ranges
-                if params_dic['b1_'+str(i)]['type'] == 'U':
-                    params_dic['b1_'+str(i)]['p1'] = params_dic['b1_'+str(i)]['p1']*params_dic['sigma8_cb']['p1']
-                    params_dic['b1_'+str(i)]['p2'] = params_dic['b1_'+str(i)]['p2']*params_dic['sigma8_cb']['p2']
-        if self.theo_model_dic['bias_model'] == 6:
-            for i in range(1, self.Survey.nbin_l+1):
-                # change fiducials for test-runs
-                params_dic['b1L_'+str(i)]['p0'] = params_dic['b1L_'+str(i)]['p0']*params_dic['sigma8_cb']['p0']
-                params_dic['b2L_'+str(i)]['p0'] = params_dic['b2L_'+str(i)]['p0']*params_dic['sigma8_cb']['p0']
-                params_dic['bs2L_'+str(i)]['p0'] = params_dic['bs2L_'+str(i)]['p0']*params_dic['sigma8_cb']['p0']
-                params_dic['blaplL_'+str(i)]['p0'] = params_dic['blaplL_'+str(i)]['p0']*params_dic['sigma8_cb']['p0']
-                # change prior ranges
-                if params_dic['b1L_'+str(i)]['type'] == 'U':
-                    params_dic['b1L_'+str(i)]['p1'] = params_dic['b1L_'+str(i)]['p1']*params_dic['sigma8_cb']['p1']
-                    params_dic['b1L_'+str(i)]['p2'] = params_dic['b1L_'+str(i)]['p2']*params_dic['sigma8_cb']['p2']
-                if params_dic['b2L_'+str(i)]['type'] == 'U':
-                    params_dic['b2L_'+str(i)]['p1'] = params_dic['b2L_'+str(i)]['p1']*params_dic['sigma8_cb']['p1']
-                    params_dic['b2L_'+str(i)]['p2'] = params_dic['b2L_'+str(i)]['p2']*params_dic['sigma8_cb']['p2']
-                if params_dic['bs2L_'+str(i)]['type'] == 'U':
-                    params_dic['bs2L_'+str(i)]['p1'] = params_dic['bs2L_'+str(i)]['p1']*params_dic['sigma8_cb']['p1']
-                    params_dic['bs2L_'+str(i)]['p2'] = params_dic['bs2L_'+str(i)]['p2']*params_dic['sigma8_cb']['p2']
-                if params_dic['blaplL_'+str(i)]['type'] == 'U':
-                    params_dic['blaplL_'+str(i)]['p1'] = params_dic['blaplL_'+str(i)]['p1']*params_dic['sigma8_cb']['p1']
-                    params_dic['blaplL_'+str(i)]['p2'] = params_dic['blaplL_'+str(i)]['p2']*params_dic['sigma8_cb']['p2']
-        # initialise data 
-        self.Data = DataClass(self.data_model_dic, self.Survey)
         # initialise model
+        self.theo_model_dic = self.config_dic['theory']
         self.TheoryModel = Theory(self.Survey, self.theo_model_dic)  
 
         # need this later for Nautilus
@@ -324,7 +315,8 @@ class MGL():
             print('################################')
 
         # initialise the likelihood
-        self.Like = MGLike(self.TheoryModel, self.Data)
+        use_jax = self.theo_model_dic.get('use_jax', False) or self.config_dic.get('use_jax', False)
+        self.Like = MGLike(self.TheoryModel, self.Data, use_jax=use_jax)
 
 
     # functions bellow are not designed to be fast, but user-friendly instead
@@ -333,7 +325,7 @@ class MGL():
     def get_loglike(self, params):
         return self.Like.compute(params)    
 
-    def get_power_spectra(self, params, theo_model):
+    def get_power_spectra(self, params_in, theo_model):
         """
         Calculate the power spectra for a given set of parameters and theoretical model.
 
@@ -357,7 +349,10 @@ class MGL():
             - pgg : array-like
                 The galaxy power spectrum.
         """
+        
         NewModel = Theory(self.Survey, theo_model)
+        params = copy.deepcopy(params_in)
+        params = NewModel.apply_relations(params)
         _, _, k = NewModel.get_ez_rz_k(params)
         NewModel.k = k
         if theo_model['nl_model'] == NL_MODEL_BACCO and 'sigma8_cb' not in params:
@@ -391,7 +386,7 @@ class MGL():
         ez, rz, _ = self.TheoryModel.get_ez_rz_k(params)
         return ez, rz
     
-    def get_windows(self, params, theo_model):
+    def get_windows(self, params_in, theo_model):
         """
         Compute the kernels (W) for different components based on the theoretical model and parameters provided.
 
@@ -404,7 +399,8 @@ class MGL():
 
         """
         NewModel = Theory(self.Survey, theo_model)  
-        print('Theo model: ', theo_model)
+        params = copy.deepcopy(params_in)
+        params = NewModel.apply_relations(params)
         if theo_model['nl_model'] == NL_MODEL_BACCO and 'sigma8_cb' not in params:
             params['sigma8_cb'] = NewModel.StructureEmu.get_sigma8_cb(params) 
         if theo_model['nl_model'] == NL_MODEL_FOFR_EMANTIS and 'sigma8_lcdm' not in params:
@@ -427,7 +423,7 @@ class MGL():
     
 
     
-    def get_c_ells(self, params, theo_model):
+    def get_c_ells(self, params_in, theo_model):
         """
         Compute the angular power spectra (C_ells) for different components based on the theoretical model and parameters provided.
 
@@ -455,7 +451,9 @@ class MGL():
             - cl_gl : array
                 Angular power spectrum for galaxy-shear cross-correlations.
         """
-        NewModel = Theory(self.Survey, theo_model)  
+        NewModel = Theory(self.Survey, theo_model) 
+        params = copy.deepcopy(params_in)
+        params = NewModel.apply_relations(params)
         print('Theo model: ', theo_model)
         if theo_model['nl_model'] == NL_MODEL_BACCO and 'sigma8_cb' not in params:
             params['sigma8_cb'] = NewModel.StructureEmu.get_sigma8_cb(params) 
@@ -481,137 +479,6 @@ class MGL():
         cl_lg, cl_gl = NewModel.get_cell_cross() 
         return cl_ll, cl_gg, cl_lg, cl_gl  
     
-    def get_c_ells_CCL(self, params, theo_model):
-        """
-        Compute angular power spectra (C_ell) using pyccl for the given cosmological and nuisance parameters.
-
-        This method supports linear and HEFT bias models. It constructs the appropriate CCL cosmology and tracer objects,
-        computes the angular power spectra for lensing-lensing, galaxy-galaxy, and cross terms, and adds noise to the diagonals.
-
-        Parameters
-        ----------
-        params : dict
-            Dictionary of cosmological and nuisance parameters.
-        theo_model : dict
-            Dictionary specifying the theoretical model, including 'bias_model'.
-
-        Returns
-        -------
-        tuple of np.ndarray
-            cl_ll : (n_ell, nbin, nbin)
-                Shear-shear angular power spectra.
-            cl_gg : (n_ell, nbin, nbin)
-                Galaxy-galaxy angular power spectra.
-            cl_lg : (n_ell, nbin, nbin)
-                Shear-galaxy angular power spectra.
-            cl_gl : (n_ell, nbin, nbin)
-                Galaxy-shear angular power spectra.
-
-        Raises
-        ------
-        KeyError
-            If the bias model is not supported by this method.
-        """
-        bemu_nl = ccl.BaccoemuNonlinear()
-        cosmo_nl = ccl.Cosmology(
-            Omega_c=params['Omega_c'],
-            Omega_b=params['Omega_b'],
-            h=params['h'],
-            n_s=params['ns'],
-            sigma8=params['sigma8_cb'],
-            m_nu=params['Mnu'],
-            w0=params['w0'],
-            wa=params['wa'],
-            Omega_k=0.,
-            T_ncdm=0,
-            transfer_function='boltzmann_camb',
-            matter_power_spectrum=bemu_nl
-        )
-        bias_ia = params['a1_IA'] * (1. + self.Survey.zz_integr) ** params['eta1_IA'] * 0.0134 / 0.01387684609
-        if self.Survey.nbin_s==self.Survey.nbin_l:
-            nbin = self.Survey.nbin_s
-        else:
-            raise NotImplementedError('get_c_ells_CCL(params, theo_model) with different nbin_l and nbin_s is not implemented yet!')    
-        n_ell = len(self.Survey.ell)
-        cl_ll = np.zeros((n_ell, nbin, nbin))
-        cl_gg = np.zeros((n_ell, nbin, nbin))
-        cl_lg = np.zeros((n_ell, nbin, nbin))
-        cl_gl = np.zeros((n_ell, nbin, nbin))
-
-        if theo_model['bias_model'] == BIAS_LIN:
-            b1_arr = np.array([params[f'b1_{i+1}'] for i in range(nbin)])
-            for i in range(nbin):
-                bias_g_i = np.ones_like(self.Survey.zz_integr) * b1_arr[i]
-                t_g_i = ccl.NumberCountsTracer(cosmo_nl, has_rsd=False, dndz=(self.Survey.zz_integr, self.Survey.eta_z_l[:, i]), 
-                                               bias=(self.Survey.zz_integr, bias_g_i), mag_bias=None)
-                t_l_i = ccl.WeakLensingTracer(cosmo_nl, dndz=(self.Survey.zz_integr, self.Survey.eta_z_s[:, i]),
-                                              ia_bias=(self.Survey.zz_integr, bias_ia))
-                for j in range(nbin):
-                    bias_g_j = np.ones_like(self.Survey.zz_integr) * b1_arr[j]
-                    t_g_j = ccl.NumberCountsTracer(cosmo_nl, has_rsd=False, dndz=(self.Survey.zz_integr, self.Survey.eta_z_l[:, j]),
-                                                   bias=(self.Survey.zz_integr, bias_g_j), mag_bias=None)
-                    t_l_j = ccl.WeakLensingTracer(cosmo_nl, dndz=(self.Survey.zz_integr, self.Survey.eta_z_s[:, j]),
-                                                  ia_bias=(self.Survey.zz_integr, bias_ia))
-                    cl_ll[:, i, j] = ccl.angular_cl(cosmo_nl, t_l_i, t_l_j, self.Survey.l_wl)
-                    cl_gg[:, i, j] = ccl.angular_cl(cosmo_nl, t_g_i, t_g_j, self.Survey.l_gc)
-                    cl_lg[:, i, j] = ccl.angular_cl(cosmo_nl, t_l_i, t_g_j, self.Survey.l_xc)
-                    cl_gl[:, i, j] = ccl.angular_cl(cosmo_nl, t_g_i, t_l_j, self.Survey.l_xc)
-
-        elif theo_model['bias_model'] == BIAS_HEFT:
-            min_k = np.log10(2.e-4 * params['h'])
-            max_k = np.log10(0.7 * params['h'])
-            heft = ccl.nl_pt.BaccoLbiasCalculator(
-                cosmo=cosmo_nl, log10k_min=min_k, log10k_max=max_k, nk_per_decade=20
-            )
-            heft.update_ingredients(cosmo_nl)
-            b1L = np.array([params[f'b1L_{i+1}'] + 1 for i in range(nbin)])
-            b2L = np.array([params[f'b2L_{i+1}'] * 2 for i in range(nbin)])
-            bs2 = np.array([params[f'bs2L_{i+1}'] * 2 for i in range(nbin)])
-            bLap = np.array([params[f'blaplL_{i+1}'] * 2 for i in range(nbin)])
-            pk_gg = [[None for _ in range(nbin)] for _ in range(nbin)]
-            pk_lg = [[None for _ in range(nbin)] for _ in range(nbin)]
-            pk_gl = [[None for _ in range(nbin)] for _ in range(nbin)]
-            for i in range(nbin):
-                for j in range(nbin):
-                    ptt_g_i = ccl.nl_pt.PTNumberCountsTracer(b1=(self.Survey.zz_integr, b1L[i] * np.ones(len(self.Survey.zz_integr))), b2=(self.Survey.zz_integr, b2L[i] * np.ones(len(self.Survey.zz_integr))),
-                                                             bs=(self.Survey.zz_integr, bs2[i] * np.ones(len(self.Survey.zz_integr))), bk2=(self.Survey.zz_integr, bLap[i] * np.ones(len(self.Survey.zz_integr))))
-                    ptt_g_j = ccl.nl_pt.PTNumberCountsTracer(b1=(self.Survey.zz_integr, b1L[j] * np.ones(len(self.Survey.zz_integr))), b2=(self.Survey.zz_integr, b2L[j] * np.ones(len(self.Survey.zz_integr))),
-                                                             bs=(self.Survey.zz_integr, bs2[j] * np.ones(len(self.Survey.zz_integr))), bk2=(self.Survey.zz_integr, bLap[j] * np.ones(len(self.Survey.zz_integr))))
-                    ptt_l_i = ccl.nl_pt.PTMatterTracer()
-                    ptt_l_j = ccl.nl_pt.PTMatterTracer()
-                    pk_gg[i][j] = heft.get_biased_pk2d(tracer1=ptt_g_i, tracer2=ptt_g_j)
-                    pk_lg[i][j] = heft.get_biased_pk2d(tracer1=ptt_l_i, tracer2=ptt_g_j)
-                    pk_gl[i][j] = heft.get_biased_pk2d(tracer1=ptt_g_i, tracer2=ptt_l_j)
-            bias_g = np.ones_like(self.Survey.zz_integr)
-            for i in range(nbin):
-                t_g_i = ccl.NumberCountsTracer(cosmo_nl, has_rsd=False, dndz=(self.Survey.zz_integr, self.Survey.eta_z_l[:, i]),
-                                               bias=(self.Survey.zz_integr, bias_g), mag_bias=None)
-                t_l_i = ccl.WeakLensingTracer(cosmo_nl, dndz=(self.Survey.zz_integr, self.Survey.eta_z_s[:, i]),
-                                               ia_bias=(self.Survey.zz_integr, bias_ia))
-                for j in range(nbin):
-                    t_g_j = ccl.NumberCountsTracer(cosmo_nl, has_rsd=False, dndz=(self.Survey.zz_integr, self.Survey.eta_z_l[:, j]),
-                                                   bias=(self.Survey.zz_integr, bias_g), mag_bias=None)
-                    t_l_j = ccl.WeakLensingTracer(
-                        cosmo_nl,
-                        dndz=(self.Survey.zz_integr, self.Survey.eta_z_s[:, j]),
-                        ia_bias=(self.Survey.zz_integr, bias_ia)
-                    )
-                    cl_ll[:, i, j] = ccl.angular_cl(cosmo_nl, t_l_i, t_l_j, self.Survey.l_wl)
-                    cl_gg[:, i, j] = ccl.angular_cl(cosmo_nl, t_g_i, t_g_j, self.Survey.l_gc, p_of_k_a=pk_gg[i][j])
-                    cl_lg[:, i, j] = ccl.angular_cl(cosmo_nl, t_l_i, t_g_j, self.Survey.l_xc, p_of_k_a=pk_lg[i][j])
-                    cl_gl[:, i, j] = ccl.angular_cl(cosmo_nl, t_g_i, t_l_j, self.Survey.l_xc, p_of_k_a=pk_gl[i][j])
-
-        else:
-            raise KeyError('CCL implementation currently supports only linear and HEFT bias models.')
-
-        # Add noise to the diagonal
-        for i in range(nbin):
-            cl_ll[:, i, i] += self.Survey.noise['LL']
-            cl_gg[:, i, i] += self.Survey.noise['GG']
-            cl_lg[:, i, i] += self.Survey.noise['LG']
-            cl_gl[:, i, i] += self.Survey.noise['GL']
-        return cl_ll, cl_gg, cl_lg, cl_gl
-
     
     def get_errorbars(self, params):
         """
@@ -818,14 +685,16 @@ class MGL():
         The results, including the log-likelihood value and the time taken, are saved to a text file.
         """ 
         dic_test = {par_i: self.params_priors[par_i]['p0'] for par_i in self.params_priors.keys()}
-        dic_test = self.params_fixed | dic_test
-        start = time.time()
-        test_like = self.Like.compute(dic_test)    
-        finish = time.time()
-        test_time = finish-start
-        test_time_hms=timedelta(seconds=test_time)        
+        dic_test = self.params_fixed | dic_test      
         test_txt = f"""
         ##############################################################
-        # loglikelihood = {test_like} evaluation took  {test_time} s (--> {test_time_hms} hh:mm:ss)
         """
+        for i in range(3):
+            start = time.time()
+            test_like = self.Like.compute(dic_test)    
+            finish = time.time()
+            test_time = finish-start
+            test_time_hms=timedelta(seconds=test_time)  
+            test_txt+=f"""       # loglikelihood = {test_like} evaluation took  {test_time} s (--> {test_time_hms} hh:mm:ss)
+            """
         np.savetxt(self.path+"chains/chain_"+self.chain_name+".txt", [], header=self.gen_output_header()+test_txt)

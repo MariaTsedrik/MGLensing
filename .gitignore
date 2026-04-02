@@ -13,12 +13,20 @@ chains/lsst/
 chains/mg/
 chains/hdf5/
 chains/bar_vs_bias/
-chains/
+chains/leonardo/
+chains/runs/
+chains/lsst/
+chains/pca_runs/
 
 # Test plots
 figs/posteriors/unofficial/
 figs/other/
 figs/posteriors/ottis
+figs/
+
+# Plotting
+plotting_scripts/
+tutorials/plot_posteriors_pca.ipynb
 
 # Distribution / packaging
 .Python
@@ -67,3 +75,6 @@ venv/
 ENV/
 env.bak/
 venv.bak/
+
+
+.ipynb_checkpoints/

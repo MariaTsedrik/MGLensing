@@ -1,9 +1,21 @@
 import numpy as np
 from scipy.linalg import cholesky, solve_triangular
 class MGLike:
-    def __init__(self, Model, Data):
+    def __init__(self, Model, Data, use_jax=False):
         self.Theo = Model
         self.Data = Data
+        self._use_jax = use_jax and getattr(Model.Survey, 'observable', None) == '3x2pt' and getattr(Model.Survey, 'likelihood', None) == 'binned'
+        self._log_like_jax = None
+        if self._use_jax:
+            try:
+                from .jax_cell_like import build_log_likelihood_jax, JAX_AVAILABLE
+                if JAX_AVAILABLE:
+                    use_cholesky = hasattr(Data, 'cholesky_transform') and Data.cholesky_transform is not None
+                    self._log_like_jax = build_log_likelihood_jax(use_cholesky=use_cholesky)
+                else:
+                    self._use_jax = False
+            except Exception:
+                self._use_jax = False
         type = Model.Survey.likelihood
         if type == 'determinants':
             if Model.Survey.observable == '3x2pt':
@@ -22,7 +34,7 @@ class MGLike:
                 self.compute_data_vector = self.Theo.compute_data_vector_gc   
             elif Model.Survey.observable == '3x2pt':
                 self.compute_data_vector = self.Theo.compute_data_vector_3x2pt    
-            self.compute = self.loglikelihood      
+            self.compute = self.loglikelihood_binned_wrapper      
 
     def loglikelihood_det_3x2pt(self, param_dic):
         r"""Compute the log-likelihood for a 3x2pt analysis using the determinant method from https://arxiv.org/pdf/1210.2194.
@@ -134,8 +146,24 @@ class MGLike:
             chi2 += np.sum((2*self.Data.ells+1)*self.Theo.Survey.fsky*((det_mix/det_theo)+np.log(det_theo/det_obs)))
             return -0.5*chi2    
         else:
-            return -np.inf    
+            return -np.inf      
         
+    def loglikelihood_binned_wrapper(self, param_dic):
+        """Binned log-likelihood: use JAX path if enabled and available, else Python."""
+        param_dic_all, status = self.Theo.check_pars(param_dic)
+        if not status:
+            return -np.inf
+        if self._use_jax and self._log_like_jax is not None:
+            try:
+                theory_arrays = self.Theo.get_theory_arrays_3x2pt(param_dic_all)
+            except Exception:
+                return -np.inf
+            if self.Theo.flag_nan:
+                return -np.inf
+            cov_info = self.Data.cholesky_transform if hasattr(self.Data, 'cholesky_transform') and self.Data.cholesky_transform is not None else self.Data.inv_data_covariance
+            mask = self.Theo.Survey.mask_data_vector_3x2pt
+            return self._log_like_jax(theory_arrays, self.Data.data_vector, cov_info, mask)
+        return self.loglikelihood(param_dic)
  
     def loglikelihood(self, param_dic):
         """Calculate the log-likelihood for a given set of parameters using the difference between model's and data's vectors.
@@ -158,17 +186,18 @@ class MGLike:
                 #print('detected NaNs before computing likelihood')
                 return -np.inf
             difference_vector = self.Data.data_vector - model_data_vector
+
             try:
                 yt = solve_triangular(self.Data.cholesky_transform, difference_vector, lower=True)
                 chi2 = yt.dot(yt)
             except:
                 # If the cholesky transform fails, we can try to use the inverse covariance matrix
                 #print(('solve_triangular breaks when ', param_dic))
-                #if hasattr(self.Data, 'inv_data_covariance') and self.Data.inv_data_covariance is not None:
-                #    chi2 = np.einsum('i, ij, j->', difference_vector, self.Data.inv_data_covariance, difference_vector)
-                #else:
-                #    return -np.inf  
-                chi2 = np.einsum('i, ij, j->', difference_vector, self.Data.inv_data_covariance, difference_vector)    
+                if hasattr(self.Data, 'inv_data_covariance') and self.Data.inv_data_covariance is not None:
+                    chi2 = np.einsum('i, ij, j->', difference_vector, self.Data.inv_data_covariance, difference_vector)
+                else:
+                    return -np.inf  
+ 
             return -0.5*chi2    
         else:
             return -np.inf      

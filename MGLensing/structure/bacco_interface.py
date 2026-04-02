@@ -1,7 +1,7 @@
 import os
-os.environ["OMP_NUM_THREADS"] = "1"
-os.environ["TF_NUM_INTEROP_THREADS"] = "1"
-os.environ["TF_NUM_INTRAOP_THREADS"] = "1"
+#os.environ["OMP_NUM_THREADS"] = "1"
+#os.environ["TF_NUM_INTEROP_THREADS"] = "1"
+#os.environ["TF_NUM_INTRAOP_THREADS"] = "1"
 from scipy.interpolate import RectBivariateSpline
 import numpy as np
 try: import baccoemu
@@ -49,9 +49,15 @@ emu_ranges_lin = {
 
 def fill_in_ell_z_array(interp, k, lbin, zz_integr, zmax=10.):
     array = np.zeros((lbin, len(zz_integr)), 'float64')
-    index_pknn = np.array(np.where((k > k_min_h_by_mpc) & (k < k_max_h_by_mpc))).transpose()
-    for index_l, index_z in index_pknn:
-            array[index_l, index_z] = interp(min(zz_integr[index_z], zmax), k[index_l,index_z])    
+    #old implementation:
+    # index_pknn = np.array(np.where((k > k_min_h_by_mpc) & (k < k_max_h_by_mpc))).transpose()
+    # for index_l, index_z in index_pknn:
+    #         array[index_l, index_z] = interp(min(zz_integr[index_z], zmax), k[index_l,index_z])  
+    mask = (k > k_min_h_by_mpc) & (k < k_max_h_by_mpc)
+    index_l, index_z = np.where(mask)
+    z_pts = zz_integr[index_z]
+    k_pts = k[index_l, index_z]
+    array[index_l, index_z] = np.ravel(interp(z_pts, k_pts, grid=False))
     return array
 
 def powerlaw_highk_extrap(pk_or_boost, log_k, k_last, kh_high, zz_num):
@@ -59,6 +65,10 @@ def powerlaw_highk_extrap(pk_or_boost, log_k, k_last, kh_high, zz_num):
     m = np.array([log(abs(last_entry[i] / lastlast_entry[i])) / log_k for i in range(zz_num)])
     #m = np.array([log(last_entry[i] / lastlast_entry[i]) / log_k for i in range(zz_num)])
     highk_extrap = last_entry[:, np.newaxis] * (kh_high[np.newaxis, :]/k_last)**m[:, np.newaxis]
+    # CHANGE HERE
+    #highk_extrap = np.where(kh_high[np.newaxis, :] < 1.5, 
+    #                       last_entry[:, np.newaxis] * (kh_high[np.newaxis, :]/k_last)**m[:, np.newaxis],
+    #                       0)
     return highk_extrap 
 
 class BaccoEmu:
@@ -156,11 +166,13 @@ class BaccoEmu:
 
 
         self.kh_nl = np.logspace(log10(k_min_nl), log10(k_max_nl), num=512)
-        self.kh_bb = np.logspace(log10(k_min_nl), log10(k_max_boost), num=256)
-        self.kh_heft = np.logspace(log10(k_min_heft), log10(k_max_heft), num=128)
+        self.kh_bb = np.logspace(log10(k_min_nl), log10(k_max_boost), num=512)#256)
+        self.kh_heft = np.logspace(log10(k_min_heft), log10(k_max_heft), num=512)#128)
         kh_lin_ = np.logspace(log10(k_min_lin), log10(k_max_lin), num=512)
-        self.z_nl_bacco = np.linspace(z_min, z_max_nl, 64)
-        self.z_lin_bacco = np.linspace(z_min, z_max_lin, 64)
+        #self.z_nl_bacco = np.linspace(z_min, z_max_nl, 64)
+        #self.z_lin_bacco = np.linspace(z_min, z_max_lin, 64)
+        self.z_nl_bacco = np.linspace(z_min, z_max_nl, 256)
+        self.z_lin_bacco = np.linspace(z_min, z_max_lin, 256)
 
         self.kh_lin_left = kh_lin_[kh_lin_<k_min_nl]
         self.kh_lin_right = kh_lin_[kh_lin_>k_max_nl]
@@ -411,13 +423,14 @@ class BaccoEmu:
                     pk_nn[index_i, index_l, index_z] = interp(z_val, k_val)
                     if pnonlin_bacco is not None:
                         pk_nl[index_l, index_z] = pnl_l_interp(z_val, k_val)
+
             else:
                 pk_lin_l[index_l, index_z] = plin_l_interp(z_val, k_val)
                 
 
         return (pk_nn, pk_lin_l, pk_nl) if pnonlin_bacco is not None else (pk_nn, pk_lin_l)
     
-    def get_heft_pgg_zextr_lin(self, params_dic, k, lbin, zz_integr, nbin=5, flag_sample_bheftsigma8=False, flag_extrap_k_const=False):
+    def get_heft_pgg_zextr_lin(self, params_dic, k, lbin, zz_integr, nbin=5, flag_extrap_k_const=False):
         ns   = params_dic['ns']
         h    = params_dic['h']
         w0    = params_dic['w0']
@@ -439,18 +452,12 @@ class BaccoEmu:
             }
         _, pnn = self.heftemulator.get_nonlinear_pnn(k=self.kh_heft, **params_bacco)
 
-        # re-parameterize the bias-parameters with sigma8
-        # implemented by Ottavia for GC-only runs
-        if flag_sample_bheftsigma8:
-            sigma8 = params_dic['sigma8_cb']
-        else:
-            sigma8 = 1.
 
         # extrapolation with linear power spectrum for k<0.01 h/Mpc and z>1.5
         params_bacco_l = params_bacco
         params_bacco_l['expfactor'] = self.aa_all
         _, plin_bacco = self.baccoemulator.get_linear_pk(k=self.kh_heft_tot, cold=False, **params_bacco_l)
-        plin_bacco = plin_bacco / sigma8**2
+        plin_bacco = plin_bacco 
         plin_left = plin_bacco[:, self.kh_heft_tot<self.kh_heft[0]]
         plin_left = plin_left[self.aa_all>=self.aa_nl[0], :]
 
@@ -467,20 +474,20 @@ class BaccoEmu:
         blapl = np.array([params_dic['blaplL_'+str(i+1)] for i in range(nbin)])   
         # term, a, k 
         p_dmdm = pk_nn[0, :, :]        
-        p_dmd1 = pk_nn[1, :, :] / sigma8   
-        p_dmd2 = pk_nn[2, :, :] / sigma8**2        
-        p_dms2 = pk_nn[3, :, :] / sigma8**2        
-        p_dmk2 = pk_nn[4, :, :] / sigma8**3      
-        p_d1d1 = pk_nn[5, :, :] / sigma8**2     
-        p_d1d2 = pk_nn[6, :, :] / sigma8**3        
-        p_d1s2 = pk_nn[7, :, :] / sigma8**3         
-        p_d1k2 = pk_nn[8, :, :] / sigma8**3          
-        p_d2d2 = pk_nn[9, :, :] / sigma8**4        
-        p_d2s2 = pk_nn[10, :, :] / sigma8**4         
-        p_d2k2 = pk_nn[11, :, :] / sigma8**5
-        p_s2s2 = pk_nn[12, :, :] / sigma8**4 
-        p_s2k2 = pk_nn[13, :, :] / sigma8**5 
-        p_k2k2 = pk_nn[14, :, :] / sigma8**6 
+        p_dmd1 = pk_nn[1, :, :] 
+        p_dmd2 = pk_nn[2, :, :]        
+        p_dms2 = pk_nn[3, :, :]        
+        p_dmk2 = pk_nn[4, :, :]      
+        p_d1d1 = pk_nn[5, :, :]     
+        p_d1d2 = pk_nn[6, :, :]        
+        p_d1s2 = pk_nn[7, :, :]         
+        p_d1k2 = pk_nn[8, :, :]          
+        p_d2d2 = pk_nn[9, :, :]        
+        p_d2s2 = pk_nn[10, :, :]         
+        p_d2k2 = pk_nn[11, :, :] 
+        p_s2s2 = pk_nn[12, :, :] 
+        p_s2k2 = pk_nn[13, :, :] 
+        p_k2k2 = pk_nn[14, :, :] 
 
         pgg = (p_dmdm[:,:,None,None]  +
                 (bL1[None,None,:,None]+bL1[None,None, None, :]) * p_dmd1[:,:,None,None] +
@@ -525,7 +532,7 @@ class BaccoEmu:
         return pgg_ij 
            
     
-    def get_heft_pgm_zextr_lin(self, params_dic, k, lbin, zz_integr, nbin=5, flag_sample_bheftsigma8=False, flag_extrap_k_const=False):
+    def get_heft_pgm_zextr_lin(self, params_dic, k, lbin, zz_integr, nbin=5, flag_extrap_k_const=False):
         ns   = params_dic['ns']
         h    = params_dic['h']
         w0    = params_dic['w0']
@@ -547,8 +554,6 @@ class BaccoEmu:
             }
         _, pnn = self.heftemulator.get_nonlinear_pnn(k=self.kh_heft, **params_bacco)
 
-        if flag_sample_bheftsigma8:
-            raise NotImplementedError("Re-parametrisation with sigma8 for HEFT in Pgm is not implemented.")
 
         # extrapolation with linear power spectrum for k<0.01 h/Mpc and z>1.5
         params_bacco_l = params_bacco
@@ -603,7 +608,7 @@ class BaccoEmu:
                 pgm_i[:, :, i] = fill_in_ell_z_array(pgm_interp, k, lbin, zz_integr)
         return pgm_i 
     
-    def get_heft_nl_pgg_zextr_lin(self, params_dic, k, lbin, zz_integr, nbin=5, flag_heft_pnl_bar=False, flag_sample_bheftsigma8=False, flag_extrap_k_const=False ):
+    def get_heft_nl_pgg_zextr_lin(self, params_dic, k, lbin, zz_integr, nbin=5, flag_heft_pnl_bar=False, flag_extrap_k_const=False ):
         ns   = params_dic['ns']
         h    = params_dic['h']
         w0    = params_dic['w0']
@@ -636,18 +641,12 @@ class BaccoEmu:
             _, boost = self.baccoemulator.get_baryonic_boost(k=self.kh_heft, cold=False, **params_bacco)
             pnl = pnl * boost
 
-        # re-parameterize the bias-parameters with sigma8
-        # implemented by Ottavia for GC-only runs
-        if flag_sample_bheftsigma8:
-            sigma8 = params_dic['sigma8_cb']
-        else:
-            sigma8 = 1.
 
         # extrapolation with linear power spectrum for k<0.01 h/Mpc and z>1.5
         params_bacco_l = params_bacco
         params_bacco_l['expfactor'] = self.aa_all
         _, plin_bacco = self.baccoemulator.get_linear_pk(k=self.kh_heft_tot, cold=False, **params_bacco_l)
-        plin_bacco = plin_bacco / sigma8**2
+        plin_bacco = plin_bacco 
         plin_left = plin_bacco[:, self.kh_heft_tot<self.kh_heft[0]]
         plin_left = plin_left[self.aa_all>=self.aa_nl[0], :]
 
@@ -667,22 +666,22 @@ class BaccoEmu:
         
         # term, a, k 
         #p_dmdm = pk_nn[0, :, :]        
-        #p_dmd1 = pk_nn[1, :, :] / sigma8   
-        p_dmd2 = pk_nn[2, :, :] / sigma8**2        
-        p_dms2 = pk_nn[3, :, :] / sigma8**2        
-        p_dmk2 = pk_nn[4, :, :] / sigma8**3      
-        #p_d1d1 = pk_nn[5, :, :] / sigma8**2     
-        p_d1d2 = pk_nn[6, :, :] / sigma8**3        
-        p_d1s2 = pk_nn[7, :, :] / sigma8**3         
-        p_d1k2 = pk_nn[8, :, :] / sigma8**3          
-        p_d2d2 = pk_nn[9, :, :] / sigma8**4        
-        p_d2s2 = pk_nn[10, :, :] / sigma8**4         
-        p_d2k2 = pk_nn[11, :, :] / sigma8**5
-        p_s2s2 = pk_nn[12, :, :] / sigma8**4 
-        p_s2k2 = pk_nn[13, :, :] / sigma8**5 
-        p_k2k2 = pk_nn[14, :, :] / sigma8**6 
+        #p_dmd1 = pk_nn[1, :, :]     
+        p_dmd2 = pk_nn[2, :, :]        
+        p_dms2 = pk_nn[3, :, :]        
+        p_dmk2 = pk_nn[4, :, :]      
+        #p_d1d1 = pk_nn[5, :, :]     
+        p_d1d2 = pk_nn[6, :, :]        
+        p_d1s2 = pk_nn[7, :, :]         
+        p_d1k2 = pk_nn[8, :, :]          
+        p_d2d2 = pk_nn[9, :, :]        
+        p_d2s2 = pk_nn[10, :, :]         
+        p_d2k2 = pk_nn[11, :, :] 
+        p_s2s2 = pk_nn[12, :, :] 
+        p_s2k2 = pk_nn[13, :, :] 
+        p_k2k2 = pk_nn[14, :, :] 
 
-        pgg = ((1.+bL1[None,None, :,None])*(1.+bL1[None,None, None, :]) * pk_nl[:,:,None,None] / sigma8**2 +
+        pgg = ((1.+bL1[None,None, :,None])*(1.+bL1[None,None, None, :]) * pk_nl[:,:,None,None] +
                 (bL2[None,None, :,None] + bL2[None,None, None, :]) * p_dmd2[:,:,None,None] +
                 (bs2[None,None, :,None] + bs2[None,None, None, :]) * p_dms2[:,:,None,None] +
                 (bL1[None,None, :,None]*bL2[None,None, None, :] + bL1[None,None, None, :]*bL2[None,None, :,None]) * p_d1d2[:,:,None,None] +
@@ -722,7 +721,7 @@ class BaccoEmu:
   
         return pgg_ij
 
-    def get_heft_nl_pgm_zextr_lin(self, params_dic, k, lbin, zz_integr, nbin=5, flag_heft_pnl_bar=False, flag_sample_bheftsigma8=False, flag_extrap_k_const=False):
+    def get_heft_nl_pgm_zextr_lin(self, params_dic, k, lbin, zz_integr, nbin=5, flag_heft_pnl_bar=False, flag_extrap_k_const=False):
         ns   = params_dic['ns']
         h    = params_dic['h']
         w0    = params_dic['w0']
@@ -760,10 +759,6 @@ class BaccoEmu:
         _, plin_bacco = self.baccoemulator.get_linear_pk(k=self.kh_heft_tot, cold=False, **params_bacco_l)
         plin_left = plin_bacco[:, self.kh_heft_tot<self.kh_heft[0]]
         plin_left = plin_left[self.aa_all>=self.aa_nl[0], :]
-
-        if flag_sample_bheftsigma8:
-            raise NotImplementedError("Re-parametrisation with sigma8 for HEFT in Pgm is not implemented.")
-        
 
         # constant extrapolation for k>0.71 h/Mpc
         if flag_extrap_k_const:
@@ -811,10 +806,6 @@ class BaccoEmu:
                 pgm_i[:, :, i] = fill_in_ell_z_array(pgm_interp, k, lbin, zz_integr)
         return pgm_i
 
-    def get_barboost(self, params_dic, k, lbin, zz_integr):
-        boost_bar_interp = self.get_barboost_interp(params_dic)
-        boost_bar = fill_in_ell_z_array(boost_bar_interp, k, lbin, zz_integr, zmax=1.5)
-        return boost_bar
 
     def get_pk_nl_zextr_lin(self, params_dic, k, lbin, zz_integr):
         pk_l_interp = self.get_pk_interp(params_dic)
@@ -841,7 +832,7 @@ class BaccoEmu:
     
     
     def get_barboost(self, params_dic, k, lbin, zz_integr):
-        boost_bar = np.zeros((lbin, len(zz_integr)), 'float64')
+        boost_bar = np.ones((lbin, len(zz_integr)), 'float64')
         index_pknn = np.array(np.where((k > k_min_h_by_mpc) & (k < k_max_h_by_mpc))).transpose()
         boost_bar_interp = self.get_barboost_interp(params_dic)
         for index_l, index_z in index_pknn:

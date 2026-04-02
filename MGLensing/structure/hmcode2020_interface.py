@@ -25,9 +25,11 @@ emu_ranges_all = {
 
 def fill_in_ell_z_array(interp, k, lbin, zz_integr):
     array = np.zeros((lbin, len(zz_integr)), 'float64')
-    index_pknn = np.array(np.where((k > k_min_h_by_mpc) & (k < k_max_h_by_mpc))).transpose()
-    for index_l, index_z in index_pknn:
-            array[index_l, index_z] = interp(zz_integr[index_z], k[index_l,index_z])    
+    mask = (k > k_min_h_by_mpc) & (k < k_max_h_by_mpc)
+    index_l, index_z = np.where(mask)
+    z_pts = zz_integr[index_z]
+    k_pts = k[index_l, index_z]
+    array[index_l, index_z] = np.ravel(interp(z_pts, k_pts, grid=False))
     return array
 
 
@@ -99,31 +101,31 @@ class HMcode2020():
         print('initialising hmcode')
         # these numers are hand-picked
         #self.zz_pk = np.array([0., 0.01,  0.12, 0.24, 0.38, 0.52, 0.68, 0.86, 1.05, 1.27, 1.5, 1.76, 2.04, 2.36, 2.5, 3.0]) 
-        self.zz_pk = np.linspace(0., 4.0, 150)
+        self.zz_pk = np.linspace(0., 4.0, 256)#150)
         self.aa_pk = np.array(1./(1.+self.zz_pk[::-1])) # should be increasing
         self.nz_pk = len(self.zz_pk)
         self.zz_max = self.zz_pk[-1]
 
         self.cp_nl_model = cosmopower_NN(restore=True, 
-                      restore_filename=dirname+'/../../emulators/log10_total_matter_nonlinear_emu',
+                      restore_filename=dirname+'/../../emulators/hmcode2020/log10_total_matter_nonlinear_emu',
                       )
         self.kh_nl = self.cp_nl_model.modes # 0.01..50. h/Mpc    
         self.cp_lin_model = cosmopower_NN(restore=True, 
-                      restore_filename=dirname+'/../../emulators/log10_total_matter_linear_emu',
+                      restore_filename=dirname+'/../../emulators/hmcode2020/log10_total_matter_linear_emu',
                       )
         self.kh_lin = self.cp_lin_model.modes # 3.7e-4..50. h/Mpc IMPORTANT LATER USED IN TATT
         self.kh_lin_left = self.kh_lin[self.kh_lin<self.kh_nl[0]]
         self.kh_tot = np.concatenate((self.kh_lin_left, self.kh_nl))
 
         self.cp_barboost_model = cosmopower_NN(restore=True, 
-                      restore_filename=dirname+'/../../emulators/total_matter_bar_boost_emu',
+                      restore_filename=dirname+'/../../emulators/hmcode2020/total_matter_bar_boost_emu',
                       )
         self.kh_bb = self.cp_barboost_model.modes # 0.01..50. h/Mpc 
         kbin_left_bb = len(self.kh_lin[self.kh_lin<self.kh_bb[0]])
         self.kh_barboost = np.concatenate((self.kh_lin[self.kh_lin<self.kh_bb[0]], self.kh_bb))
         self.boost_left = np.ones((self.nz_pk, kbin_left_bb))
         self.cp_sigma8_model = cosmopower_NN(restore=True, 
-                      restore_filename=dirname+'/../../emulators/sigma8_emu',
+                      restore_filename=dirname+'/../../emulators/hmcode2020/sigma8_emu',
                       )
         self.emu_name = 'HMcode2020'
 

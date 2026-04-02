@@ -34,30 +34,44 @@ def powerlaw_highk_extrap(pk_or_boost, log_k, k_last, kh_high, zz_num):
     highk_extrap = last_entry[:, np.newaxis] * (kh_high[np.newaxis, :]/k_last)**m[:, np.newaxis]
     return highk_extrap 
 
+def fill_in_ell_z_array(interp, k, lbin, zz_integr, zmax=10.):
+    array = np.zeros((lbin, len(zz_integr)), 'float64')
+    #old implementation:
+    # index_pknn = np.array(np.where((k > k_min_h_by_mpc) & (k < k_max_h_by_mpc))).transpose()
+    # for index_l, index_z in index_pknn:
+    #         array[index_l, index_z] = interp(min(zz_integr[index_z], zmax), k[index_l,index_z])  
+    mask = (k > k_min_h_by_mpc) & (k < k_max_h_by_mpc)
+    index_l, index_z = np.where(mask)
+    z_pts = zz_integr[index_z]
+    k_pts = k[index_l, index_z]
+    array[index_l, index_z] = np.ravel(interp(z_pts, k_pts, grid=False))
+    return array
+
 class MuSigmaReACT():
     # emulator is trained only for LCDM background!
     def __init__(self, option=None):
         #self.zz_pk = np.array([0., 0.01,  0.12, 0.24, 0.38, 0.52, 0.68, 0.86, 1.05, 1.27, 1.5, 1.76, 2.04, 2.36, 2.5, 3.0]) # these numers are hand-picked
-        self.zz_pk = np.linspace(0., 3., 64, endpoint=True)
+        #self.zz_pk = np.linspace(0., 3., 64, endpoint=True)
+        self.zz_pk = np.linspace(0., 3., 256, endpoint=True)
         self.aa_pk = np.array(1./(1.+self.zz_pk[::-1])) # should be increasing
         self.nz_pk = len(self.zz_pk)
         self.zz_max = self.zz_pk[-1]
         print('initialising mu-Sigma')
         self.cp_nl_musigma_model = cosmopower_NN(restore=True, 
-                      restore_filename=dirname+'/../../emulators/MuSigma_nonlinearboost_extAs', 
+                      restore_filename=dirname+'/../../emulators/mu_sigma/mu_z/react_nonlinearboost_musigma', 
                       )
         self.kh_nl_boost = self.cp_nl_musigma_model.modes # 0.01..10. h/Mpc
         self.cp_lin_musigma_model = cosmopower_NN(restore=True, 
-                      restore_filename=dirname+'/../../emulators/MuSigma_linear_log10ps_extAs', 
+                      restore_filename=dirname+'/../../emulators/mu_sigma/mu_z/mgcamb_log10_total_matter_linear', 
                       )
         self.kh_lin = self.cp_lin_musigma_model.modes # 1.e-4..50. h/Mpc IMPORTANT LATER USED IN TATT
 
         self.cp_nl_hmcode_model = cosmopower_NN(restore=True, 
-                      restore_filename=dirname+'/../../emulators/log10_total_matter_nonlinear_emu',
+                      restore_filename=dirname+'/../../emulators/hmcode2020/log10_total_matter_nonlinear_emu',
                       )
         self.kh_nl_hmcode = self.cp_nl_hmcode_model.modes # 0.01..50. h/Mpc    
         self.cp_lin_model = cosmopower_NN(restore=True, 
-                      restore_filename=dirname+'/../../emulators/log10_total_matter_linear_emu',
+                      restore_filename=dirname+'/../../emulators/hmcode2020/log10_total_matter_linear_emu',
                       )
         self.kh_lin_hmcode = self.cp_lin_model.modes # 3.7e-4..50. h/Mpc IMPORTANT LATER USED IN TATT
         self.kh_lin_left_hmcode = self.kh_lin_hmcode[self.kh_lin_hmcode<self.kh_nl_hmcode[0]]
@@ -198,6 +212,7 @@ class MuSigmaReACT():
                     self.kh_lin,
                     mg_pk_lin,
                     kx=1, ky=1)
+        # returns interpolator in z and k            
         return  mg_plin_interp
 
     def get_pk_hmcode_interp(self, params_dic):
@@ -247,31 +262,44 @@ class MuSigmaReACT():
         omega_m = params_dic['Omega_m']
         w0 = params_dic['w0']
         wa = params_dic['wa']
-        omega_lambda = (1.-omega_m)* pow(zz_integr, 3.*(1.+w0+wa)) * np.exp(-3.*wa*(1.-1./(1.+zz_integr)))
-        e2 = omega_m*zz_integr**3+omega_lambda
+        omega_lambda = (1.-omega_m)* pow(1.+zz_integr, 3.*(1.+w0+wa)) * np.exp(-3.*wa*zz_integr/(1.+zz_integr))
+        e2 = omega_m*(1.+zz_integr)**3+omega_lambda
         sigma0 = params_dic['sigma0'] 
         sigma = 1.+sigma0/e2*omega_lambda/(1.-omega_m)
         #dimensions of (ell, zz_integr, n_bin)
         return sigma[None, :, None]
     
     def get_pk_pseudo(self, params_dic, k, lbin, zz_integr):
-        pk_lin_interp = self.get_pk_lin_interp(params_dic)
-        pklin_k0_mg_z = pk_lin_interp(self.zz_pk, 0.01)
-        params_dic_lcdm = params_dic.copy()
-        params_dic_lcdm['mu0'] = 0.0
-        params_dic_lcdm['sigma0'] = 0.0
-        params_dic_lcdm['q1'] = 0.0
-        pk_lcdm_lin_interp = self.get_pk_lin_interp(params_dic_lcdm)
-        pklin_k0_lcdm_z = pk_lcdm_lin_interp(self.zz_pk, 0.01)
-        self.d2_mg_lcdm_z = (pklin_k0_mg_z / pklin_k0_lcdm_z)[:, 0]
-        pk_m_l  = np.zeros((lbin, len(zz_integr)), 'float64')
-        index_pknn = np.array(np.where((k > k_min_h_by_mpc) & (k < k_max_h_by_mpc))).transpose()
-        As_orig = params_dic['As']
+        # pk_lin_interp = self.get_pk_lin_interp(params_dic)
+        # pklin_k0_mg_z = pk_lin_interp(self.zz_pk, 0.01)
+        # params_dic_lcdm = params_dic.copy()
+        # params_dic_lcdm['mu0'] = 0.0
+        # params_dic_lcdm['sigma0'] = 0.0
+        # params_dic_lcdm['q1'] = 0.0
+        # pk_lcdm_lin_interp = self.get_pk_lin_interp(params_dic_lcdm)
+        # pklin_k0_lcdm_z = pk_lcdm_lin_interp(self.zz_pk, 0.01)
+        # self.d2_mg_lcdm_z = (pklin_k0_mg_z / pklin_k0_lcdm_z)[:, 0]
+        #pk_m_l  = np.zeros((lbin, len(zz_integr)), 'float64')
+        #index_pknn = np.array(np.where((k > k_min_h_by_mpc) & (k < k_max_h_by_mpc))).transpose()
+        # As_orig = params_dic['As']
+        # params_new = params_dic.copy()
+        # params_new['As'] = self.d2_mg_lcdm_z * As_orig
+        # pk_l_interp = self.get_pk_hmcode_interp(params_new)
+        # for index_l, index_z in index_pknn:
+        #     pk_m_l[index_l, index_z] = pk_l_interp(zz_integr[index_z], k[index_l,index_z])
+
+        d_mg_z, d_mg_z0 = self.get_growth(params_dic, self.zz_pk)
+        d_lcdm_z, d_lcdm_z0 = self.get_growth_lcdm(params_dic, self.zz_pk)
+        d2_mg_lcdm_z = (d_mg_z*d_mg_z0/d_lcdm_z/d_lcdm_z0)**2
+
         params_new = params_dic.copy()
-        params_new['As'] = self.d2_mg_lcdm_z * As_orig
+        As_orig = params_dic['As']
+        params_new['As'] = d2_mg_lcdm_z * As_orig
+
+
+
         pk_l_interp = self.get_pk_hmcode_interp(params_new)
-        for index_l, index_z in index_pknn:
-            pk_m_l[index_l, index_z] = pk_l_interp(zz_integr[index_z], k[index_l,index_z])
+        pk_m_l = fill_in_ell_z_array(pk_l_interp, k, lbin, zz_integr)
         return pk_m_l 
     
 
@@ -298,6 +326,25 @@ class MuSigmaReACT():
         da, _ = cosmo.growth_parameters(mu_interp=mu_interpolator) 
         dz = da[::-1] 
         # growth factor should be normalised to z=0
+        dz0 = dz[0]
+        dz = dz[1:]/dz0
+        return dz, dz0
+
+    
+    def get_growth_lcdm(self, params_dic, zz_integr):
+        aa_integr =  np.array(1./(1.+zz_integr[::-1]))
+        background ={
+            'Omega_m': params_dic['Omega_m'],
+            'h' : params_dic['h'],
+            'w0': -1.,
+            'wa': 0.,
+            'a_arr': np.hstack((aa_integr, 1.))
+            }
+        cosmo = mg.LCDM(background)
+        da, _ = cosmo.growth_parameters()  
+        dz = da[::-1] 
+        # growth factor should be normalised to z=0
+        # return array of z
         dz0 = dz[0]
         dz = dz[1:]/dz0
         return dz, dz0

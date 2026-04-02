@@ -19,7 +19,7 @@ This code is not complete to perform a real data analysis (yet), but is a fairly
     - normal branch of [DGP gravity](https://arxiv.org/abs/hep-th/0005016) (nDGP); 
     - Hu-Sawicki [f(R) gravity](https://arxiv.org/abs/0705.1158);
     - [growth index parametrisation](https://arxiv.org/abs/astro-ph/0507263) and [time-dependent growth index](https://arxiv.org/abs/2304.07281) with [Screening](https://arxiv.org/abs/2210.01094);
-    - [mu-Sigma with DE time-evolution](https://arxiv.org/abs/1212.3339) with [Screening](https://arxiv.org/abs/2210.01094);
+    - [mu-Sigma (scale-independent and scale-dependent) with DE time-evolution](https://arxiv.org/abs/1212.3339) with [Screening](https://arxiv.org/abs/2210.01094);
     - Interacting Dark Energy also known as [Dark Scattering](https://arxiv.org/abs/1605.05623).
 - Simulation-based emulators: 
     - [eMANTIS](https://arxiv.org/abs/2303.08899) for f(R) gravity;
@@ -54,15 +54,16 @@ You can then run a test likelihood computation:
 ```python
 import MGLensing
 
+folder = os.path.dirname(os.path.abspath(__file__))
+os.chdir(folder)
+
 MGL = MGLensing.MGL("config.yaml")
 MGL.test() 
 ```
 
 Following files provide examples of using MGL:
-* plotting_scripts/plot_power_spectrum.py and plotting_scripts/plot_c_ells.py : compute and plot observables and modelling components;
 * test_mcmc_run.py: run an MCMC chain with [Nautilus sampler](https://github.com/johannesulf/nautilus);
-* plotting_scripts/plot_posterior.py: plot posterior distributions with GetDist;
-* plotting_scripts/postprocess_compute_S8.py: compute $\sigma_8$ and $S_8$ from a chain.
+* notebooks in the tutorials-folder
 
 ## Documentation
 

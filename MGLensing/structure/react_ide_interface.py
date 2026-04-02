@@ -40,12 +40,12 @@ class DarkScatteringReACT():
         self.zz_max = self.zz_pk[-1]
         print('initialising Dark Scattering')
         self.cp_nl_ds_model = cosmopower_NN(restore=True, 
-                      restore_filename=dirname+'/../emulators/DS_nonlinear_cp_NN_S8', 
+                      restore_filename=dirname+'/../emulators/dark_scattering/w_const/log10_total_matter_nonlinear_s8_ds', 
                       )
         self.kh_nl_boost = self.cp_nl_ds_model.modes # 1e-3..10. h/Mpc
 
         self.cp_lin_ds_model = cosmopower_NN(restore=True, 
-                      restore_filename=dirname+'/../emulators/DS_linear_cp_NN_S8', 
+                      restore_filename=dirname+'/../emulators/dark_scattering/w_const/log10_total_matter_linear_s8_ds', 
                       )
         self.kh_lin_boost = self.cp_lin_ds_model.modes # 1e-3..10. h/Mpc later used in tatt
 

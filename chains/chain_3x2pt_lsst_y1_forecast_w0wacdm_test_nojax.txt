@@ -1,0 +1,105 @@
+# 
+#         ##############################################################
+#         # Cosmology Pipeline Configuration
+#         #------------------------------------------------------------
+#         # Observable: WL+XC+GC
+#         # Likelihood: using covariance and differences between data vectors in ell-bins
+#         # Sky Fraction (fsky): 0.43
+#         # Redshift Binning: 5 source bins and 5 lense bins (0.01 ≤ z ≤ 3.0)
+#         # for n(z) LSST-like
+#         # Lensing & Clustering Scales:
+#         #   - l_min: 20
+#         #   - l_max: 5000.0
+#         #   - total l_bins: 30
+#         #   - cut in l_max (WL): [2000, 2000, 2000, 2000, 2000, 2000, 2000, 2000, 2000, 2000, 2000, 2000, 2000, 2000, 2000]
+#         #   - cut in l_max (GC, XC): [478, 478, 478, 478, 478, 617, 617, 617, 617, 716, 716, 716, 780, 780, 818]
+#         #
+#             
+#             # Data Model:
+#             #   - Nonlinear Power Spectrum: HMcode (0)
+#             #   - Galaxy Bias Model: b1 constant within bins (0)
+#             #   - Intrinsic Alignments: zNLA (0)
+#             #   - Baryon Model: no baryons (0)
+#             #   - Cross Correlation sqrt(Baryonic Supression): False 
+#             #   - Parameters: 
+#             
+#             #       - Omega_m: 0.31
+#             #       - Omega_b: 0.05
+#             #       - h: 0.68
+#             #       - log10As: 3.044
+#             #       - ns: 0.97
+#             #       - Mnu: 0.0
+#             #       - w0: -0.838
+#             #       - wa: -0.62
+#             #       - log10T_AGN: 7.9
+#             #       - a1_IA: 0.16
+#             #       - eta1_IA: 1.66
+#             #       - beta_IA: 0.0
+#             #       - b1_1: 1.2497
+#             #       - b1_2: 1.3809
+#             #       - b1_3: 1.5231
+#             #       - b1_4: 1.6716
+#             #       - b1_5: 1.8245
+#             #       - deltaz_s_1: 0.0
+#             #       - deltaz_s_2: 0.0
+#             #       - deltaz_s_3: 0.0
+#             #       - deltaz_s_4: 0.0
+#             #       - deltaz_s_5: 0.0
+#             #       - deltaz_l_1: 0.0
+#             #       - deltaz_l_2: 0.0
+#             #       - deltaz_l_3: 0.0
+#             #       - deltaz_l_4: 0.0
+#             #       - deltaz_l_5: 0.0
+#             #       - TCMB: 2.7255
+#             #       - nnu: 3.044
+#             #       - Ombh2: 0.02312
+#             #       - Omnuh2: 0.0
+#             #       - Omega_nu: 0.0
+#             #       - Omega_cb: 0.31
+#             #       - Omega_c: 0.26
+#             #       - fb: 0.16129032258064518
+#             #       - As: 2.0989031673191437e-09
+#         #
+#         # Theory Model:
+#         #   - Nonlinear Power Spectrum: HMcode (0)
+#         #   - Galaxy Bias Model: b1 constant within bins (0)
+#         #   - Intrinsic Alignments: zNLA (0)
+#         #   - Baryon Model: no baryons (0)
+#         #   - Cross Correlation sqrt(Baryonic Supression): False 
+#         #   - Photo-z Error Model: additive mode, n(z') = n(z + dz) (1)
+#         #   - Parameter priors:
+#         
+#            #       - Omega_m: [0.25,0.4]
+#            #       - Omega_b: [0.01,0.1]
+#            #       - h: [0.4,1.0]
+#            #       - log10As: [1.7,4.0]
+#            #       - ns: [0.6,1.2]
+#            #       - Mnu: 0.0
+#            #       - w0: [-3.0,-0.3]
+#            #       - wa: [-3.0,3.0]
+#            #       - log10T_AGN: [7.6,8.3]
+#            #       - a1_IA: [-5.0,5.0]
+#            #       - eta1_IA: [-5.0,5.0]
+#            #       - beta_IA: 0.0
+#            #       - b1_1: [0.0,3.0]
+#            #       - b1_2: [0.0,3.0]
+#            #       - b1_3: [0.0,3.0]
+#            #       - b1_4: [0.0,3.0]
+#            #       - b1_5: [0.0,3.0]
+#            #       - deltaz_s_1: N(0.0,0.0025012)
+#            #       - deltaz_s_2: N(0.0,0.002912)
+#            #       - deltaz_s_3: N(0.0,0.003309)
+#            #       - deltaz_s_4: N(0.0,0.0038346)
+#            #       - deltaz_s_5: N(0.0,0.0050532)
+#            #       - deltaz_l_1: N(0.0,0.0065855)
+#            #       - deltaz_l_2: N(0.0,0.007528)
+#            #       - deltaz_l_3: N(0.0,0.0084995)
+#            #       - deltaz_l_4: N(0.0,0.00948)
+#            #       - deltaz_l_5: N(0.0,0.0104645)
+#         ##############################################################
+#              Omega_m          Omega_b          h          log10As          ns          w0          wa          log10T_AGN          a1_IA          eta1_IA          b1_1          b1_2          b1_3          b1_4          b1_5          deltaz_s_1          deltaz_s_2          deltaz_s_3          deltaz_s_4          deltaz_s_5          deltaz_l_1          deltaz_l_2          deltaz_l_3          deltaz_l_4          deltaz_l_5        log_w   log_l
+#         ##############################################################
+#                # loglikelihood = -3.0446195411012936e-25 evaluation took  0.04122805595397949 s (--> 0:00:00.041228 hh:mm:ss)
+#                    # loglikelihood = -3.0446195411012936e-25 evaluation took  0.040618896484375 s (--> 0:00:00.040619 hh:mm:ss)
+#                    # loglikelihood = -3.0446195411012936e-25 evaluation took  0.03911709785461426 s (--> 0:00:00.039117 hh:mm:ss)
+#             

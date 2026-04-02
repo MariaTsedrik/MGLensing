@@ -1,10 +1,12 @@
+import absl.logging
+absl.logging.set_verbosity(absl.logging.ERROR)
 import MGLensing
 import os
 os.environ["OMP_NUM_THREADS"] = "1"
 # os.environ["MKL_NUM_THREADS"] = "1"
 # os.environ["NUMEXPR_NUM_THREADS"] = "1"
-# os.environ["OMP_PLACES"] = "threads"
-# os.environ["OMP_PROC_BIND"] = "spread"
+os.environ["OMP_PLACES"] = "threads"
+os.environ["OMP_PROC_BIND"] = "spread"
 from nautilus import Prior, Sampler
 import numpy as np
 import time
@@ -17,10 +19,19 @@ os.chdir(folder)
 
 
 
-MGLtest = MGLensing.MGL("config.yaml")
+#MGLtest = MGLensing.MGL("config.yaml")
+MGLtest = MGLensing.MGL("config_hmcode.yaml")
+#MGLtest = MGLensing.MGL("config_pandey.yaml")
+#MGLtest = MGLensing.MGL("config_lssty10.yaml")
+print(MGLtest.params_fixed)
 def log_probability_function(pars):
+    #for i in range(10):
+    #    pars['bs2L_'+str(i+1)] = ...pars['b1L_'+str(i+1)] * (-4./7.)
     param_dic = pars | MGLtest.params_fixed
-    return MGLtest.Like.compute(param_dic)
+    if param_dic['w0']+param_dic['wa'] > 0:
+        return -np.inf
+    else:
+        return MGLtest.Like.compute(param_dic)
 
 
 prior = Prior()

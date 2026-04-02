@@ -39,11 +39,11 @@ class FofRReACT():
         self.zz_max = self.zz_pk[-1]
 
         self.cp_nl_hmcode_model = cosmopower_NN(restore=True, 
-                      restore_filename=dirname+'/../../emulators/log10_total_matter_nonlinear_emu',
+                      restore_filename=dirname+'/../../emulators/hmcode2020/log10_total_matter_nonlinear_emu',
                       )
         self.kh_nl = self.cp_nl_hmcode_model.modes # 0.01..50. h/Mpc    
         self.cp_lin_model = cosmopower_NN(restore=True, 
-                      restore_filename=dirname+'/../../emulators/log10_total_matter_linear_emu',
+                      restore_filename=dirname+'/../../emulators/hmcode2020/log10_total_matter_linear_emu',
                       )
         self.kh_lin = self.cp_lin_model.modes # 3.7e-4..50. h/Mpc IMPORTANT LATER USED IN TATT
         self.kh_lin_left = self.kh_lin[self.kh_lin<self.kh_nl[0]]
@@ -53,7 +53,7 @@ class FofRReACT():
 
         print('initialising f(R) ReACT')
         self.cp_nl_fofr_model = cosmopower_NN(restore=True, 
-                        restore_filename=dirname+'/../../emulators/react_boost_spph_nn_wide_100k_mt',
+                        restore_filename=dirname+'/../../emulators/fofr/react_boost_fofr',
                         )
         self.kh_nl_boost = self.cp_nl_fofr_model.modes # 0.01..3. h/Mpc 
         self.zz_boost = np.minimum(self.zz_pk, 2.)
@@ -67,16 +67,16 @@ class FofRReACT():
 
         # load for sigma8 computation 
         self.HMcodeEmu = HMcode2020()
-        # load pyhmcode objects
-        self.hmc = pyhmcode.Cosmology()
-        # Set the halo model in HMcode
-        # Options: HMcode2015, HMcode2016, HMcode2020
-        self.hmod = pyhmcode.Halomodel(pyhmcode.HMcode2020, verbose=False)
 
         if option=='linear':
             self.get_pk_nl =  self.get_pk_lin 
         elif option=='pseudo':
             self.get_pk_nl = self.get_pk_pseudo
+            # load pyhmcode objects
+            self.hmc = pyhmcode.Cosmology()
+            # Set the halo model in HMcode
+            # Options: HMcode2015, HMcode2016, HMcode2020
+            self.hmod = pyhmcode.Halomodel(pyhmcode.HMcode2020, verbose=False)
         else:
             self.get_pk_nl = self.get_pk_nl_
 

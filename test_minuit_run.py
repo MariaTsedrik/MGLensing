@@ -1,5 +1,5 @@
 import os
-os.environ["OMP_NUM_THREADS"] = "1"
+#os.environ["OMP_NUM_THREADS"] = "1"
 #os.environ["OMP_PLACES"] = "threads"
 from iminuit import Minuit
 import numpy as np
@@ -22,7 +22,7 @@ def log_probability_function(pars):
 
 
 par_fid_array = np.array([
-    2.06, 2.13, 2.07, 2.29, 0., 0., 0., 0., 0., 0., 0., 0.,...
+    2.06, 2.13, 2.07, 2.29, 0., 0., 0., 0., 0., 0., 0., 0., #...
     ])
 ndim = len(par_fid_array)
 
@@ -33,10 +33,7 @@ min_obj= Minuit(nll,initial)
 min_obj.errordef = Minuit.LIKELIHOOD
 
 #priors
-#min_obj.limits['b1_nz1'] = (0,4)
-#min_obj.limits['b1_nz3'] = (0,4)
-#min_obj.limits['b1_sz1'] = (0,4)
-#min_obj.limits['b1_sz3'] = (0,4)
+#min_obj.limits['b1_1'] = (0,4)
 
 
 #min_obj.tol = 0.001

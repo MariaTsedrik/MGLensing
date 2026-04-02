@@ -33,5 +33,4 @@ while MGL either uses HMcode2020 or linear power spectrum from BACCO.
    :width: 100 %
    :align: center
 
-One can perform further comparison test by modifying and running ``plotting_scripts/compare_mgl_vs_ccl.py``. Additionally, we provide a Jupyter notebook 
-``mgl_vs_ccl_notebook.ipynb`` with the same functionality.
+One can perform further comparison tests by modifying and running Jupyter notebooks ``mgl_vs_ccl_bacco.ipynb`` and ``mgl_vs_ccl_hmcode.ipynb``.

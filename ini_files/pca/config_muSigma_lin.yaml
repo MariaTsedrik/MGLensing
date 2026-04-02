@@ -18,8 +18,8 @@ specs:
   #'kmax' -> vary kmax in each z-bin, which technically equals to the 'lmax'-option via lmax=kmax rcom(z_mod)/(1+z_mod)
   #           with z_mod corresponding to a peak of the shear and photo-GC kernels 
   scale_cuts:
-    type: 'lmax'
-    max_WL: #[1478.5]
+    type: 'const_lmax'
+    max_WL: [1478.5]
             #[2800, 2800, 2800, 2800, 2800, 
             #       3000, 3000, 3000, 3000, 
             #             3000, 3000, 3000, 
@@ -30,31 +30,27 @@ specs:
             #           470, 334, 470,
             #                470, 470,
             #                    470]
-             [45, 60, 60, 85, 85,
-                  60, 60, 85, 85,
-                      60, 85, 85,
-                          85, 85,
-                              85]
-            #[3., 3., 3., 2., 2.]
-            #[0.1, 0.1, 0.1, 0.1, 0.1]
-    max_GC: #[21]
+            #[45, 60, 60, 85, 85,
+            #     60, 60, 85, 85,
+            #         60, 85, 85,
+            #             85, 85,
+            #                 85] #linear cuts 
+    max_GC: [500.]
             #[478, 478, 478, 478, 478, 
             #      617, 617, 617, 617, 
             #           716, 716, 716, 
             #                780, 780,
             #                     818] #always a list, same length as nbin*(nbin+1)/2 or just 1 for const_lmax
-            [68, 68, 68, 68, 68, 
-                 88, 88, 88, 88, 
-                 102, 102, 102, 
-                 111, 111,
-                 116] 
+            #[68, 68, 68, 68, 68, 
+            #     88, 88, 88, 88, 
+            #     102, 102, 102, 
+            #     111, 111,
+            #     116] #linear cuts
             #[204, 204, 204, 204, 204, 
             #      264, 264, 264, 264, 
             #           306, 306, 306, 
             #                334, 334,
             #                     350] 
-            #[0.7, 0.7, 0.7, 0.7, 0.7]
-            #[0.1, 0.1, 0.1, 0.1, 0.1]
     cosmo: # for transformation from k_eff to ell
       'Omega_m': 0.31
       'w0': -1.
@@ -85,8 +81,14 @@ data:
   #     1 -> bacco
   #     2 -> nDGP
   #     3 -> gLEMURS
-  #     4 -> μ-Σ (Σ is not properly implemented in Cls yet)
+  #     4 -> μ-Σ +q1 with ReACT
   #     5 -> Dark Scattering (Interacting Dark Energy)
+  #     6 -> f(R) with ReACT
+  #     7 -> f(R) with eMANTIS
+  #     8 -> nDGP with nDGPemu
+  #     9 -> μ(k,z)-Σ(k,z) +q123 with ReACT
+  #     10 -> μ(z)-Σ(z) +q123 with ReACT
+  #     11 -> μ(z)-spline with MGrowth and pseudo
   bias_model: 0
   # Photometric galaxy bias model (redshift dependence)
   #     0 -> constant linear bias within bins
@@ -121,8 +123,14 @@ theory:
   #     1 -> bacco
   #     2 -> nDGP
   #     3 -> gLEMURS
-  #     4 -> μ-Σ (Σ is not properly implemented in Cls yet)
+  #     4 -> μ-Σ +q1 with ReACT
   #     5 -> Dark Scattering (Interacting Dark Energy)
+  #     6 -> f(R) with ReACT
+  #     7 -> f(R) with eMANTIS
+  #     8 -> nDGP with nDGPemu
+  #     9 -> μ(k,z)-Σ(k,z) +q123 with ReACT
+  #     10 -> μ(z)-Σ(z) +q123 with ReACT
+  #     11 -> μ(z)-spline with MGrowth and pseudo
   bias_model: 0
   # Photometric galaxy bias model (redshift dependence)
   #     0 -> linear interpolation
@@ -148,13 +156,13 @@ theory:
   params: ./ini_files/pca/params_model_hmcode_all.yaml   
 
 output: 
-  chain_name: lsst_y1_test_muSigma_linps_purelincuts
+  chain_name: lsst_y1_test_muSigma_linps_purelincuts_grnsgpfofr
 sampler: 
   mcmc:
     verbose: True
     n_eff: 5000
     n_live: 1000
-    pool: 20
-    resume: False
-    hdf5_name:  lsst_y1_test_muSigma_linps_purelincuts
+    pool: 10
+    resume: True
+    hdf5_name:  lsst_y1_test_muSigma_linps_purelincuts_grnsgpfofr
     

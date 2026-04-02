@@ -40,11 +40,11 @@ class GammaReACT():
         self.zz_max = self.zz_pk[-1]
 
         self.cp_nl_hmcode_model = cosmopower_NN(restore=True, 
-                      restore_filename=dirname+'/../../emulators/log10_total_matter_nonlinear_emu',
+                      restore_filename=dirname+'/../../emulators/hmcode2020/log10_total_matter_nonlinear_emu',
                       )
         self.kh_nl = self.cp_nl_hmcode_model.modes # 0.01..50. h/Mpc    
         self.cp_lin_model = cosmopower_NN(restore=True, 
-                      restore_filename=dirname+'/../../emulators/log10_total_matter_linear_emu',
+                      restore_filename=dirname+'/../../emulators/hmcode2020/log10_total_matter_linear_emu',
                       )
         self.kh_lin = self.cp_lin_model.modes # 3.7e-4..50. h/Mpc IMPORTANT LATER USED IN TATT
         self.kh_lin_left = self.kh_lin[self.kh_lin<self.kh_nl[0]]
@@ -52,7 +52,7 @@ class GammaReACT():
 
         print('initialising Growth Index Parametrisation')
         self.cp_nl_gammaz_model = cosmopower_NN(restore=True, 
-                        restore_filename=dirname+'/../../emulators/react_boost_gLEMURSzzz', 
+                        restore_filename=dirname+'/../../emulators/gamma/react_boost_gamma_z_q1', 
                         )
         self.kh_nl_boost = self.cp_nl_gammaz_model.modes # 0.01..5. h/Mpc 
         self.zz_boost = np.minimum(self.zz_pk, 2.5)

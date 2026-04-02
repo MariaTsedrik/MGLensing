@@ -27,7 +27,7 @@ specs:
             #                         3000] #always a list, same length as nbin*(nbin+1)/2 or just 1 for const_lmax
             #[3., 3., 3., 2., 2.]
             #[0.1, 0.1, 0.1, 0.1, 0.1]
-    max_GC: [21]
+    max_GC: [500.]
             #[478, 478, 478, 478, 478, 
             #      617, 617, 617, 617, 
             #           716, 716, 716, 
@@ -75,8 +75,14 @@ data:
   #     1 -> bacco
   #     2 -> nDGP
   #     3 -> gLEMURS
-  #     4 -> μ-Σ (Σ is not properly implemented in Cls yet)
+  #     4 -> μ-Σ +q1 with ReACT
   #     5 -> Dark Scattering (Interacting Dark Energy)
+  #     6 -> f(R) with ReACT
+  #     7 -> f(R) with eMANTIS
+  #     8 -> nDGP with nDGPemu
+  #     9 -> μ(k,z)-Σ(k,z) +q123 with ReACT
+  #     10 -> μ(z)-Σ(z) +q123 with ReACT
+  #     11 -> μ(z)-spline with MGrowth and pseudo
   bias_model: 0
   # Photometric galaxy bias model (redshift dependence)
   #     0 -> constant linear bias within bins
@@ -111,8 +117,14 @@ theory:
   #     1 -> bacco
   #     2 -> nDGP
   #     3 -> gLEMURS
-  #     4 -> μ-Σ (Σ is not properly implemented in Cls yet)
+  #     4 -> μ-Σ +q1 with ReACT
   #     5 -> Dark Scattering (Interacting Dark Energy)
+  #     6 -> f(R) with ReACT
+  #     7 -> f(R) with eMANTIS
+  #     8 -> nDGP with nDGPemu
+  #     9 -> μ(k,z)-Σ(k,z) +q123 with ReACT
+  #     10 -> μ(z)-Σ(z) +q123 with ReACT
+  #     11 -> μ(z)-spline with MGrowth and pseudo
   bias_model: 0
   # Photometric galaxy bias model (redshift dependence)
   #     0 -> linear interpolation
@@ -144,7 +156,7 @@ sampler:
     verbose: True
     n_eff: 5000
     n_live: 1000
-    pool: 20
+    pool: 10
     resume: False
     hdf5_name:  lsst_y1_test_muSigma_nonlinps_nonlincuts
     

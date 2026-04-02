@@ -7,12 +7,14 @@ import sacc
 import yaml
 import warnings
 import os
+try: import euclidlib as el
+except: print('euclidlib not installed! Euclid TR1 setup will not be available!')
 DEG2_IN_SPHERE = 4 * np.pi * (180 / np.pi)**2
 
 dirname = os.path.split(__file__)[0]
 print(dirname)
 H0_h_c = 1./2997.92458 #=100/c in Mpc/h
-z_bins_for_integration = 256 #512 
+z_bins_for_integration = 400 #512 #256 
 
 def get_luminosity_func(file_name):
     """
@@ -523,7 +525,7 @@ class LSSTSetUp:
         # \ell bins setup
         lmin = 20
         self.lmin = lmin
-        self.lbin = 20 #50 #100 
+        self.lbin = 30 #20  #50 #100 
         lmax = 5e3
         self.lmax = lmax
         if likelihood == 'determinants':
@@ -896,3 +898,68 @@ class EuclidSetUp:
             norm_nz_s[:,Bin] /= trapezoid(norm_nz_s[:,Bin],self.zz_integr[:])     
 
         return norm_nz_s, norm_nz_l
+
+
+class CLOESetUp:
+    def __init__(self, config:dict):
+        survey_info = config['specs']['survey_info']
+        scale_cuts_info = config['specs']['scale_cuts']
+        likelihood = config['likelihood']
+        self.observable = config['observable']
+        self.survey_name = 'Euclid'
+
+        # redshift bins setup
+        self.zmin = 0.001
+        self.zmax  = 3.
+
+        self.gal_per_sqarcmn_l = self.gal_per_sqarcmn_s = 30.0
+        self.rms_shear = 0.30
+        
+
+        self.nbin_l = 6
+        self.nbin_s = 6
+        #self.z_bin_edge = np.array([self.zmin, 0.418, 0.560, 0.678, 0.789, 0.900, 1.019, 1.155, 1.324, 1.576, 2.5])
+        #self.z_bin_edge_s = self.z_bin_edge_l = self.z_bin_edge
+        self.fsky = 2500/DEG2_IN_SPHERE 
+        
+        #self.z_bin_center_s = np.array([(self.z_bin_edge_s[i]+self.z_bin_edge_s[i+1])/2 for i in range(self.nbin_s)])
+       # self.z_bin_center_l = np.array([(self.z_bin_edge_l[i]+self.z_bin_edge_l[i+1])/2 for i in range(self.nbin_l)])
+        # z values for integration (!= from z bins)
+        self.zbin_integr = z_bins_for_integration 
+        self.zz_integr = np.linspace(self.zmin, self.zmax, num=self.zbin_integr, endpoint=True)
+        self.aa_integr = np.array(1./(1.+self.zz_integr[::-1])) 
+        # normalized galaxy distribution and noise
+        z_nz, nz_heracles = el.photo.redshift_distributions('/Users/s2265800/Desktop/GitHub/playground_th1/tutorials/th1-kp4/nz_example.fits')
+        # Normalize and resample n(z) for both position and shear
+        def normalize_and_resample(nz_dict, z_grid, z_target):
+            nz_array = np.vstack([nz / trapezoid(nz, z_grid) for nz in nz_dict.values()])
+            return np.array([np.interp(z_target, z_grid, nz) for nz in nz_array])
+
+        my_dndz_pos_norm = normalize_and_resample(nz_heracles, z_nz, self.zz_integr)
+        my_dndz_she_norm = normalize_and_resample(nz_heracles, z_nz, self.zz_integr)
+        self.eta_z_s, self.eta_z_l = my_dndz_she_norm.T, my_dndz_pos_norm.T
+        zz_mod_wl = [self.zz_integr[np.argmax(self.eta_z_s[:, i])] for i in range (self.nbin_s)]
+        zz_mod_gg = [self.zz_integr[np.argmax(self.eta_z_l[:, i])] for i in range (self.nbin_l)]
+        n_bar_l = get_noise(self.nbin_l, self.gal_per_sqarcmn_l)
+        n_bar_s = get_noise(self.nbin_s, self.gal_per_sqarcmn_s)
+        self.noise = {
+        'LL': 0., #self.rms_shear**2./n_bar_l,
+        'LG': 0.,
+        'GL': 0.,
+        'GG': 0., #1./n_bar_s
+        }
+        
+        cells_data = el.photo.angular_power_spectra('/Users/s2265800/Desktop/GitHub/playground_th1/tutorials/th1-kp4/synth_cells_5000_binned.fits')
+        ells = cells_data[('SHE', 'SHE', 1, 1)].ell
+        self.l_wl_bin_centers = ells
+        self.ell = self.l_wl_bin_centers
+        self.lbin = len(ells)
+        self.lmin = 10
+        self.lmax = 5000
+        self.ell_bin_edges = np.logspace(log10(self.lmin), log10(self.lmax), num=self.lbin+1, endpoint=True) 
+        self.d_ell_bin = np.diff(self.ell_bin_edges)
+        validate_and_setup_lmax(self, scale_cuts_info, likelihood, self.lmin, self.lmax, zz_mod_wl, zz_mod_gg)
+        
+        self.lum_func = get_luminosity_func(dirname+'/scaledmeanlum_E2Sa.dat')
+        self.likelihood = likelihood
+        

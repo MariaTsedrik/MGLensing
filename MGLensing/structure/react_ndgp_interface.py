@@ -38,11 +38,11 @@ class DGPReACT():
         self.zz_max = self.zz_pk[-1]
 
         self.cp_nl_hmcode_model = cosmopower_NN(restore=True, 
-                      restore_filename=dirname+'/../../emulators/log10_total_matter_nonlinear_emu',
+                      restore_filename=dirname+'/../../emulators/hmcode2020/log10_total_matter_nonlinear_emu',
                       )
         self.kh_nl = self.cp_nl_hmcode_model.modes # 0.01..50. h/Mpc    
         self.cp_lin_model = cosmopower_NN(restore=True, 
-                      restore_filename=dirname+'/../../emulators/log10_total_matter_linear_emu',
+                      restore_filename=dirname+'/../../emulators/hmcode2020/log10_total_matter_linear_emu',
                       )
         self.kh_lin = self.cp_lin_model.modes # 3.7e-4..50. h/Mpc IMPORTANT LATER USED IN TATT
         self.kh_lin_left = self.kh_lin[self.kh_lin<self.kh_nl[0]]
@@ -50,7 +50,7 @@ class DGPReACT():
 
         print('initialising nDGP ReACT')
         self.cp_nl_ngdp_model = cosmopower_NN(restore=True, 
-                        restore_filename=dirname+'/../../emulators/react_boost_nDGP_emu_v2',
+                        restore_filename=dirname+'/../../emulators/ndgp/react_boost_ndgp',
                         )
         self.kh_nl_boost = self.cp_nl_ngdp_model.modes # 0.01..5. h/Mpc 
         self.zz_boost = np.minimum(self.zz_pk, 2.5)

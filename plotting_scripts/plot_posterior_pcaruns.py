@@ -27,25 +27,26 @@ def read_last_header_line(file_path):
         return []
 
 file_paths = [ #'chains/mg/chain_lsst_y1_test_muSigma_linps_lincuts.txt',  
-              #'chains/mg/chain_lsst_y1_test_muSigma_linps_pcacuts.txt',
-              #'chains/mg/chain_lsst_y1_test_muSigma_nonlinps_nonlincuts.txt',
+              'chains/mg/chain_lsst_y1_test_muSigma_linps_pcacuts.txt',
+              'chains/mg/chain_lsst_y1_test_muSigma_nonlinps_nonlincuts.txt',
 
-            'chains/chain_lsst_y1_test_muSigma_linps_purelincuts_w_S8.txt',
-              'chains/chain_lsst_y1_test_muSigma_linps_pcacuts_gr_ndgp_w_S8.txt',
+            #'chains/chain_lsst_y1_test_muSigma_linps_purelincuts_w_S8.txt',
+            #  'chains/chain_lsst_y1_test_muSigma_linps_pcacuts_gr_ndgp_w_S8.txt',
 
  ]  
 
-file_name = 'mu_chain_lsst_wl_pca_gr_dgp'
+file_name = 'mu_chain_lsst_3x2pt_preliminary_run_pca'
 legend_labels = [
-#'model: $\mu$ lin, cuts: lin (0:09:07)',
-#'model: $\mu$ lin, cuts: PCA (2:20:34)',
-#'model: $\mu+q_1$ nonlin, cuts: nonlin (0:14:29)',
-'model: $\mu$ lin, cuts: lin (0:03:11)',
-'model: $\mu$ lin, cuts: PCA \n with GR and nDGP (0:16:39)',
+#'model: $\mu$ lin, cuts: $\ell^{\\rm WL}_{\\rm max} = [57, 82, 99, 111, 119]$, $\ell^{\\rm GC, XC}_{\\rm max} = [68, 88, 102, 111, 116]$', # lin (0:09:07)',
+'model: $\mu$ lin, cuts: PCA', #(2:20:34)',
+'model: $\mu+q_1$ nonlin, cuts: nonlin' #(0:14:29)',
+#'model: $\mu$ lin, cuts: lin (0:03:11)',
+#'model: $\mu$ lin, cuts: PCA \n with GR and nDGP (0:16:39)',
 ]
-annotation_text = 'LSST Y1 data \n shear-analysis\n data: GR (no IA) \n fixed $\Sigma_0=0$, $\omega_{\\rm b}$, $n_{\\rm s}$'
+#annotation_text = 'LSST Y1 data \n shear-analysis\n data: GR (no IA) \n fixed $\Sigma_0=0$, $\omega_{\\rm b}$, $n_{\\rm s}$'
+annotation_text = 'LSST Y1 data \n 3x2pt-analysis\n data: GR\n fixed $\Sigma_0=0$, $\omega_{\\rm b}$, $n_{\\rm s}$\n $\ell^{\\rm WL}_{\\rm max} = [1734, 2480, 2976, 2229, 2389]$,\n $\ell^{\\rm GC, XC}_{\\rm max} = [68, 88, 102, 111, 116]$'
 # annotation square
-num = 1
+num = 2
 
 n_samples = len(file_paths)
 chains_info = {}
@@ -70,9 +71,9 @@ for i in range(n_samples):
                                     settings={'smooth_scale_2D':0.35, 'smooth_scale_1D':0.35},
                                     ) 
     )
-    p = samples[i].getParams() 
-    samples[i].addDerived(np.exp(p.log10As)*0.1, name='10As', label=r'10^9A_{\rm s}')
-    samples[i].addDerived(p.Omega_m-0.0222383/p.h**2, name='Omega_c', label=r'\Omega_{\rm c}')
+    #p = samples[i].getParams() 
+    #samples[i].addDerived(np.exp(p.log10As)*0.1, name='10As', label=r'10^9A_{\rm s}')
+    #samples[i].addDerived(p.Omega_m-0.0222383/p.h**2, name='Omega_c', label=r'\Omega_{\rm c}')
 
 
 
@@ -80,7 +81,7 @@ ModelPars = chains_info[0]['pars']
 # add parameters that are not present in the first chain:
 #ModelPars.append('q1')
 #ModelPars = ModelPars[:7]
-ModelPars = ['Omega_c', 'mu0', '10As', 'sigma8', 'h']
+#ModelPars = ['Omega_c', 'mu0', '10As', 'sigma8', 'h']
 
 colors = ['tab:orange', 'tab:blue', 'tab:green', 'tab:red', 'tab:purple', 'tab:olive', 'tab:cyan']
 from matplotlib import rc
@@ -100,6 +101,7 @@ g.triangle_plot(samples,
     ModelPars,
 legend_labels = legend_labels,
 legend_loc = 'upper right',
+title_limit=1,
 contour_args = [{'filled':True, 'color': colors[0]}, {'filled':True, 'color': colors[1], 'ls': '-'}, {'filled':True, 'color': colors[2], 'ls': '-'},
                 {'filled':True, 'color': colors[3], 'ls': '-'},  {'filled':True, 'color': colors[4], 'ls': '-'},  {'filled':True, 'color': colors[5], 'ls': '-'}], 
 line_args=[ {'color': colors[0], 'ls': '-'}, {'color': colors[1], 'ls': '-'}, {'color': colors[2], 'ls': '-'}, 
@@ -117,8 +119,8 @@ if fiducials != None:
                 ax.axvline(fiducials[ModelPars[j]],lw=2.,color='tab:gray')
 
 ax = g.subplots[num, num]
-#ax.annotate(annotation_text, (2.5, 0.05), xycoords='axes fraction', clip_on=False, fontsize=20) 
-ax.annotate(annotation_text, (1.5, 0.05), xycoords='axes fraction', clip_on=False, fontsize=20)      
+ax.annotate(annotation_text, (2.5, 0.05), xycoords='axes fraction', clip_on=False, fontsize=20) 
+#ax.annotate(annotation_text, (1.5, 0.05), xycoords='axes fraction', clip_on=False, fontsize=20)      
 
 plt.savefig('figs/posteriors/'+file_name+'.png')  
 
