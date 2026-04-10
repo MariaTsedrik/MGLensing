@@ -41,24 +41,6 @@ ns:
 
 
 
-mu0: 
-  type: 'F'
-  p0: 0.
-  p1: -0.9999
-  p2: 2.9999   
-
-sigma0: 
-  type: 'F'
-  p0: 0.
-  p1: -1.
-  p2: 3.    
-
-q1: 
-  type: 'F' #change to U when mu-nonlinear
-  p0: 0.
-  p1: -2.
-  p2: 2.  
-
 
 Mnu: 
   type: 'F'
@@ -78,42 +60,13 @@ wa:
   p1: -3.
   p2: 3.  
 
-log10f_R0: 
-  type: 'F'
-  p0: -5.
-  p1: -7.
-  p2: -4.   
 
 
 log10Omega_rc: 
-  type: 'U'
-  p0: -0.6020599913279624 #Omega_rc = 0.25
+  type: 'F'
+  p0:  0. #Omega_rc = 1 #-1.3010299956639813 #Omega_rc = 0.05 #-0.6020599913279624 #Omega_rc = 0.25
   p1: -3.
   p2: 2.  
-
-gamma0: 
- type: 'F'
- p0: 0.8
- p1: 0.
- p2: 1.   
-
-gamma1: 
- type: 'F'
- p0: 0.
- p1: -0.7
- p2: 0.7 
-
-q1_gamma: 
- type: 'F'
- p0: 0.7
- p1: -2.
- p2: 2.    
-
-# log10T_AGN:
-#   type: 'F'
-#   p0: 7.9   
-#   p1: 7.6
-#   p2: 8.3  
 
 ################################################
 #               Nuisances                      #

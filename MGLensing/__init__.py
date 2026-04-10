@@ -603,7 +603,7 @@ class MGL():
 
         def get_model_label(value, model_type):
             model_maps = {
-                "nl_model": {0: "HMcode", 1: "bacco", 2: "nDGP: ReACT", 3: "gLEMURS: ReACT", 4: "mu-Sigma: ReACT", 5:"Dark Scattering: ReACT", 6:"f(R): ReACT", 7: "f(R): EMANTIS", 8: "nDGPemu", 9: "scale-dep mu: MGrowth"},
+                "nl_model": {0: "HMcode", 1: "bacco", 2: "nDGP: ReACT", 3: "gamma+q1: ReACT", 4: "mu-Sigma: ReACT", 5:"Dark Scattering: ReACT", 6:"f(R): ReACT", 7: "f(R): EMANTIS", 8: "nDGP: nDGPemu", 9: "mu-Sigma-k-z+ q123: ReACT", 10: "mu-Sigma-z+ q123: ReACT", 11: "mu-Sigma-z-spline: Pseudo"},
                 "bias_model": {0: "b1 constant within bins", 1: "(b1, b2) constant within bins", 2: "HEFT", 3: 'HEFT with Pnl', 4: 'HEFT with Pnl*S', 5: 'sample in b1*sigma8', 6: 'sample in heft*sigma8'},
                 "ia_model": {0: "zNLA", 1: "TATT"},
                 "baryon_model": {0: "no baryons", 1: "Tagn HMcode", 2: "bcemu", 3: "bacco"},

@@ -28,11 +28,19 @@ mu9: '\mu_9'
 mu10: '\mu_{10}'
 sigma0: '\Sigma_0'
 q1: 'q_1'
+q2: 'q_2'
+q3: 'q_3'
 S8: 'S_8'
 
 c1: 'c_1'
 c2: 'c_2'
-lambda: '\lambda'
+lam: '\lambda'
+
+log10f_R0: '\log_{10}{f_{\rm R0}}'
+log10Omega_rc: '\log_{10}{\Omega_{\rm rc}}'
+gamma0: '\gamma_0'
+gamma1: '\gamma_1'
+q1_gamma: 'q_1^{\gamma}'
 ################################################
 #               Nuisances                      #
 ################################################

@@ -86,7 +86,7 @@ log10f_R0:
 
 
 log10Omega_rc: 
-  type: 'U'
+  type: 'F'
   p0: -0.6020599913279624 #Omega_rc = 0.25
   p1: -3.
   p2: 2.  

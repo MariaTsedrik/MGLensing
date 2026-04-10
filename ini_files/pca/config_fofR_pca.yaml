@@ -1,0 +1,21 @@
+observable: 'WL'
+likelihood: 'binned'
+specs:
+  scale_cuts:
+    type: 'const_lmax'
+    max_WL: [1478.5]
+    max_GC: [500.]
+  survey_info: 'LSST_Y1' #'Euclid_Y1' #'Euclid_5bins'
+  custom_survey_path: 
+
+theory:
+  add_noise: False
+  nl_model: 6
+  bias_model: 0
+  ia_model: 0
+  baryon_model: 0
+  photoz_err_model: 0
+  params: ./ini_files/pca/params_model_hmcode_fofR_pca.yaml   
+
+
+    

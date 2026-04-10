@@ -33,6 +33,12 @@ REACT_MUKZ_Q123 = 9
 REACT_MUSIGMA_Q123 = 10
 PSEUDO_MUSPLINE = 11
 
+def get_model_label(value, model_type):
+    nl_model_maps = {
+        "nl_model": {0: "HMcode", 1: "bacco", 2: "nDGP: ReACT", 3: "gamma+q1: ReACT", 4: "mu-Sigma: ReACT", 5:"Dark Scattering: ReACT", 6:"f(R): ReACT", 7: "f(R): EMANTIS", 8: "nDGP: nDGPemu", 9: "mu-Sigma-k-z+ q123: ReACT", 10: "mu-Sigma-z+ q123: ReACT", 11: "mu-Sigma-z-spline: Pseudo"},
+    }
+    return nl_model_maps.get(model_type, {}).get(value, "Unknown")
+
 # Perform PCA with numpy.linalg.svd - find rotation matrix
 def findPCA(M_data, B_data, L_ch_inv):
     Delta = np.array(np.matmul(L_ch_inv, (B_data - M_data).T).T)
@@ -72,7 +78,7 @@ def _build_model_from_base(base_config_path, nl_model, option=None):
 # In the config file the datavector and the corresponding model is specified
 # as well as varying parameters and their priors, 
 # and the fixed parameters for the models in the data reduction
-_base_pca_config = "ini_files/pca/config_muSigma_lin.yaml"
+_base_pca_config = "ini_files/pca/config_nDGP_lin.yaml"
 MGL_model = MGLensing.MGL(_base_pca_config)
 
 cov = MGL_model.Data.data_covariance
@@ -83,7 +89,7 @@ L_choleski_inv_uncut = np.linalg.inv(L_choleski_uncut)
 L_ch_inv = L_choleski_inv_uncut
 
 # List of models in the data reduction and decide on the PCA option
-model_list = [HMCODE, REACT_NDGP, REACT_FOFR]
+model_list = [HMCODE, REACT_FOFR, REACT_NDGP]
 pca_option = "linear"
 
 # Build the models for the data reduction
@@ -91,10 +97,14 @@ model_1_pca_nl = _build_model_from_base(_base_pca_config, nl_model=model_list[0]
 model_1_pca = _build_model_from_base(_base_pca_config, nl_model=model_list[0], option=pca_option)
 model_2_pca_nl = _build_model_from_base(_base_pca_config, nl_model=model_list[1], option=None)
 model_2_pca = _build_model_from_base(_base_pca_config, nl_model=model_list[1], option=pca_option)
-model_3_pca_nl = _build_model_from_base(_base_pca_config, nl_model=model_list[2], option=None)
-model_3_pca = _build_model_from_base(_base_pca_config, nl_model=model_list[2], option=pca_option)
+#model_2_pca_nl = MGLensing.MGL("ini_files/pca/config_fofR_pca.yaml")
+#model_2_pca = MGLensing.MGL("ini_files/pca/config_fofR_lin_pca.yaml")
+#model_3_pca_nl = _build_model_from_base(_base_pca_config, nl_model=model_list[2], option=None)
+#model_3_pca = _build_model_from_base(_base_pca_config, nl_model=model_list[2], option=pca_option)
+model_3_pca_nl = MGLensing.MGL("ini_files/pca/config_nDGP_pca.yaml")
+model_3_pca = MGLensing.MGL("ini_files/pca/config_nDGP_lin_pca.yaml")
 
-
+hdf5_name = chain_name = "lsst_y1_test_nDGP_linps_pca_gr_fofr_ndgp_omegarc1"
 
 def log_probability_function(pars):
         param_dic = pars | MGL_model.params_fixed
@@ -157,10 +167,20 @@ for par_i in MGL_model.params_model:
 # Ensure the directories exist
 os.makedirs('chains', exist_ok=True)
 os.makedirs('chains/hdf5', exist_ok=True)
-
+pca_header = (
+    "Models in the data reduction: \n"
+    + get_model_label(model_list[0], "nl_model") + "(=" + str(model_list[0]) + ")\n"
+    + get_model_label(model_list[1], "nl_model") + "(=" + str(model_list[1]) + ")\n"
+    + get_model_label(model_list[2], "nl_model") + "(=" + str(model_list[2]) + ")\n"
+    + (
+        get_model_label(model_list[3], "nl_model") + "(=" + str(model_list[3]) + ")\n"
+        if len(model_list) > 3 else "\n"
+    )
+    + "\n with PCA option: " + pca_option + "\n" + MGL_model.gen_output_header() 
+)
 def main():    
     sampler = Sampler(prior, log_probability_function, 
-                      filepath='chains/hdf5/'+MGL_model.hdf5_name+'.hdf5', resume=True, #MGL_model.mcmc_resume, 
+                      filepath='chains/hdf5/'+hdf5_name+'.hdf5', resume=True, #MGL_model.mcmc_resume, 
                       n_live=MGL_model.mcmc_nlive, pool=14)
     start = time.time()
     sampler.run(verbose=MGL_model.mcmc_verbose, discard_exploration=True, n_eff=MGL_model.mcmc_neff)
@@ -169,7 +189,9 @@ def main():
     finish = time.time()
     chain_time = finish-start
 
-    np.savetxt("chains/chain_"+MGL_model.chain_name+".txt", np.c_[points, log_w, log_l], header="Models in the data reduction: "+", ".join(map(str, model_list))+"\n with PCA option: "+pca_option+"\n"+MGL_model.gen_output_header(), footer='log_Z = {log_z};  chain_time = {chain_time} (--> {chain_time_hms} hh:mm:ss)'.format(log_z=log_z, chain_time=chain_time, chain_time_hms=timedelta(seconds=chain_time)))
+    np.savetxt("chains/chain_"+chain_name+".txt", np.c_[points, log_w, log_l], 
+    header=pca_header,
+    footer='log_Z = {log_z};  chain_time = {chain_time} (--> {chain_time_hms} hh:mm:ss)'.format(log_z=log_z, chain_time=chain_time, chain_time_hms=timedelta(seconds=chain_time)))
 
 
 if __name__ == "__main__":

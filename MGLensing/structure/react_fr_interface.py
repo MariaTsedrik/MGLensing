@@ -322,10 +322,18 @@ class FofRReACT():
         # of the intrinsic alignment signal
         dz  = np.ones((lbin, len(zz_integr)), 'float64') 
         dz0  = np.ones((lbin, len(zz_integr)), 'float64') 
-        index_pknn = np.array(np.where((k > k_min_h_by_mpc) & (k < k_max_h_by_mpc))).transpose() 
-        for index_l, index_z in index_pknn:
-            dz[index_l, index_z] = dz_fr0_interp(k[index_l,index_z], zz_integr[index_z])
-            dz0[index_l, index_z] = dz0_fr0_interp(k[index_l,index_z])
+        #index_pknn = np.array(np.where((k > k_min_h_by_mpc) & (k < k_max_h_by_mpc))).transpose() 
+        #for index_l, index_z in index_pknn:
+        #    dz[index_l, index_z] = dz_fr0_interp(k[index_l,index_z], zz_integr[index_z])
+        #    dz0[index_l, index_z] = dz0_fr0_interp(k[index_l,index_z])
+        mask = (k > k_min_h_by_mpc) & (k < k_max_h_by_mpc)
+        index_l, index_z = np.where(mask)
+        k_pts = k[index_l, index_z]
+        z_pts = zz_integr[index_z]
+        dz_vals = dz_fr0_interp(k_pts, z_pts, grid=False)
+        dz0_vals = dz0_fr0_interp(k_pts)
+        dz[index_l, index_z] = np.ravel(dz_vals)
+        dz0[index_l, index_z] = np.ravel(dz0_vals)
         return dz, dz0
     
 

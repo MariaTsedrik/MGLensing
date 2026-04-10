@@ -17,6 +17,7 @@ chains/leonardo/
 chains/runs/
 chains/lsst/
 chains/pca_runs/
+chains/chain_lsst_y1_*
 
 # Test plots
 figs/posteriors/unofficial/

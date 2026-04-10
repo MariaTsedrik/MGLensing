@@ -193,9 +193,9 @@ class Theory:
             raise ValueError("Invalid nl_model option.")
         check_zmax(self.Survey.zmax, self.StructureEmu)
         if (model['nl_model'] == NL_MODEL_FOFR) or (model['nl_model'] == NL_MODEL_FOFR_EMANTIS) or (model['nl_model'] == NL_MODEL_MUKZ):
-            self.flag_fofr = True
+            self.flag_scale_dependence = True
         else:
-            self.flag_fofr = False   
+            self.flag_scale_dependence = False   
 
         # check for Sigma, modification of the lensing potential 
         if hasattr(self.StructureEmu, 'sigma_lensing') and callable(getattr(self.StructureEmu, 'sigma_lensing')):
@@ -643,7 +643,7 @@ class Theory:
         """
         omega_m = params['Omega_m']
         # dz is normalise at z=0
-        dz = self.dz if self.flag_fofr else self.dz[None,:] 
+        dz = self.dz if self.flag_scale_dependence else self.dz[None,:] 
         a1_ia = params['a1_IA']
         a2_ia = params['a2_IA']
         b1_ia = params['b1_IA']
@@ -675,7 +675,7 @@ class Theory:
             Power spectrum for the intrinsic alignment-intrinsic alignment.
         """
         c1, c1d, c2 = self.get_tatt_parameters(params_dic)
-        dz = self.dz if self.flag_fofr else self.dz[None,:] 
+        dz = self.dz if self.flag_scale_dependence else self.dz[None,:] 
         # growth factor can be scale-dependent for f(R) in the future potentially
         # fpt terms are computed at redshift 0
         fpt_terms = self.get_fpt_terms(self.StructureEmu.pklin_z0)
@@ -741,7 +741,7 @@ class Theory:
         f_ia = ((1. + self.Survey.zz_integr) / (1. + PIVOT_REDSHIFT))**eta_ia * (self.Survey.lum_func(self.Survey.zz_integr))**beta_ia
         # dz (ell, zz_inegr) must be normalise to unity at z=0 to cancel the linear growth of the density field 
         # and yield a constant amplitude in the primordial alignment scenario
-        dz = self.dz if self.flag_fofr else self.dz[None,:] 
+        dz = self.dz if self.flag_scale_dependence else self.dz[None,:] 
         # growth factor can be scale-dependent for f(R) in the future potentially
         # dimensions of is power spectra: (ell, zz_integr)
         self.factor_nla = - a_ia*C_IA*omega_m*f_ia[None,:]/dz
@@ -790,7 +790,7 @@ class Theory:
         # add modification of the lensing potential
         # must have the same dimension (ell, zz_integr, n_bin) or be 1
         # specified in StructureEmu, can be scale-dependent
-        w_gamma *= self.Sigma(params_dic, self.k, self.Survey.lbin, self.Survey.zz_integr)
+        w_gamma = w_gamma * self.Sigma(params_dic, self.k, self.Survey.lbin, self.Survey.zz_integr)
         
         return w_gamma
     
@@ -1209,7 +1209,7 @@ class Theory:
         # compute background
         self.ez, self.rz, self.k = self.get_ez_rz_k(params_dic)
         # compute normalized growth factor, of size (z_integr)
-        self.dz, _ = self.StructureEmu.get_growth_binned(params_dic, self.k, self.Survey.lbin, self.Survey.zz_integr) if self.flag_fofr else self.StructureEmu.get_growth(params_dic, self.Survey.zz_integr)
+        self.dz, _ = self.StructureEmu.get_growth_binned(params_dic, self.k, self.Survey.lbin, self.Survey.zz_integr) if self.flag_scale_dependence else self.StructureEmu.get_growth(params_dic, self.Survey.zz_integr)
         # get redshift uncertainties
         self.deltaz_s, self.deltaz_l = self.get_deltaz(params_dic)
         # compute matter-matter power spectrum
@@ -1241,7 +1241,7 @@ class Theory:
         # compute background
         self.ez, self.rz, self.k = self.get_ez_rz_k(params_dic)
         # compute growth factor
-        self.dz, _ = self.StructureEmu.get_growth_binned(params_dic, self.k, self.Survey.lbin, self.Survey.zz_integr) if self.flag_fofr else self.StructureEmu.get_growth(params_dic, self.Survey.zz_integr)
+        self.dz, _ = self.StructureEmu.get_growth_binned(params_dic, self.k, self.Survey.lbin, self.Survey.zz_integr) if self.flag_scale_dependence else self.StructureEmu.get_growth(params_dic, self.Survey.zz_integr)
         # get redshift uncertainties
         self.deltaz_s, self.deltaz_l = self.get_deltaz(params_dic)
         if self.flag_heft:
@@ -1285,7 +1285,7 @@ class Theory:
         # compute background
         self.ez, self.rz, self.k = self.get_ez_rz_k(params_dic)
         # compute growth factor
-        self.dz, _ = self.StructureEmu.get_growth_binned(params_dic, self.k, self.Survey.lbin, self.Survey.zz_integr) if self.flag_fofr else self.StructureEmu.get_growth(params_dic, self.Survey.zz_integr)
+        self.dz, _ = self.StructureEmu.get_growth_binned(params_dic, self.k, self.Survey.lbin, self.Survey.zz_integr) if self.flag_scale_dependence else self.StructureEmu.get_growth(params_dic, self.Survey.zz_integr)
         # get redshift uncertainties
         self.deltaz_s, self.deltaz_l = self.get_deltaz(params_dic)
         # compute matter-matter power spectrum
@@ -1338,7 +1338,7 @@ class Theory:
             All array values are numpy; JAX will convert and JIT from these.
         """
         self.ez, self.rz, self.k = self.get_ez_rz_k(params_dic)
-        self.dz, _ = self.StructureEmu.get_growth_binned(params_dic, self.k, self.Survey.lbin, self.Survey.zz_integr) if self.flag_fofr else self.StructureEmu.get_growth(params_dic, self.Survey.zz_integr)
+        self.dz, _ = self.StructureEmu.get_growth_binned(params_dic, self.k, self.Survey.lbin, self.Survey.zz_integr) if self.flag_scale_dependence else self.StructureEmu.get_growth(params_dic, self.Survey.zz_integr)
         self.deltaz_s, self.deltaz_l = self.get_deltaz(params_dic)
         self.pmm, bar_boost = self.get_pmm(params_dic)
         self.pmm_no_barboost = self.pmm / bar_boost

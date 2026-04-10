@@ -17,9 +17,9 @@ k_max_h_by_mpc = 50.0
 
 emu_ranges_all = {
         'Omega_m':      {'p1':0.24,            'p2':0.4}, 
-        'Omega_b':      {'p1':0.049,         'p2':0.049}, 
+        #'Omega_b':      {'p1':0.049,         'p2':0.049}, 
         'h':            {'p1':0.6,           'p2':0.84},
-        'ns':           {'p1':0.9649,          'p2':0.9649},
+        #'ns':           {'p1':0.9649,          'p2':0.9649},
         'As':           {'p1':1.7e-09,         'p2':2.5e-09},
         'Omega_nu':     {'p1':0.,              'p2':0.},
         'w0':           {'p1':-1.5,              'p2':-0.5},
@@ -90,16 +90,17 @@ class MuKZReACT():
         self.HMcodeEmu = HMcode2020()
         self.emu_name = 'ReACT mu-Sigma-k-z'
 
-        # load pyhmcode objects
-        self.hmc = pyhmcode.Cosmology()
-        # Set the halo model in HMcode
-        # Options: HMcode2015, HMcode2016, HMcode2020
-        self.hmod = pyhmcode.Halomodel(pyhmcode.HMcode2020, verbose=False)
+    
 
         if option=='linear':
             self.get_pk_nl =  self.get_pk_lin 
         elif option=='pseudo':
             self.get_pk_nl = self.get_pk_pseudo
+            # load pyhmcode objects
+            self.hmc = pyhmcode.Cosmology()
+            # Set the halo model in HMcode
+            # Options: HMcode2015, HMcode2016, HMcode2020
+            self.hmod = pyhmcode.Halomodel(pyhmcode.HMcode2020, verbose=False)
         else:
             self.get_pk_nl = self.get_pk_nl_
 
@@ -281,7 +282,7 @@ class MuKZReACT():
         sigma0 = params_dic['sigma0'] 
         c2 = params_dic['c2']
         lamb = params_dic['lam']
-        sigma = 1.+sigma0/e2[None, :]*omega_lambda[None, :]/(1.-omega_m)*(1+c2*(lamb*np.sqrt(e2[None, :])/k[:, None])**2)/(1.+(lamb*np.sqrt(e2[None, :])/k[:, None])**2)
+        sigma = 1.+sigma0/e2*omega_lambda/(1.-omega_m)*(1+c2*(lamb*np.sqrt(e2)/k)**2)/(1.+(lamb*np.sqrt(e2)/k)**2)
         #dimensions of (ell, zz_integr, n_bin)
         return sigma[:, :, None]
     
@@ -366,7 +367,32 @@ class MuKZReACT():
         k_pts = k[index_l, index_z]
         array[index_l, index_z] = np.ravel(pk_l_interp(0., k_pts, grid=False)*d2_mg_lcdm_z_interp(k_pts, z_pts, grid=False))
         pk_m_l = array
-        return pk_m_l  
+        return pk_m_l 
+
+    def get_growth_binned(self, params_dic, k, lbin,  zz_integr):
+        dz_mu0, dz0_mu0 = self.get_growth(params_dic, self.zz_pk)
+        dz_mu0_interp  = RectBivariateSpline(
+                            self.kh_lin_less_bins,
+                            self.zz_pk,
+                            dz_mu0,
+                            kx=1, ky=1)  
+        dz0_mu0_interp  = interp1d(
+                            self.kh_lin_less_bins,
+                            dz0_mu0[:, 0])  
+        # ones instead of zeros, because dz is in the denominator 
+        # of the intrinsic alignment signal
+        dz  = np.ones((lbin, len(zz_integr)), 'float64') 
+        dz0  = np.ones((lbin, len(zz_integr)), 'float64') 
+        mask = (k > k_min_h_by_mpc) & (k < k_max_h_by_mpc)
+        index_l, index_z = np.where(mask)
+        k_pts = k[index_l, index_z]
+        z_pts = zz_integr[index_z]
+        dz_vals = dz_mu0_interp(k_pts, z_pts, grid=False)
+        dz0_vals = dz0_mu0_interp(k_pts)
+        dz[index_l, index_z] = np.ravel(dz_vals)
+        dz0[index_l, index_z] = np.ravel(dz0_vals)
+       
+        return dz, dz0 
 
     def mu_DE(self, a, k, omega0, mu0, c1, lamb, w0=-1, wa=0.):
         omegaL = (1.-omega0) * a**(-3.*(1.+w0+wa)) * np.exp(3.*(-1.+a)*wa)
