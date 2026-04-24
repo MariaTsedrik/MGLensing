@@ -1,4 +1,4 @@
-observable: '3x2pt'
+observable: 'GC'
 #Observables 
 #     'WL' -> shear-shear
 #     'GC' -> photo-clustering
@@ -33,7 +33,7 @@ specs:
             #[5., 3., 3., 2., 2.]
     max_GC: #[1000]
             [482, 482, 482, 482, 482, 
-                  617, 617, 617, 617, 
+                  616, 616, 616, 616, 
                        716, 716, 716, 
                             780, 780,
                                  818] #always a list, same length as nbin*(nbin+1)/2 or just 1 for const_lmax
@@ -80,7 +80,7 @@ data:
   #     6 -> f(R) with ReACT
   #     7 -> f(R) with eMANTIS
   #     8 -> nDGP with nDGPemu
-  bias_model: 2
+  bias_model: 0
   # Options for extrapolation in k for HEFT-bias expansion with bacco: False (default, power law extrapolation) or True (constant extrapolation)
   heft_extrap_k_const: True
   # Photometric galaxy bias model (redshift dependence)
@@ -93,9 +93,9 @@ data:
   # Intrinsic alignment model
   #     0 -> zNLA
   #     1 -> TATT
-  baryon_model: 0
+  baryon_model: 3
   # Cross-correlation include/exclude the square root of the baryonic suppression [Zennaro et al. 2024] (default: False)
-  cross_sqrt_baryon: True
+  cross_sqrt_baryon: False
   # Baryonic flag
   #     0 -> no baryons
   #     1 -> Tagn HMcode
@@ -155,7 +155,7 @@ theory:
   #     0 -> no photo-z error
   #     1 -> additive mode, n(z') = n(z + dz)
   #     2 -> multiplicative mode, n(z') = n(z(1 + dz))
-  params: ./ini_files/param_files/params_model_bacco.yaml  
+  params: ./ini_files/param_files/params_model_bacco_minimise.yaml  
 
 output: 
   chain_name: lsst_y1_test

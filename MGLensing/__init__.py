@@ -406,7 +406,7 @@ class MGL():
         if theo_model['nl_model'] == NL_MODEL_FOFR_EMANTIS and 'sigma8_lcdm' not in params:
             params['sigma8_lcdm'] = NewModel.StructureEmu.HMcodeEmu.get_sigma8_lcdm(params)[0]    
         NewModel.ez, NewModel.rz, NewModel.k = NewModel.get_ez_rz_k(params)
-        NewModel.dz, _ = NewModel.StructureEmu.get_growth_binned(params, NewModel.k, NewModel.Survey.lbin, NewModel.Survey.zz_integr) if NewModel.flag_fofr else NewModel.StructureEmu.get_growth(params, NewModel.Survey.zz_integr)
+        NewModel.dz, _ = NewModel.StructureEmu.get_growth_binned(params, NewModel.k, NewModel.Survey.lbin, NewModel.Survey.zz_integr) if NewModel.flag_scale_dependence else NewModel.StructureEmu.get_growth(params, NewModel.Survey.zz_integr)
         NewModel.deltaz_s, NewModel.deltaz_l = NewModel.get_deltaz(params)
         NewModel.pmm, bar_boost = NewModel.get_pmm(params)
         NewModel.pmm_no_barboost = NewModel.pmm/bar_boost
@@ -460,7 +460,7 @@ class MGL():
         if theo_model['nl_model'] == NL_MODEL_FOFR_EMANTIS and 'sigma8_lcdm' not in params:
             params['sigma8_lcdm'] = NewModel.StructureEmu.HMcodeEmu.get_sigma8_lcdm(params)[0]
         NewModel.ez, NewModel.rz, NewModel.k = NewModel.get_ez_rz_k(params)
-        NewModel.dz, _ = NewModel.StructureEmu.get_growth_binned(params, NewModel.k, NewModel.Survey.lbin, NewModel.Survey.zz_integr) if NewModel.flag_fofr else NewModel.StructureEmu.get_growth(params, NewModel.Survey.zz_integr)
+        NewModel.dz, _ = NewModel.StructureEmu.get_growth_binned(params, NewModel.k, NewModel.Survey.lbin, NewModel.Survey.zz_integr) if NewModel.flag_scale_dependence else NewModel.StructureEmu.get_growth(params, NewModel.Survey.zz_integr)
         NewModel.deltaz_s, NewModel.deltaz_l = NewModel.get_deltaz(params)
         NewModel.pmm, bar_boost = NewModel.get_pmm(params)
         NewModel.pmm_no_barboost = NewModel.pmm/bar_boost
