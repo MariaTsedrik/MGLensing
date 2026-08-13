@@ -41,6 +41,16 @@ log10Omega_rc: '\log_{10}{\Omega_{\rm rc}}'
 gamma0: '\gamma_0'
 gamma1: '\gamma_1'
 q1_gamma: 'q_1^{\gamma}'
+
+log10_zq: '\log_{10}{z_{\rm q}}'
+Bqg_log: 'B_{\rm log}'
+mqg: 'm_{\rm qg}'
+Aqg: 'A_{\rm qg}'
+Bqg: 'B_{\rm qg}'
+w_piv: 'w_{\rm piv}'
+amp: 'A_{w}'
+alpha: '\phi'
+beta: '\beta'
 ################################################
 #               Nuisances                      #
 ################################################

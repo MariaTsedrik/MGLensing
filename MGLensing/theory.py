@@ -15,6 +15,7 @@ from .structure.ndgpemu_interface import NDGPEmu
 from .structure.react_musigma_zk_interface import MuKZReACT
 from .structure.react_musigma_q123_interface import MuSigmaQ123ReACT
 from .structure.mgrowth_muspline import MuSigmaSpline
+from .structure.qg_interace import QuantumGravity
 
 from math import sqrt, log, exp, pow, log10
 import os
@@ -45,6 +46,7 @@ NL_MODEL_NDGP_EMU = 8
 NL_MODEL_MUKZ = 9
 NL_MODEL_MUQ123 = 10
 NL_MODEL_MUSPLINE = 11
+NL_MODEL_QG= 12
 
 NO_BARYONS = 0
 BARYONS_HMCODE = 1
@@ -178,7 +180,8 @@ class Theory:
             NL_MODEL_NDGP_EMU: NDGPEmu,
             NL_MODEL_MUKZ: MuKZReACT,
             NL_MODEL_MUQ123: MuSigmaQ123ReACT,
-            NL_MODEL_MUSPLINE: MuSigmaSpline
+            NL_MODEL_MUSPLINE: MuSigmaSpline,
+            NL_MODEL_QG: QuantumGravity
         }
         print('model["nl_model"] = ', model['nl_model'])
         try:
@@ -206,7 +209,7 @@ class Theory:
         #if 'add_noise' in model and not model['add_noise']:
         #    self.Survey.noise['LL'] = 0.
         #    self.Survey.noise['GG'] = 0.
-
+        self.flag_qg = (model['nl_model'] == NL_MODEL_QG)
         self.flag_nan = False
         # assign baryonic prescription
         baryon_models = {
@@ -549,17 +552,23 @@ class Theory:
         omega_m = params_dic['Omega_m']
         w0 = params_dic['w0']
         wa = params_dic['wa']
-        omega_lambda_func = lambda z: (1.-omega_m) * pow(1.+z, 3.*(1.+w0+wa)) * np.exp(-3.*wa*z/(1.+z))
-        e_z_func = lambda z: np.sqrt(omega_m*pow(1.+z, 3) + omega_lambda_func(z))
-        r_z_int = lambda z: 1./e_z_func(z)
         zz = self.Survey.zz_integr
-        r_z_grid = np.zeros(len(zz), dtype=np.float64)
-        r_z_grid[0] = quad(r_z_int, 0, zz[0])[0]
-        for i in range(1, len(zz)):
-            r_z_grid[i] = r_z_grid[i-1] + quad(r_z_int, zz[i-1], zz[i])[0]
-        r_z_grid = r_z_grid / H0_h_c
-        e_z_grid = np.array([e_z_func(zz_i) for zz_i in zz])
-        k_grid =(self.Survey.ell[:,None]+0.5)/r_z_grid
+        if self.flag_qg:
+            self.StructureEmu.get_interpolators(params_dic)
+            e_z_grid = np.array([self.StructureEmu.E_interp(zz_i) for zz_i in zz]) 
+            r_z_grid = np.array([self.StructureEmu.rcom_interp(zz_i) for zz_i in zz]) / H0_h_c
+            k_grid =(self.Survey.ell[:,None]+0.5)/r_z_grid
+        else:
+            omega_lambda_func = lambda z: (1.-omega_m) * pow(1.+z, 3.*(1.+w0+wa)) * np.exp(-3.*wa*z/(1.+z))
+            e_z_func = lambda z: np.sqrt(omega_m*pow(1.+z, 3) + omega_lambda_func(z))
+            r_z_int = lambda z: 1./e_z_func(z)
+            r_z_grid = np.zeros(len(zz), dtype=np.float64)
+            r_z_grid[0] = quad(r_z_int, 0, zz[0])[0]
+            for i in range(1, len(zz)):
+                r_z_grid[i] = r_z_grid[i-1] + quad(r_z_int, zz[i-1], zz[i])[0]
+            r_z_grid = r_z_grid / H0_h_c
+            e_z_grid = np.array([e_z_func(zz_i) for zz_i in zz])
+            k_grid =(self.Survey.ell[:,None]+0.5)/r_z_grid
         return e_z_grid, r_z_grid, k_grid
     
     def get_add_photoz_error(self, nz, deltaz, nbin):
@@ -1511,26 +1520,36 @@ class Theory:
         denom = self.Survey.fsky * (2*self.Survey.ell+1)
         return ( cl2_sum ) / denom
 
-        
+    def _eval_3x2pt_on_integer_ells(self, params_dic):
+        """Compute 3x2pt C_ell at every integer ell in [lmin, lmax].
+
+        Sets ``Survey.ell`` to that unbinned grid so that
+        ``get_cov_diag_ijkl`` uses the matching (2ell+1) denominator.
+        Restore the binned ell grid with ``_restore_binned_ell`` after
+        the unbinned Knox terms are finished.
+        """
+        n_ell_binned = self.Survey.lbin
+        ell_all_int = np.arange(self.Survey.lmin, self.Survey.lmax + 1).astype(int)
+        self.Survey.lbin = len(ell_all_int)
+        self.Survey.ell = self.Survey.l_wl = self.Survey.l_xc = self.Survey.l_gc = ell_all_int
+        self.Survey.nell_wl = self.Survey.nell_xc = self.Survey.nell_gc = len(ell_all_int)
+        try:
+            cl_ll, cl_gg, cl_lg, cl_gl = self.compute_3x2pt(params_dic)
+        except Exception:
+            self._restore_binned_ell(n_ell_binned)
+            raise
+        return ell_all_int, cl_ll, cl_gg, cl_lg, cl_gl
+
+    def _restore_binned_ell(self, n_ell):
+        self.Survey.ell = self.Survey.l_wl = self.Survey.l_xc = self.Survey.l_gc = self.Survey.l_wl_bin_centers
+        self.Survey.lbin = n_ell
+        self.Survey.nell_wl = self.Survey.nell_xc = self.Survey.nell_gc = n_ell
 
     
     def compute_covariance_cosmosis_3x2pt(self, params_dic):
         n_ell = self.Survey.lbin
         ell_lims = self.Survey.ell_bin_edges
-        ell_all_int = np.arange(self.Survey.lmin, self.Survey.lmax+1).astype(int)
-        self.Survey.lbin = 100
-        ell_vals = np.logspace(log10(self.Survey.lmin), log10(self.Survey.lmax), num=self.Survey.lbin, endpoint=True) 
-        self.Survey.ell = self.Survey.l_wl = self.Survey.l_xc = self.Survey.l_gc = ell_vals
-        self.Survey.nell_wl = self.Survey.nell_xc = self.Survey.nell_gc = len(self.Survey.l_wl)
-
-        cl_ll_, cl_gg_, cl_lg_, cl_gl_ = self.compute_3x2pt(params_dic)
-        cl_ll = build_data_matrix(cl_ll_, ell_vals, ell_all_int, self.Survey.nbin_s, self.Survey.nbin_s)
-        cl_gg = build_data_matrix(cl_gg_, ell_vals, ell_all_int, self.Survey.nbin_l, self.Survey.nbin_l)
-        cl_lg = build_data_matrix(cl_lg_, ell_vals, ell_all_int, self.Survey.nbin_s, self.Survey.nbin_l)
-        cl_gl = build_data_matrix(cl_gl_, ell_vals, ell_all_int, self.Survey.nbin_l, self.Survey.nbin_s)
-        self.Survey.ell = self.Survey.l_wl = self.Survey.l_xc = self.Survey.l_gc = ell_all_int
-        self.Survey.lbin = len(ell_all_int)
-        self.Survey.nell_wl = self.Survey.nell_xc = self.Survey.nell_gc = len(self.Survey.l_wl)
+        ell_all_int, cl_ll, cl_gg, cl_lg, cl_gl = self._eval_3x2pt_on_integer_ells(params_dic)
 
         cl_ll_dic = {'bin_pairs': [(i, j) for i in range(self.Survey.nbin_s) for j in range(i, self.Survey.nbin_s)], 
                     'cls': cl_ll,
@@ -1613,10 +1632,88 @@ class Theory:
                         covmat[ cov_inds_T ] = np.diag(cl_var_binned)        
         print('cov_flat: ', covmat.shape)                                      
         covmat_masked = covmat[self.Survey.mask_cov_3x2pt]
-        print('cov_flat_masked: ', covmat_masked.shape)  
-        self.Survey.ell = self.Survey.l_wl = self.Survey.l_xc = self.Survey.l_gc = self.Survey.l_wl_bin_centers
-        self.Survey.lbin = n_ell
-        self.Survey.nell_wl = self.Survey.nell_xc = self.Survey.nell_gc = n_ell
+        print('cov_flat_masked: ', covmat_masked.shape)
+        self._restore_binned_ell(n_ell)
+        return covmat_masked
+
+
+    def compute_covariance_spaceborne_3x2pt(self, params_dic):
+        """Gaussian 3x2pt covariance using Spaceborne's equal-weight bin average.
+
+        C_ell is evaluated at every integer ell in [lmin, lmax], matching
+        Spaceborne's unbinned Knox grid. Unbinned term:
+            Var(C_ell) = (C_ik C_jl + C_il C_jk) / [fsky (2ell+1)]
+        The bin average matches Spaceborne ``cov_hs_g_ell_bin_average=True``:
+            Var_bin = sum_{ell in bin} Var(C_ell) / N_modes^2
+        with integer-ell membership ``int(ell_low) <= ell < int(ell_high)``.
+        """
+        n_ell = self.Survey.lbin
+        ell_lims = self.Survey.ell_bin_edges
+        ell_all_int, cl_ll, cl_gg, cl_lg, cl_gl = self._eval_3x2pt_on_integer_ells(params_dic)
+
+        cl_ll_dic = {'bin_pairs': [(i, j) for i in range(self.Survey.nbin_s) for j in range(i, self.Survey.nbin_s)],
+                    'cls': cl_ll,
+                    'is_auto': True,
+                    'name': 'LL',
+                    'types': (0, 0)
+                    }
+        cl_gg_dic = {'bin_pairs': [(i, j) for i in range(self.Survey.nbin_l) for j in range(i, self.Survey.nbin_l)],
+                    'cls': cl_gg,
+                    'is_auto': True,
+                    'name': 'GG',
+                    'types': (1, 1)
+                    }
+        cl_gl_dic = {'bin_pairs': [(i, j) for i in range(self.Survey.nbin_l) for j in range(self.Survey.nbin_s)],
+                    'cls': cl_gl,
+                    'is_auto': False,
+                    'name': 'GL',
+                    'types': (1, 0)
+                    }
+        theory_spectra = [cl_ll_dic, cl_gl_dic, cl_gg_dic]
+        self.types = [cl_ll_dic['types'], cl_gl_dic['types'], cl_gg_dic['types']]
+        cl_lengths = [n_ell*self.Survey.nbin_flat_s, n_ell*self.Survey.nbin_s*self.Survey.nbin_l, n_ell*self.Survey.nbin_flat_l]
+        cl_starts = []
+        for i in range(3):
+            cl_starts.append(int(sum(cl_lengths[:i])))
+        covmat = np.zeros((n_ell*(self.Survey.nbin_flat_s + self.Survey.nbin_flat_l + self.Survey.nbin_s*self.Survey.nbin_l), n_ell*(self.Survey.nbin_flat_s + self.Survey.nbin_flat_l + self.Survey.nbin_s*self.Survey.nbin_l)), 'float64')
+        for i_cl in range(3):
+            cl_spec_i = theory_spectra[i_cl]
+            for j_cl in range(i_cl, 3):
+                cl_spec_j = theory_spectra[j_cl]
+                cov_blocks = {}
+                for i_bp, bin_pair_i in enumerate(cl_spec_i['bin_pairs']):
+                    for j_bp, bin_pair_j in enumerate(cl_spec_j['bin_pairs']):
+                        if (i_cl == j_cl) and cl_spec_i['is_auto'] and (j_bp < i_bp):
+                            cl_var_binned = cov_blocks[j_bp, i_bp]
+                        else:
+                            cl_var_unbinned = self.get_cov_diag_ijkl(theory_spectra, i_cl,
+                                    j_cl, bin_pair_i, bin_pair_j)
+                            cl_var_binned = np.zeros(n_ell)
+                            for ell_bin in range(n_ell):
+                                ell_lower = int(ell_lims[ell_bin])
+                                ell_upper = int(ell_lims[ell_bin + 1])
+                                mask = (ell_all_int >= ell_lower) & (ell_all_int < ell_upper)
+                                n_modes = np.sum(mask)
+                                if n_modes == 0:
+                                    raise ValueError(
+                                        f'No integer ell modes in bin {ell_bin} '
+                                        f'[{ell_lower}, {ell_upper}).'
+                                    )
+                                cl_var_binned[ell_bin] = np.sum(cl_var_unbinned[mask]) / n_modes**2
+                            cov_blocks[i_bp, j_bp] = cl_var_binned
+
+                        inds_i = np.arange(cl_starts[i_cl] + n_ell*i_bp,
+                            cl_starts[i_cl] + n_ell*(i_bp+1))
+                        inds_j = np.arange(cl_starts[j_cl] + n_ell*j_bp,
+                            cl_starts[j_cl] + n_ell*(j_bp+1))
+                        cov_inds = np.ix_(inds_i, inds_j)
+                        covmat[cov_inds] = np.diag(cl_var_binned)
+                        cov_inds_T = np.ix_(inds_j, inds_i)
+                        covmat[cov_inds_T] = np.diag(cl_var_binned)
+        print('cov_flat: ', covmat.shape)
+        covmat_masked = covmat[self.Survey.mask_cov_3x2pt]
+        print('cov_flat_masked: ', covmat_masked.shape)
+        self._restore_binned_ell(n_ell)
         return covmat_masked
     
     

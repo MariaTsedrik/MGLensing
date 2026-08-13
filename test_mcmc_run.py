@@ -19,18 +19,26 @@ os.chdir(folder)
 
 
 
-
-MGLtest = MGLensing.MGL("ini_files/pca/config_muSigma.yaml")
-
+#MGLtest = MGLensing.MGL("ini_files/config_files/config_hmcode.yaml")
+#MGLtest = MGLensing.MGL("ini_files/pca/config_muSigma.yaml")
+MGLtest = MGLensing.MGL("ini_files/config_files/config_qg.yaml")
 print(MGLtest.params_fixed)
 def log_probability_function(pars):
     #for i in range(10):
     #    pars['bs2L_'+str(i+1)] = ...pars['b1L_'+str(i+1)] * (-4./7.)
     param_dic = pars | MGLtest.params_fixed
-    if param_dic['w0']+param_dic['wa'] > 0:
+    #if param_dic.get('w0', -1.) + param_dic.get('wa', 0.) > 0:
+    #    return -np.inf
+    #if param_dic['Ads']/(1.+param_dic['w0']) < 0:
+    #    return -np.inf
+    try:
+        like = MGLtest.Like.compute(param_dic)
+    except Exception:
         return -np.inf
-    else:
-        return MGLtest.Like.compute(param_dic)
+    # odeint/LSODA failures often return NaN without raising
+    if not np.isfinite(like):
+        return -np.inf
+    return like
 
 
 prior = Prior()

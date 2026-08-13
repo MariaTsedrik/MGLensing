@@ -515,17 +515,17 @@ class LSSTSetUp:
         n_bar_l = get_noise(self.nbin_l, self.gal_per_sqarcmn_l)
         n_bar_s = get_noise(self.nbin_s, self.gal_per_sqarcmn_s)
         self.noise = {
-        'LL': self.rms_shear**2./n_bar_l,
+        'LL': self.rms_shear**2./n_bar_s,
         'LG': 0.,
         'GL': 0.,
-        'GG': 1./n_bar_s
+        'GG': 1./n_bar_l
         }
         self.aa_integr = np.array(1./(1.+self.zz_integr[::-1])) 
         self.zbin_integr = len(self.zz_integr)        
         # \ell bins setup
         lmin = 20
         self.lmin = lmin
-        self.lbin = 30 #20  #50 #100 
+        self.lbin = 20 #30   #50 #100 
         lmax = 5e3
         self.lmax = lmax
         if likelihood == 'determinants':
@@ -789,10 +789,10 @@ class EuclidSetUp:
         n_bar_l = get_noise(self.nbin_l, self.gal_per_sqarcmn_l)
         n_bar_s = get_noise(self.nbin_s, self.gal_per_sqarcmn_s)
         self.noise = {
-        'LL': self.rms_shear**2./n_bar_l,
+        'LL': self.rms_shear**2./n_bar_s,
         'LG': 0.,
         'GL': 0.,
-        'GG': 1./n_bar_s
+        'GG': 1./n_bar_l
         }
         # \ell bins setup
         if likelihood == 'determinants':
@@ -943,10 +943,10 @@ class CLOESetUp:
         n_bar_l = get_noise(self.nbin_l, self.gal_per_sqarcmn_l)
         n_bar_s = get_noise(self.nbin_s, self.gal_per_sqarcmn_s)
         self.noise = {
-        'LL': 0., #self.rms_shear**2./n_bar_l,
+        'LL': 0., #self.rms_shear**2./n_bar_s,
         'LG': 0.,
         'GL': 0.,
-        'GG': 0., #1./n_bar_s
+        'GG': 0., #1./n_bar_l
         }
         
         cells_data = el.photo.angular_power_spectra('/Users/s2265800/Desktop/GitHub/playground_th1/tutorials/th1-kp4/synth_cells_5000_binned.fits')

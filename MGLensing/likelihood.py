@@ -197,8 +197,10 @@ class MGLike:
                 if hasattr(self.Data, 'inv_data_covariance') and self.Data.inv_data_covariance is not None:
                     chi2 = np.einsum('i, ij, j->', difference_vector, self.Data.inv_data_covariance, difference_vector)
                 else:
-                    return -np.inf  
- 
+                    return -np.inf
+
+            if not np.isfinite(chi2):
+                return -np.inf
             return -0.5*chi2    
         else:
             return -np.inf      

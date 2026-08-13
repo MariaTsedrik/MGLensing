@@ -34,18 +34,18 @@ def powerlaw_highk_extrap(pk_or_boost, log_k, k_last, kh_high, zz_num):
 
 class DarkScatteringReACT():
     def __init__(self):
-        self.zz_pk = np.array([0., 0.01,  0.12, 0.24, 0.38, 0.52, 0.68, 0.86, 1.05, 1.27, 1.5, 1.76, 2.04, 2.36, 2.5, 3.0]) # these numers are hand-picked
+        self.zz_pk = np.linspace(0., 3., 128) #np.array([0., 0.01,  0.12, 0.24, 0.38, 0.52, 0.68, 0.86, 1.05, 1.27, 1.5, 1.76, 2.04, 2.36, 2.5, 3.0]) # these numers are hand-picked
         self.aa_pk = np.array(1./(1.+self.zz_pk[::-1])) # should be increasing
         self.nz_pk = len(self.zz_pk)
         self.zz_max = self.zz_pk[-1]
         print('initialising Dark Scattering')
         self.cp_nl_ds_model = cosmopower_NN(restore=True, 
-                      restore_filename=dirname+'/../emulators/dark_scattering/w_const/log10_total_matter_nonlinear_s8_ds', 
+                      restore_filename=dirname+'/../../emulators/dark_scattering/w_const/log10_total_matter_nonlinear_s8_ds', 
                       )
         self.kh_nl_boost = self.cp_nl_ds_model.modes # 1e-3..10. h/Mpc
 
         self.cp_lin_ds_model = cosmopower_NN(restore=True, 
-                      restore_filename=dirname+'/../emulators/dark_scattering/w_const/log10_total_matter_linear_s8_ds', 
+                      restore_filename=dirname+'/../../emulators/dark_scattering/w_const/log10_total_matter_linear_s8_ds', 
                       )
         self.kh_lin_boost = self.cp_lin_ds_model.modes # 1e-3..10. h/Mpc later used in tatt
 
@@ -128,11 +128,11 @@ class DarkScatteringReACT():
         mg_pk_lin = self.cp_lin_ds_model.ten_to_predictions_np(params_react)
         self.pklin_z0 = mg_pk_lin[0] # zz_pk[0] must be 0.! later used in tatt
         # power law extrapolation for k>10 h/Mpc
-        mg_pk_nl_right = powerlaw_highk_extrap(mg_pk_nl, self.log_k, self.k_nl_boost_last, self.kh_nl_right_boost, self.zz_boost)
+        mg_pk_nl_right = powerlaw_highk_extrap(mg_pk_nl, self.log_k, self.k_nl_boost_last, self.kh_nl_right_boost, len(self.zz_boost))
         # combine mg_boost at all scales
-        mg_pnl_k = np.concatenate((mg_pk_nl, mg_pk_nl_right))
+        mg_pnl_k = np.concatenate((mg_pk_nl, mg_pk_nl_right), axis=1)
         # interpolate
-        mg_pnl_interp = RectBivariateSpline(self.zz_boost,
+        mg_pnl_interp = RectBivariateSpline(self.zz_pk,
                     self.kh_nl_boost_tot,
                     mg_pnl_k,
                     kx=1, ky=1)
@@ -156,7 +156,10 @@ class DarkScatteringReACT():
             'a_arr': np.hstack((aa_integr, 1.))
             }
         cosmo = mg.IDE(background)
-        xi = params_dic['Ads']/(1.+params_dic['w0'])
+        if params_dic['w0']!=-1.:
+            xi = params_dic['Ads']/(1.+params_dic['w0'])
+        else:
+            xi = 0.
         da, _ = cosmo.growth_parameters(xi=xi)  
         dz = da[::-1] 
         # growth factor should be normalised to z=0
