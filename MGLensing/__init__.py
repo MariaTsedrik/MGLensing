@@ -131,11 +131,18 @@ class DataClass():
             '3x2pt': self.DataModel.compute_data_vector_3x2pt
             }
             # gaussian covariance with diagonal components only
-            compute_covariance = {
-            'WL': self.DataModel.compute_covariance_wl,
-            'GC': self.DataModel.compute_covariance_gc,
-            '3x2pt':  self.DataModel.compute_covariance_cosmosis_3x2pt 
-            }
+            if Survey.spaceborne_covariance == True:
+                compute_covariance = {
+                'WL': self.DataModel.mask_input_spaceborne_covariance_wl,  
+                'GC': self.DataModel.mask_input_spaceborne_covariance_gc,  
+                '3x2pt': self.DataModel.mask_input_spaceborne_covariance_3x2pt 
+                }
+            else:
+                compute_covariance = {
+                'WL': self.DataModel.compute_covariance_wl,
+                'GC': self.DataModel.compute_covariance_gc,
+                '3x2pt':  self.DataModel.compute_covariance_cosmosis_3x2pt 
+                }
             print('computing data vector')
             self.data_vector = compute_vector[Survey.observable](self.params_data_dic)
             print('wl_masked_ells: ', sum(Survey.mask_data_vector_wl))

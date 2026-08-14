@@ -472,7 +472,11 @@ class LSSTSetUp:
         likelihood = config['likelihood']
         self.survey_name = 'LSST'
         self.observable = config['observable']
-
+        self.spaceborne_covariance = config['spaceborne_covariance']
+        if self.spaceborne_covariance:
+            # input SB-like covariance
+            self.cov_input_file = config['cov_input_file']
+            self.which_cov = config['which_cov']
 
         # redshift setup 
         self.zmin = 0.01 

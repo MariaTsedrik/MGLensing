@@ -1,3 +1,4 @@
+import yaml
 import numpy as np
 import MGrowth as mg
 from scipy.integrate import simpson, trapezoid, quad
@@ -1637,6 +1638,31 @@ class Theory:
         return covmat_masked
 
 
+    def mask_input_spaceborne_covariance_3x2pt(self, params_dic):
+        """
+        Reads the Spaceborne-like covariance from input (Gaussian or total)
+        and applies the ell mask. 
+        Returns the 3x2pt masked ovariance.
+        """
+    
+        covs_2d = np.load(self.Survey.cov_input_file)
+
+        if self.Survey.which_cov=='Gauss':
+            covmat = covs_2d['Gauss']
+        elif self.Survey.which_cov=='TOT':
+            covmat = covs_2d['TOT']
+        else:
+            KeyError("Covariance type not valid! Should be 'Gauss' or 'TOT'")
+
+        covmat_masked = covmat[self.Survey.mask_cov_3x2pt]
+
+        # store full and masked covariances
+        self.Survey.covmat_3x2pt_full = covmat
+        self.Survey.covmat_3x2pt_masked = covmat_masked
+
+        return covmat_masked
+    
+
     def compute_covariance_spaceborne_3x2pt(self, params_dic):
         """Gaussian 3x2pt covariance using Spaceborne's equal-weight bin average.
 
@@ -1737,6 +1763,7 @@ class Theory:
         cov_theory = build_data_matrix(cl_wl, self.Survey.l_wl, self.Survey.ells_wl, self.Survey.nbin_s, self.Survey.nbin_s)
         return cov_theory
     
+    
     def compute_data_vector_wl(self, params_dic):
         """This function calculates the weak lensing angular power spectra and constructs
         the data vector for weak lensing, applying a mask to the resulting data vector.
@@ -1762,6 +1789,7 @@ class Theory:
                 idx_start += 1
         data_vector_masked = data_vector[self.Survey.mask_data_vector_wl]
         return data_vector_masked
+
     
     def compute_covariance_wl(self, params_dic):
         r"""Compute the Gaussian (only diagonal components with :math:`\ell=\ell'`) covariance matrix for the weak lensing (WL) analysis.
@@ -1807,7 +1835,32 @@ class Theory:
         cov_flat_masked = cov_flat[self.Survey.mask_cov_wl]
         print('cov_flat_masked: ', cov_flat_masked.shape)  
         return cov_flat_masked 
+
+
+    def mask_input_spaceborne_covariance_wl(self, params_dic):
+        """
+        Reads the Spaceborne-like covariance from input (Gaussian or total)
+        and applies the ell mask. 
+        Returns the WL masked ovariance.
+        """
     
+        covs_2d = np.load(self.Survey.cov_input_file)
+
+        if self.Survey.which_cov=='Gauss':
+            covmat = covs_2d['Gauss']
+        elif self.Survey.which_cov=='TOT':
+            covmat = covs_2d['TOT']
+        else:
+            KeyError("Covariance type not valid! Should be 'Gauss' or 'TOT'")
+
+        covmat_masked = covmat[self.Survey.mask_cov_wl]
+
+        # store full and masked covariances
+        self.Survey.covmat_wl_full = covmat
+        self.Survey.covmat_wl_masked = covmat_masked
+
+        return covmat_masked
+
 
     def compute_data_matrix_gc(self, params_dic):
         """This function computes the angular power spectra for galaxy clustering
@@ -1830,6 +1883,7 @@ class Theory:
         # construct matrix
         cov_theory = build_data_matrix(cl_gc, self.Survey.l_gc, self.Survey.ells_gc, self.Survey.nbin_l, self.Survey.nbin_l)
         return cov_theory
+    
     
     def compute_data_vector_gc(self, params_dic):
         """This method computes the angular power spectra for galaxy clustering
@@ -1858,6 +1912,7 @@ class Theory:
                 idx_start += 1
         data_vector_masked = data_vector[self.Survey.mask_data_vector_gc]
         return data_vector_masked
+    
     
     def compute_covariance_gc(self, params_dic):
         r"""Compute the Gaussian (only diagonal components with :math:`\ell=\ell'`) covariance matrix for the galaxy clustering (GC) analysis.
@@ -1903,3 +1958,28 @@ class Theory:
         cov_flat_masked = cov_flat[self.Survey.mask_cov_gc]
         print('cov_flat_masked: ', cov_flat_masked.shape)  
         return cov_flat_masked 
+
+
+    def mask_input_spaceborne_covariance_gc(self, params_dic):
+        """
+        Reads the Spaceborne-like covariance from input (Gaussian or total)
+        and applies the ell mask. 
+        Returns the GC masked ovariance.
+        """
+    
+        covs_2d = np.load(self.Survey.cov_input_file)
+
+        if self.Survey.which_cov=='Gauss':
+            covmat = covs_2d['Gauss']
+        elif self.Survey.which_cov=='TOT':
+            covmat = covs_2d['TOT']
+        else:
+            KeyError("Covariance type not valid! Should be 'Gauss' or 'TOT'")
+
+        covmat_masked = covmat[self.Survey.mask_cov_gc]
+
+        # store full and masked covariances
+        self.Survey.covmat_gc_full = covmat
+        self.Survey.covmat_gc_masked = covmat_masked
+
+        return covmat_masked
