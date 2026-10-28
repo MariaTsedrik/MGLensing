@@ -19,9 +19,10 @@ os.chdir(folder)
 
 
 
-#MGLtest = MGLensing.MGL("ini_files/config_files/config_hmcode.yaml")
+MGLtest = MGLensing.MGL("ini_files/config_files/config_hmcode.yaml")
 #MGLtest = MGLensing.MGL("ini_files/pca/config_muSigma.yaml")
-MGLtest = MGLensing.MGL("ini_files/config_files/config_qg.yaml")
+# MGLtest = MGLensing.MGL("ini_files/config_files/config_qg.yaml")
+
 print(MGLtest.params_fixed)
 def log_probability_function(pars):
     #for i in range(10):

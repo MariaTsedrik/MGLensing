@@ -164,7 +164,7 @@ sampler:
     verbose: True
     n_eff: 5000
     n_live: 1000
-    pool: 1
+    pool: 2
     resume: True
     hdf5_name:  lsst_y1_test
     

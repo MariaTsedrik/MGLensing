@@ -6,9 +6,9 @@ os.chdir(folder)
 
 
 
-#MGLtest = MGLensing.MGL("ini_files/config_files/config_hmcode.yaml")
+MGLtest = MGLensing.MGL("ini_files/config_files/config_hmcode.yaml")
 #MGLtest = MGLensing.MGL("ini_files/pca/config_muSigma_lin.yaml")
 #MGLtest = MGLensing.MGL("ini_files/config_files/config_qg.yaml")
-MGLtest = MGLensing.MGL("ini_files/config_files/config_spaceborne.yaml")
+#MGLtest = MGLensing.MGL("ini_files/config_files/config_spaceborne.yaml")
 MGLtest.test()
 

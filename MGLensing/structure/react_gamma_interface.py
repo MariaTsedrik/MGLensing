@@ -1,8 +1,9 @@
 from scipy.interpolate import RectBivariateSpline, interp1d
+from scipy.integrate import cumulative_trapezoid
+from scipy.special import hyp2f1
 import numpy as np
 from cosmopower import cosmopower_NN
 import os
-import MGrowth as mg
 from math import log10, log
 
 dirname = os.path.split(__file__)[0]
@@ -21,8 +22,33 @@ emu_ranges_all = {
         'Omega_nu':     {'p1':0.,              'p2':0.00317},
         'gamma0':       {'p1':0.,              'p2':1.},
         'gamma1':       {'p1':-0.7,            'p2':0.7},
-        'q1':           {'p1':-2.,             'p2':2.}
+        'q1_gamma':     {'p1':-2.,             'p2':2.}
 }
+
+
+def _ell_z_points(k, lbin, zz_integr):
+    array = np.zeros((lbin, len(zz_integr)), 'float64')
+    index_l, index_z = np.where((k > k_min_h_by_mpc) & (k < k_max_h_by_mpc))
+    return array, index_l, index_z, zz_integr[index_z], k[index_l, index_z]
+
+
+def _lcdm_growth_ratio_squared(z, omega_m):
+    """[D(z)/D(0)]^2 for flat ΛCDM.
+
+    D(a) ∝ E(a) ∫_0^a da' / [a'^3 E(a')^3]. The prefactor cancels in the
+    ratio. This is the linear-theory growth of the HMcode spectrum, not the
+    modified-gravity D(z) used for intrinsic alignments.
+    """
+    z = np.asarray(z, dtype=np.float64)
+    a_grid = np.logspace(-4., 0., 4096)
+    e_a = np.sqrt(omega_m * a_grid**(-3) + (1. - omega_m))
+    integrand = 1. / (a_grid**3 * e_a**3)
+    integral = cumulative_trapezoid(integrand, a_grid, initial=0.)
+    a0 = a_grid[0]
+    integral = integral + (2. / 5.) * a0**2.5 / omega_m**1.5
+    growth = e_a * integral
+    growth /= growth[-1]
+    return np.interp(1. / (1. + z), a_grid, growth)**2
 
 
 def powerlaw_highk_extrap(pk_or_boost, log_k, k_last, kh_high, zz_num):
@@ -34,7 +60,7 @@ def powerlaw_highk_extrap(pk_or_boost, log_k, k_last, kh_high, zz_num):
 class GammaReACT():
     def __init__(self, option=None):
         #self.zz_pk = np.array([0., 0.01,  0.12, 0.24, 0.38, 0.52, 0.68, 0.86, 1.05, 1.27, 1.5, 1.76, 2.04, 2.36, 2.5, 3.0]) # these numers are hand-picked
-        self.zz_pk = np.linspace(0., 3., 64, endpoint=True)
+        self.zz_pk = np.linspace(0., 3., 128, endpoint=True)
         self.aa_pk = np.array(1./(1.+self.zz_pk[::-1])) # should be increasing
         self.nz_pk = len(self.zz_pk)
         self.zz_max = self.zz_pk[-1]
@@ -146,25 +172,40 @@ class GammaReACT():
                     kx=1, ky=1)
         return  mg_boost_interp
     
-    def get_pk_hmcode_lin_interp(self, params_dic):
-        ns   = params_dic['ns']
-        a_s   = params_dic['As']
-        h    = params_dic['h']
+    def _lcdm_linear_power(self, params_dic):
+        """ΛCDM linear P(k, z) on the emulator redshift grid.
+
+        The network is evaluated once at z=0. With massless neutrinos the
+        growth is scale-independent, so P_lin(k, z) = P_lin(k, 0) [D(z)/D(0)]^2.
+        A redshift-dependent As, used by the pseudo spectrum, scales the same way.
+        """
+        ns = params_dic['ns']
+        a_s = params_dic['As']
+        h = params_dic['h']
         omega_b = params_dic['Omega_b']
         omega_c = params_dic['Omega_c']
-        params_hmcode = {
-                'ns'            :  np.full(self.nz_pk, ns),
-                'As'            :  np.full(self.nz_pk, a_s),
-                'hubble'        :  np.full(self.nz_pk, h),
-                'omega_baryon'  :  np.full(self.nz_pk, omega_b),
-                'omega_cdm'     :  np.full(self.nz_pk, omega_c),
-                'neutrino_mass' :  np.zeros(self.nz_pk),
-                'w0'            :  np.full(self.nz_pk, -1.),
-                'wa'            :  np.zeros(self.nz_pk),
-                'z'             :  self.zz_pk
+        as_per_z = isinstance(a_s, np.ndarray) and np.size(a_s) == self.nz_pk
+        as_z0 = a_s[0] if as_per_z else a_s
+        params_z0 = {
+                'ns'            :  np.array([ns]),
+                'As'            :  np.array([as_z0]),
+                'hubble'        :  np.array([h]),
+                'omega_baryon'  :  np.array([omega_b]),
+                'omega_cdm'     :  np.array([omega_c]),
+                'neutrino_mass' :  np.zeros(1),
+                'w0'            :  np.array([-1.]),
+                'wa'            :  np.zeros(1),
+                'z'             :  np.zeros(1),
             }
-        plin_cp = self.cp_lin_model.ten_to_predictions_np(params_hmcode)
-        self.pklin_z0_lcdm = plin_cp[0] # zz_pk[0] must be 0.!
+        plin_z0 = self.cp_lin_model.ten_to_predictions_np(params_z0)[0]
+        self.pklin_z0_lcdm = plin_z0
+        growth2 = _lcdm_growth_ratio_squared(self.zz_pk, params_dic['Omega_m'])
+        if as_per_z:
+            growth2 = growth2 * (a_s / as_z0)
+        return plin_z0[None, :] * growth2[:, None]
+
+    def get_pk_hmcode_lin_interp(self, params_dic):
+        plin_cp = self._lcdm_linear_power(params_dic)
         plin_interp = RectBivariateSpline(self.zz_pk,
                             self.kh_lin,
                             plin_cp,
@@ -190,8 +231,7 @@ class GammaReACT():
                 'z'             :  self.zz_pk
             }
         pnl_cp  = self.cp_nl_hmcode_model.ten_to_predictions_np(params_hmcode)
-        plin_cp = self.cp_lin_model.ten_to_predictions_np(params_hmcode)
-        self.pklin_z0_lcdm = plin_cp[0] # zz_pk[0] must be 0.!
+        plin_cp = self._lcdm_linear_power(params_dic)
         plin_left = plin_cp[:, self.kh_lin<self.kh_nl[0]]
         pnl  = np.concatenate((plin_left, pnl_cp),axis=1)
         pnl_interp = RectBivariateSpline(self.zz_pk,
@@ -201,13 +241,14 @@ class GammaReACT():
         return  pnl_interp
     
     def get_pk_react(self, params_dic, k, lbin, zz_integr, mg_boost_l_interp):
-        pk_m_l  = np.zeros((lbin, len(zz_integr)), 'float64')
-        index_pknn = np.array(np.where((k > k_min_h_by_mpc) & (k < k_max_h_by_mpc))).transpose()
         pk_l_interp = self.get_pk_hmcode_interp(params_dic)
         # d2_mg_lcdm is computed in self.get_mg_boost_interp
-        self.pklin_z0 = self.d2_mg_lcdm * self.pklin_z0_lcdm # later used in tatt 
-        for index_l, index_z in index_pknn:
-            pk_m_l[index_l, index_z] = pk_l_interp(zz_integr[index_z], k[index_l,index_z])*mg_boost_l_interp(min(zz_integr[index_z], 2.5), k[index_l,index_z])
+        self.pklin_z0 = self.d2_mg_lcdm * self.pklin_z0_lcdm # later used in tatt
+        pk_m_l, index_l, index_z, z_pts, k_pts = _ell_z_points(k, lbin, zz_integr)
+        pk_m_l[index_l, index_z] = (
+            np.ravel(pk_l_interp(z_pts, k_pts, grid=False))
+            * np.ravel(mg_boost_l_interp(np.minimum(z_pts, 2.5), k_pts, grid=False))
+        )
         return pk_m_l  
 
 
@@ -222,14 +263,12 @@ class GammaReACT():
         # call linear lcdm with original As  
         _ = self.get_pk_hmcode_lin_interp(params_dic)
         self.pklin_z0 = self.d2_mg_lcdm * self.pklin_z0_lcdm # later used in tatt 
-        pk_m_l  = np.zeros((lbin, len(zz_integr)), 'float64')
-        index_pknn = np.array(np.where((k > k_min_h_by_mpc) & (k < k_max_h_by_mpc))).transpose()
         As_orig = params_dic['As']
         params_new = params_dic.copy()
         params_new['As'] = self.d2_mg_lcdm_z * As_orig
         pk_l_interp = self.get_pk_hmcode_interp(params_new)
-        for index_l, index_z in index_pknn:
-            pk_m_l[index_l, index_z] = pk_l_interp(zz_integr[index_z], k[index_l,index_z])
+        pk_m_l, index_l, index_z, z_pts, k_pts = _ell_z_points(k, lbin, zz_integr)
+        pk_m_l[index_l, index_z] = np.ravel(pk_l_interp(z_pts, k_pts, grid=False))
         return pk_m_l 
     
     def get_pk_lin(self, params_dic, k, lbin, zz_integr):
@@ -238,28 +277,28 @@ class GammaReACT():
         d2_mg_lcdm_z_interp = interp1d(self.zz_pk, self.d2_mg_lcdm_z)
         # call linear lcdm with original As  
         pk_l_interp = self.get_pk_hmcode_lin_interp(params_dic)
-        self.pklin_z0 = self.d2_mg_lcdm * self.pklin_z0_lcdm # later used in tatt 
-        pk_m_l  = np.zeros((lbin, len(zz_integr)), 'float64')
-        index_pknn = np.array(np.where((k > k_min_h_by_mpc) & (k < k_max_h_by_mpc))).transpose()
-        for index_l, index_z in index_pknn:
-            pk_m_l[index_l, index_z] = pk_l_interp(zz_integr[index_z], k[index_l,index_z])*d2_mg_lcdm_z_interp(zz_integr[index_z])
-        return pk_m_l  
-    
+        self.pklin_z0 = self.d2_mg_lcdm * self.pklin_z0_lcdm # later used in tatt
+        pk_m_l, index_l, index_z, z_pts, k_pts = _ell_z_points(k, lbin, zz_integr)
+        pk_m_l[index_l, index_z] = np.ravel(pk_l_interp(z_pts, k_pts, grid=False)) * d2_mg_lcdm_z_interp(z_pts)
+        return pk_m_l
+
     def get_growth(self, params_dic, zz_integr):
-        aa_integr =  np.array(1./(1.+zz_integr[::-1]))
-        background ={
-            'Omega_m': params_dic['Omega_m'],
-            'h' : params_dic['h'],
-            'w0': -1.,
-            'wa': 0.,
-            'a_arr': np.hstack((aa_integr, 1.))
-            }
-        cosmo = mg.Linder_gamma_a(background)
-        gamma0 = params_dic['gamma0'] 
-        gamma1 = params_dic['gamma1'] 
-        da, _ = cosmo.growth_parameters(gamma0=gamma0, gamma1=gamma1)
-        dz = da[::-1] 
-        # growth factor should be normalised to z=0
+        # Linder gamma(a) = gamma0 + gamma1 (1-a)^2/a, integrated once in ln a.
+        # Same D(a=1e-4) normalisation as MGrowth.Linder_gamma_a; the returned
+        # array is D(z)/D(a=1) on zz_integr. Flat Lambda only (w0=-1, wa=0).
+        omega0 = params_dic['Omega_m']
+        gamma0 = params_dic['gamma0']
+        gamma1 = params_dic['gamma1']
+        a_start = 1.e-4
+        a_out = np.hstack((1./(1. + zz_integr[::-1]), 1.))
+        lna = np.linspace(np.log(a_start), 0., 8192)
+        a = np.exp(lna)
+        omega_m_a = omega0 / (omega0 + (1. - omega0) * a**3)
+        gamma_a = gamma0 + gamma1 * (1. - a)**2 / a
+        integral = cumulative_trapezoid(np.exp(gamma_a * np.log(omega_m_a)), lna, initial=0.)
+        d_ini = a_start * hyp2f1(1./3., 1., 11./6., (omega0 - 1.) / omega0 * a_start**3)
+        growth_a = np.interp(a_out, a, d_ini * np.exp(integral))
+        dz = growth_a[::-1]
         dz0 = dz[0]
-        dz = dz[1:]/dz0
+        dz = dz[1:] / dz0
         return dz, dz0

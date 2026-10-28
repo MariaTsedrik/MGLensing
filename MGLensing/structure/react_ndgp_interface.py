@@ -32,7 +32,7 @@ def powerlaw_highk_extrap(pk_or_boost, log_k, k_last, kh_high, zz_num):
 class DGPReACT():
     def __init__(self, option=None):
         #self.zz_pk = np.array([0., 0.01,  0.12, 0.24, 0.38, 0.52, 0.68, 0.86, 1.05, 1.27, 1.5, 1.76, 2.04, 2.36, 2.5, 3.0]) # these numers are hand-picked
-        self.zz_pk = np.linspace(0., 3., 64, endpoint=True)
+        self.zz_pk = np.linspace(0., 3., 128, endpoint=True)
         self.aa_pk = np.array(1./(1.+self.zz_pk[::-1])) # should be increasing
         self.nz_pk = len(self.zz_pk)
         self.zz_max = self.zz_pk[-1]

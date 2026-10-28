@@ -83,6 +83,7 @@ class MGLike:
             det_obs = np.concatenate([det_obs,det_obs_high])
             det_mix = np.concatenate([det_mix,det_mix_high])
             chi2 += np.sum((2*self.Data.ells+1)*self.Theo.Survey.fsky*((det_mix/det_theo)+np.log(det_theo/det_obs)))
+            print('chi2: ', chi2)
             return -0.5*chi2 
         else:
             return -np.inf

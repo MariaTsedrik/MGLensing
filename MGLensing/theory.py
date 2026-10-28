@@ -1,6 +1,6 @@
 import numpy as np
 import MGrowth as mg
-from scipy.integrate import simpson, trapezoid, quad
+from scipy.integrate import simpson, trapezoid, cumulative_trapezoid
 from scipy import interpolate as itp
 from .structure.hmcode2020_interface import HMcode2020
 from .structure.bacco_interface import BaccoEmu
@@ -29,7 +29,10 @@ os.environ['TF_CPP_MIN_LOG_LEVEL'] = '3'
 
 H0_h_c = 1./2997.92458 
 # =100/c in Mpc/h Hubble constant conversion factor
-C_IA = 0.0134 
+C_IA = 0.0134
+# Trapezoid panels per redshift interval for the comoving distance.
+# 64 keeps |Δχ|/χ below about 1e-8 for w0 in [-3, -0.3] and wa in [-3, 3].
+_DISTANCE_PANELS = 64 
 
 # =dimensionsless, C x rho_crit 
 PIVOT_REDSHIFT = 0.
@@ -123,6 +126,33 @@ def build_data_matrix_3x2pt(cl_ll, cl_gg, cl_lg, cl_gl,  binned_ell_wl, binned_e
     return cov_theory, cov_theory_high
 
 #flag_test_heft_new_extrap = True
+def _expansion_function(z, omega_m, w0, wa):
+    """E(z) for a flat w0-wa background."""
+    zp1 = 1. + z
+    omega_l = (1. - omega_m) * zp1**(3. * (1. + w0 + wa)) * np.exp(-3. * wa * z / zp1)
+    return np.sqrt(omega_m * zp1**3 + omega_l)
+
+
+def _comoving_distance_c_over_h0(zz, omega_m, w0, wa, n_panels=_DISTANCE_PANELS):
+    """∫_0^z dz'/E(z') on an arbitrary increasing redshift grid, in units of c/H0.
+
+    Each interval, including the one from 0 to zz[0], is a trapezoid. The panel
+    width is at most that of a 400-point grid from 0 to 3 with n_panels steps,
+    so a coarser output grid does not loosen the integral.
+    """
+    zz = np.asarray(zz, dtype=np.float64)
+    z_edges = np.concatenate(([0.], zz))
+    dz = np.diff(z_edges)
+    dz_cap = 3.0 / 399.0
+    n_use = max(n_panels, int(np.ceil(np.max(dz) / dz_cap * n_panels)))
+    t = np.linspace(0., 1., n_use + 1)
+    z_panel = z_edges[:-1, None] + dz[:, None] * t
+    inv_e = 1. / _expansion_function(z_panel, omega_m, w0, wa)
+    weights = np.ones(n_use + 1)
+    weights[0] = weights[-1] = 0.5
+    return np.cumsum(dz * (inv_e * weights).sum(axis=1) / n_use)
+
+
 class Theory:
     def __init__(self, SurveyClass, model: dict):
         """
@@ -559,15 +589,9 @@ class Theory:
             r_z_grid = np.array([self.StructureEmu.rcom_interp(zz_i) for zz_i in zz]) / H0_h_c
             k_grid =(self.Survey.ell[:,None]+0.5)/r_z_grid
         else:
-            omega_lambda_func = lambda z: (1.-omega_m) * pow(1.+z, 3.*(1.+w0+wa)) * np.exp(-3.*wa*z/(1.+z))
-            e_z_func = lambda z: np.sqrt(omega_m*pow(1.+z, 3) + omega_lambda_func(z))
-            r_z_int = lambda z: 1./e_z_func(z)
-            r_z_grid = np.zeros(len(zz), dtype=np.float64)
-            r_z_grid[0] = quad(r_z_int, 0, zz[0])[0]
-            for i in range(1, len(zz)):
-                r_z_grid[i] = r_z_grid[i-1] + quad(r_z_int, zz[i-1], zz[i])[0]
-            r_z_grid = r_z_grid / H0_h_c
-            e_z_grid = np.array([e_z_func(zz_i) for zz_i in zz])
+            e_z_grid = _expansion_function(zz, omega_m, w0, wa)
+            # χ(z) = ∫_0^z dz'/E(z'), in units of c/H0, then converted to Mpc/h.
+            r_z_grid = _comoving_distance_c_over_h0(zz, omega_m, w0, wa) / H0_h_c
             k_grid =(self.Survey.ell[:,None]+0.5)/r_z_grid
         return e_z_grid, r_z_grid, k_grid
     
@@ -789,13 +813,17 @@ class Theory:
         """
         omega_m = params_dic['Omega_m']
         eta_z_s =  self.get_n_of_z(self.Survey.eta_z_s, self.deltaz_s, self.Survey.nbin_s)
-        
-        # in the integrand dimensions are (bin_i, zz_integr, zz_integr)
-        integrand = 3./2.*H0_h_c**2. * omega_m * self.rz[None,:,None]*(1.+self.Survey.zz_integr[None,:,None])*eta_z_s.T[:,None,:]*(1.-self.rz[None,:,None]/self.rz[None,None,:])
-        # integrate along the third dimension in zz_integr
-        w_gamma  = trapezoid(np.triu(integrand), self.Survey.zz_integr,axis=-1).T  # simpson(np.triu(integrand), self.Survey.zz_integr,axis=-1).T 
-        # add an extra dimension to w_gamma as we might have ell-dependence in the IA-kernel due to the scale-dependent linear growth
-        w_gamma = w_gamma[None,:,:]
+        zz = self.Survey.zz_integr
+        # Wbar_i(z) = ∫_{z'>z} n_i(z') [1 - r(z)/r(z')] dz'
+        # = ∫_{z'>z} n_i dz' - r(z) ∫_{z'>z} n_i/r dz',
+        # with the same trapezoid weights as integrating the upper triangle in z'.
+        n_over_r = eta_z_s / self.rz[:, None]
+        cum_n = cumulative_trapezoid(eta_z_s, zz, axis=0, initial=0.)
+        cum_nr = cumulative_trapezoid(n_over_r, zz, axis=0, initial=0.)
+        window = (cum_n[-1] - cum_n) - self.rz[:, None] * (cum_nr[-1] - cum_nr)
+        prefactor = 1.5 * H0_h_c**2 * omega_m * self.rz * (1. + zz)
+        # extra leading axis: the kernel can be ell-dependent once Sigma(k, z) is applied
+        w_gamma = (prefactor[:, None] * window)[None, :, :]
         # add modification of the lensing potential
         # must have the same dimension (ell, zz_integr, n_bin) or be 1
         # specified in StructureEmu, can be scale-dependent

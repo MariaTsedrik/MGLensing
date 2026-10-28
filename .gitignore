@@ -36,7 +36,8 @@ tutorials/plot_posteriors_gq.ipynb
 tutorials/plot_posteriors_gq_osc.ipynb
 
 
- MGLensing/structure/qg_interace.py
+MGLensing/structure/qg_interace.py
+tutorials/plot_posteriors_pca_copy.ipynb 
 
 # Distribution / packaging
 .Python
